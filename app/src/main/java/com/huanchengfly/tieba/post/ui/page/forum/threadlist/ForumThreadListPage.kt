@@ -199,9 +199,9 @@ private fun ThreadList(
         }
         itemsIndexed(
             items = items,
-            key = { index, (holder) ->
+            key = { _, (holder) ->
                 val (item) = holder
-                "${index}_${item.id}"
+                if (item.isTop == 1) "Top_${item.id}" else "Thread_${item.id}"
             },
             contentType = { _, (holder) ->
                 val (item) = holder

@@ -40,7 +40,9 @@ import androidx.compose.material.icons.rounded.SwapCalls
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.movableContentOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,9 +63,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastForEach
 import androidx.compose.ui.util.fastForEachIndexed
-import com.google.accompanist.placeholder.PlaceholderHighlight
-import com.google.accompanist.placeholder.material.fade
-import com.google.accompanist.placeholder.material.placeholder
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import com.huanchengfly.tieba.post.App
 import com.huanchengfly.tieba.post.R
@@ -73,10 +72,12 @@ import com.huanchengfly.tieba.post.api.models.protos.PostInfoList
 import com.huanchengfly.tieba.post.api.models.protos.SimpleForum
 import com.huanchengfly.tieba.post.api.models.protos.ThreadInfo
 import com.huanchengfly.tieba.post.api.models.protos.User
+import com.huanchengfly.tieba.post.api.models.protos.bawuType
 import com.huanchengfly.tieba.post.api.models.protos.VideoInfo
 import com.huanchengfly.tieba.post.api.models.protos.abstractText
 import com.huanchengfly.tieba.post.api.models.protos.renders
 import com.huanchengfly.tieba.post.arch.BaseComposeActivity.Companion.LocalWindowSizeClass
+import com.huanchengfly.tieba.post.ui.page.thread.UserNameText
 import com.huanchengfly.tieba.post.arch.ImmutableHolder
 import com.huanchengfly.tieba.post.arch.wrapImmutable
 import com.huanchengfly.tieba.post.findActivity
@@ -94,6 +95,7 @@ import com.huanchengfly.tieba.post.utils.EmoticonUtil.emoticonString
 import com.huanchengfly.tieba.post.utils.ImageUtil
 import com.huanchengfly.tieba.post.utils.StringUtil
 import com.huanchengfly.tieba.post.utils.StringUtil.getShortNumString
+import com.huanchengfly.tieba.post.utils.TiebaUtil
 import com.huanchengfly.tieba.post.utils.appPreferences
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
@@ -121,6 +123,8 @@ private fun UserHeader(
     val context = LocalContext.current
     val user = remember(userProvider) { userProvider() }
     val time = remember(timeProvider) { timeProvider() }
+    val bawuType = remember(user) { user.get { bawuType } }
+    val ipAddress = remember(user) { user.get { ip_address } }
     UserHeader(
         avatar = {
             Avatar(
@@ -130,24 +134,29 @@ private fun UserHeader(
             )
         },
         name = {
-            Text(
-                text = StringUtil.getUsernameAnnotatedString(
+            UserNameText(
+                userName = StringUtil.getUsernameAnnotatedString(
                     context = LocalContext.current,
                     username = user.get { name },
                     nickname = user.get { nameShow },
                     color = LocalContentColor.current
                 ),
-                color = ExtendedTheme.colors.text
+                userLevel = user.get { level_id },
+                bawuType = bawuType
             )
         },
         onClick = onClick,
         desc = {
-            Text(
-                text = DateTimeUtils.getRelativeTimeString(
-                    context,
-                    time.toString()
-                )
+            val relativeTime = DateTimeUtils.getRelativeTimeString(
+                context,
+                time.toString()
             )
+            val descText = if (ipAddress.isNotBlank()) {
+                "$relativeTime  ${stringResource(R.string.text_ip_location, ipAddress)}"
+            } else {
+                relativeTime
+            }
+            Text(text = descText)
         },
         content = content,
         modifier = modifier
@@ -162,6 +171,7 @@ fun UserHeader(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     timeProvider: (() -> Int)? = null,
+    ipProvider: (() -> String)? = null,
     content: @Composable RowScope.() -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -169,6 +179,7 @@ fun UserHeader(
     val nameShow = remember(nameShowProvider) { nameShowProvider() }
     val portrait = remember(portraitProvider) { portraitProvider() }
     val time = remember(timeProvider) { timeProvider?.invoke() }
+    val ip = remember(ipProvider) { ipProvider?.invoke().orEmpty() }
     UserHeader(
         avatar = {
             Avatar(
@@ -190,13 +201,20 @@ fun UserHeader(
         },
         onClick = onClick,
         desc = (@Composable {
-            Text(
-                text = DateTimeUtils.getRelativeTimeString(
+            val relativeTime = time?.let {
+                DateTimeUtils.getRelativeTimeString(
                     context,
-                    time.toString()
+                    it.toString()
                 )
-            )
-        }).takeIf { time != null },
+            }.orEmpty()
+            val descText = if (ip.isNotBlank()) {
+                if (relativeTime.isNotEmpty()) "$relativeTime  ${stringResource(R.string.text_ip_location, ip)}"
+                else stringResource(R.string.text_ip_location, ip)
+            } else {
+                relativeTime
+            }
+            Text(text = descText)
+        }).takeIf { time != null || ip.isNotBlank() },
         content = content,
         modifier = modifier
     )
@@ -611,6 +629,7 @@ fun OriginThreadCard(
     modifier: Modifier = Modifier,
 ) {
     val contentRenders = remember(originThreadInfo) { originThreadInfo.get { content.renders } }
+    var localPollInfo by remember(originThreadInfo) { mutableStateOf(originThreadInfo.get { poll_info }) }
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -623,10 +642,18 @@ fun OriginThreadCard(
         ThreadMedia(
             forumId = originThreadInfo.get { fid },
             forumName = originThreadInfo.get { fname },
-            threadId = originThreadInfo.get { tid.toLong() },
+            threadId = originThreadInfo.get { tid.toLongOrNull() ?: 0L },
             medias = originThreadInfo.getImmutableList { media },
             videoInfo = originThreadInfo.get { video_info }?.wrapImmutable()
         )
+        localPollInfo?.takeIf { it.options.isNotEmpty() }?.let { poll ->
+            VoteCard(
+                pollInfo = poll,
+                threadId = originThreadInfo.get { tid.toLongOrNull() ?: 0L },
+                forumId = originThreadInfo.get { fid },
+                onVoteSuccess = { newPoll -> localPollInfo = newPoll },
+            )
+        }
     }
 }
 
@@ -798,13 +825,28 @@ fun FeedCard(
                     )
                 }
 
+            var localPollInfo by remember(item) { mutableStateOf(item.get { poll_info }) }
+            localPollInfo?.takeIf { it.options.isNotEmpty() }?.let { poll ->
+                VoteCard(
+                    pollInfo = poll,
+                    threadId = item.get { if (threadId != 0L) threadId else id },
+                    forumId = item.get { forumId },
+                    onVoteSuccess = { newPoll -> localPollInfo = newPoll },
+                )
+            }
+
             ThreadForumInfo(item = item, onClick = onClickForum)
         },
         action = {
+            val context = LocalContext.current
             Row(modifier = Modifier.fillMaxWidth()) {
                 ThreadShareBtn(
                     shareNum = item.get { shareNum },
-                    onClick = {},
+                    onClick = {
+                        val threadId = item.get { if (threadId != 0L) threadId else id }
+                        val title = item.get { title }.ifBlank { null }
+                        TiebaUtil.shareText(context, "https://tieba.baidu.com/p/$threadId", title)
+                    },
                     modifier = Modifier.weight(1f)
                 )
 
@@ -845,6 +887,7 @@ fun FeedCard(
                 nameShowProvider = { item.get { name_show } },
                 portraitProvider = { item.get { user_portrait } },
                 timeProvider = { item.get { create_time } },
+                ipProvider = { item.get { ip } },
                 onClick = {
                     onClickUser(item.get { user_id })
                 },
@@ -880,6 +923,16 @@ fun FeedCard(
                     )
                 }
 
+            var localPollInfo by remember(item) { mutableStateOf(item.get { poll_info }) }
+            localPollInfo?.takeIf { it.options.isNotEmpty() }?.let { poll ->
+                VoteCard(
+                    pollInfo = poll,
+                    threadId = item.get { thread_id },
+                    forumId = item.get { forum_id },
+                    onVoteSuccess = { newPoll -> localPollInfo = newPoll },
+                )
+            }
+
             ThreadForumInfo(
                 forumName = item.get { forum_name },
                 forumAvatar = null,
@@ -887,10 +940,15 @@ fun FeedCard(
             )
         },
         action = {
+            val context = LocalContext.current
             Row(modifier = Modifier.fillMaxWidth()) {
                 ThreadShareBtn(
                     shareNum = item.get { share_num }.toLong(),
-                    onClick = {},
+                    onClick = {
+                        val threadId = item.get { thread_id }
+                        val title = item.get { title }.ifBlank { null }
+                        TiebaUtil.shareText(context, "https://tieba.baidu.com/p/$threadId", title)
+                    },
                     modifier = Modifier.weight(1f)
                 )
 

@@ -34,9 +34,8 @@ repositories:
 
 versions:
   accompanist: 0.34.0
-  appcenter: 5.0.4
-  hilt: 2.46.1
-  kotlin: 1.9.22
+  hilt: 2.51.1
+  kotlin: 2.0.21
   sketch: 3.3.0
   wire: 4.9.3
 
@@ -55,7 +54,7 @@ plugins:
   com.autonomousapps.dependency-analysis:
     version: 1.29.0
   com.android.application:
-    version: 8.2.2
+    version: 8.13.2
   org.jetbrains.kotlin.android:
     alias: kotlin-android
     version-ref: kotlin
@@ -64,12 +63,15 @@ plugins:
     version-ref: kotlin
   com.google.devtools.ksp:
     alias: kotlin-ksp
-    version: 1.9.22-1.0.17
+    version: 2.0.21-1.0.28
   org.jetbrains.kotlin.plugin.serialization:
     alias: kotlin-serialization
     version-ref: kotlin
   org.jetbrains.kotlin.plugin.parcelize:
     alias: kotlin-parcelize
+    version-ref: kotlin
+  org.jetbrains.kotlin.plugin.compose:
+    alias: kotlin-compose
     version-ref: kotlin
   com.google.dagger.hilt.android:
     alias: hilt-android
@@ -129,10 +131,6 @@ libraries:
     wire-runtime:
       alias: wire-runtime
       version-ref: wire
-  net.swiftzer.semver:
-    semver:
-      alias: swiftzer-semver
-      version: 1.3.0
   com.godaddy.android.colorpicker:
     compose-color-picker:
       alias: godaddy-color-picker
@@ -167,7 +165,7 @@ libraries:
   io.github.raamcosta.compose-destinations:
     animations-core:
       alias: compose-destinations-core
-      version: 1.10.0
+      version: 1.10.2
     ksp:
       alias: compose-destinations-ksp
       version-ref: compose-destinations-core
@@ -198,9 +196,6 @@ libraries:
       version-ref: accompanist
     accompanist-systemuicontroller:
       alias: accompanist-systemuicontroller
-      version-ref: accompanist
-    accompanist-placeholder-material:
-      alias: accompanist-placeholder-material
       version-ref: accompanist
   io.github.panpf.sketch3:
     sketch:
@@ -320,16 +315,6 @@ libraries:
     datastore-preferences:
       alias: androidx-datastore-preferences
       version: 1.0.0
-  com.github.bumptech.glide:
-    glide:
-      alias: glide-core
-      version: 4.16.0
-    okhttp3-integration:
-      alias: glide-okhttp3-integration
-      version-ref: glide-core
-    ksp:
-      alias: glide-ksp
-      version-ref: glide-core
   com.squareup.okhttp3:
     okhttp:
       alias: okhttp3-core
@@ -355,6 +340,10 @@ libraries:
     Matisse:
       alias: github.matisse
       version: 0.5.3-20220115
+  com.davemorrissey.labs:
+    subsampling-scale-image-view-androidx:
+      alias: subsampling-scale-image-view
+      version: 3.10.0
   com.github.getActivity:
     XXPermissions:
       alias: xx-permissions
@@ -365,21 +354,6 @@ libraries:
   com.github.yalantis:
     ucrop:
       version: 2.2.8
-  com.jakewharton:
-    butterknife:
-      version: 10.2.3
-    butterknife-compiler:
-      version: 10.2.3
-  com.microsoft.appcenter:
-    appcenter-analytics:
-      alias: appcenter-analytics
-      version-ref: appcenter
-    appcenter-crashes:
-      alias: appcenter-crashes
-      version-ref: appcenter
-    appcenter-distribute:
-      alias: appcenter-distribute
-      version-ref: appcenter
   androidx.compose.runtime:
     runtime-tracing:
       alias: compose-runtime-tracing

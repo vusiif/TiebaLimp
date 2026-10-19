@@ -5,6 +5,8 @@ import android.app.IntentService
 import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
+import android.os.Build
 import android.util.Log
 import android.widget.Toast
 import androidx.core.app.ActivityCompat
@@ -43,13 +45,20 @@ class OKSignService : IntentService(TAG), CoroutineScope, ProgressListener {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.i(TAG, "onStartCommand")
         if (intent?.action == ACTION_START_SIGN) {
-            startForeground(
-                NOTIFICATION_ID,
-                buildNotification(
-                    getString(R.string.title_loading_data),
-                    getString(R.string.text_please_wait)
-                ).build()
-            )
+            val notification = buildNotification(
+                getString(R.string.title_loading_data),
+                getString(R.string.text_please_wait)
+            ).build()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                ServiceCompat.startForeground(
+                    this,
+                    NOTIFICATION_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
         }
         return super.onStartCommand(intent, flags, startId)
     }
@@ -243,12 +252,6 @@ class OKSignService : IntentService(TAG), CoroutineScope, ProgressListener {
     }
 
     companion object {
-//        fun enqueueWork(context: Context, work: Intent) {
-//            enqueueWork(context, OKSignService::class.java, JOB_ID, work)
-//        }
-//
-//        private const val JOB_ID = 233
-
         const val TAG = "OKSignService"
         const val NOTIFICATION_CHANNEL_ID = "1"
         const val NOTIFICATION_ID = 1

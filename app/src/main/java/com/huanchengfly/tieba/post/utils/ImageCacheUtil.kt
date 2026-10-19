@@ -1,6 +1,7 @@
 package com.huanchengfly.tieba.post.utils
 
 import android.content.Context
+import android.os.Handler
 import android.os.Looper
 import android.text.TextUtils
 import com.github.panpf.sketch.sketch
@@ -47,10 +48,22 @@ object ImageCacheUtil {
      */
     fun clearImageMemoryCache(context: Context) {
         try {
-            if (Looper.myLooper() == Looper.getMainLooper()) { //只能在主线程执行
+            if (Looper.myLooper() == Looper.getMainLooper()) {
                 context.sketch
                     .memoryCache
                     .clear()
+                context.sketch
+                    .bitmapPool
+                    .clear()
+            } else {
+                Handler(Looper.getMainLooper()).post {
+                    context.sketch
+                        .memoryCache
+                        .clear()
+                    context.sketch
+                        .bitmapPool
+                        .clear()
+                }
             }
         } catch (e: Exception) {
             e.printStackTrace()

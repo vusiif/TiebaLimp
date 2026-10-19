@@ -3,6 +3,7 @@ import com.android.build.gradle.internal.api.BaseVariantOutputImpl
 plugins {
     autowire(libs.plugins.com.android.application)
     autowire(libs.plugins.kotlin.android)
+    autowire(libs.plugins.kotlin.compose)
     autowire(libs.plugins.kotlin.kapt)
     autowire(libs.plugins.kotlin.serialization)
     autowire(libs.plugins.kotlin.parcelize)
@@ -35,13 +36,12 @@ wire {
 }
 
 android {
-    buildToolsVersion = "34.0.0"
-    compileSdk = 34
+    compileSdk = 35
     defaultConfig {
         applicationId = "com.huanchengfly.tieba.post"
         minSdk = 21
         //noinspection OldTargetApi
-        targetSdk = 34
+        targetSdk = 35
         versionCode = applicationVersionCode
         versionName = applicationVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -52,6 +52,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     signingConfigs {
         if (property.keystore.file.isNotBlank()) {
@@ -86,15 +87,12 @@ android {
             multiDexEnabled = true
         }
     }
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.8"
-    }
     compileOptions {
-        targetCompatibility = JavaVersion.VERSION_11
-        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions {
-        jvmTarget = "11"
+        jvmTarget = "17"
         freeCompilerArgs += listOf(
             "-P",
             "plugin:androidx.compose.compiler.plugins.kotlin:reportsDestination=" + project.buildDir.absolutePath + "/compose_metrics"
@@ -126,7 +124,12 @@ android {
         kotlin.sourceSets {
             getByName(variant.name) {
                 kotlin.srcDir("build/generated/ksp/${variant.name}/kotlin")
+                kotlin.srcDir("build/generated/source/wire/${variant.name}")
             }
+        }
+        val variantNameCapitalized = variant.name.replaceFirstChar { it.uppercase() }
+        tasks.matching { it.name == "ksp${variantNameCapitalized}Kotlin" }.configureEach {
+            dependsOn("generate${variantNameCapitalized}Protos")
         }
     }
 }
@@ -135,7 +138,6 @@ dependencies {
     //Local Files
 //    implementation fileTree(include: ["*.jar"], dir: "libs")
 
-    implementation(net.swiftzer.semver.semver)
     implementation(godaddy.color.picker)
 
     implementation(airbnb.lottie)
@@ -162,7 +164,6 @@ dependencies {
     implementation(accompanist.drawablepainter)
     implementation(accompanist.insets.ui)
     implementation(accompanist.systemuicontroller)
-    implementation(accompanist.placeholder.material)
 
     implementation(sketch.core)
     implementation(sketch.compose)
@@ -183,7 +184,6 @@ dependencies {
     // Optional - Add full set of material icons
     implementation(compose.material.icons.extended)
     implementation(compose.ui.util)
-//    implementation "androidx.compose.material3:material3"
 
     // Android Studio Preview support
     implementation(compose.ui.tooling.preview)
@@ -232,10 +232,7 @@ dependencies {
     androidTestImplementation(androidx.test.espresso.core)
     androidTestRuntimeOnly(androidx.test.runner)
 
-    //Glide
-    implementation(glide.core)
-    ksp(glide.ksp)
-    implementation(glide.okhttp3.integration)
+    //Glide removed, unified to Sketch 3
 
     implementation(google.material)
 
@@ -248,15 +245,9 @@ dependencies {
     implementation(com.jaredrummler.colorpicker)
 
     implementation(github.matisse)
+    compileOnly(subsampling.scale.image.view)
     implementation(xx.permissions)
     implementation(com.gyf.immersionbar.immersionbar)
 
     implementation(com.github.yalantis.ucrop)
-
-    implementation(com.jakewharton.butterknife)
-    kapt(com.jakewharton.butterknife.compiler)
-
-    implementation(appcenter.analytics)
-    implementation(appcenter.crashes)
-    implementation(appcenter.distribute)
 }

@@ -75,6 +75,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -137,6 +138,7 @@ import com.huanchengfly.tieba.post.ui.widgets.compose.Avatar
 import com.huanchengfly.tieba.post.ui.widgets.compose.BackNavigationIcon
 import com.huanchengfly.tieba.post.ui.widgets.compose.BlockTip
 import com.huanchengfly.tieba.post.ui.widgets.compose.BlockableContent
+import com.huanchengfly.tieba.post.ui.widgets.compose.FoldedTip
 import com.huanchengfly.tieba.post.ui.widgets.compose.Button
 import com.huanchengfly.tieba.post.ui.widgets.compose.Card
 import com.huanchengfly.tieba.post.ui.widgets.compose.Chip
@@ -160,6 +162,7 @@ import com.huanchengfly.tieba.post.ui.widgets.compose.TitleCentredToolbar
 import com.huanchengfly.tieba.post.ui.widgets.compose.UserHeader
 import com.huanchengfly.tieba.post.ui.widgets.compose.VerticalDivider
 import com.huanchengfly.tieba.post.ui.widgets.compose.VerticalGrid
+import com.huanchengfly.tieba.post.ui.widgets.compose.VoteCard
 import com.huanchengfly.tieba.post.ui.widgets.compose.buildChipInlineContent
 import com.huanchengfly.tieba.post.ui.widgets.compose.rememberDialogState
 import com.huanchengfly.tieba.post.ui.widgets.compose.rememberMenuState
@@ -1042,7 +1045,12 @@ fun ThreadPage(
             }
             items(
                 items = latestPosts,
-                key = { (item) -> "LatestPost_${item.get { id }}" }
+                key = { (item) -> "LatestPost_${item.get { id }}" },
+                contentType = { (item, blocked) ->
+                    if (blocked) "BlockedPost"
+                    else if (item.get { is_fold == 1 || fold_comment_status != 0 }) "FoldedPost"
+                    else "NormalPost"
+                }
             ) { (item, blocked, renders, subPosts) ->
                 Container {
                     PostCard(
@@ -1336,6 +1344,7 @@ fun ThreadPage(
                                                 PostCard(
                                                     postHolder = firstPost!!,
                                                     contentRenders = firstPostContentRenders,
+                                                    threadAuthorId = author?.get { id } ?: 0L,
                                                     canDelete = { it.author_id == user.get { id } },
                                                     immersiveMode = isImmersiveMode,
                                                     isCollected = {
@@ -1400,6 +1409,19 @@ fun ThreadPage(
                                                                 .padding(16.dp)
                                                         )
                                                     }
+
+                                                var localPollInfo by remember(thread) { mutableStateOf(thread?.get { poll_info }) }
+                                                localPollInfo?.takeIf { it.options.isNotEmpty() }?.let { poll ->
+                                                    VoteCard(
+                                                        pollInfo = poll,
+                                                        threadId = threadId,
+                                                        forumId = curForumId ?: 0L,
+                                                        onVoteSuccess = { newPoll -> localPollInfo = newPoll },
+                                                        modifier = Modifier
+                                                            .padding(horizontal = 16.dp)
+                                                            .padding(bottom = 16.dp)
+                                                    )
+                                                }
 
                                                 VerticalDivider(
                                                     modifier = Modifier
@@ -1562,7 +1584,12 @@ fun ThreadPage(
                                 } else {
                                     items(
                                         items = data,
-                                        key = { (item) -> "Post_${item.get { id }}" }
+                                        key = { (item) -> "Post_${item.get { id }}" },
+                                        contentType = { (item, blocked) ->
+                                            if (blocked) "BlockedPost"
+                                            else if (item.get { is_fold == 1 || fold_comment_status != 0 }) "FoldedPost"
+                                            else "NormalPost"
+                                        }
                                     ) { (item, blocked, renders, subPosts) ->
                                         Container {
                                             PostCard(
@@ -1751,6 +1778,12 @@ fun PostCard(
     val navigator = LocalNavigator.current
     val coroutineScope = rememberCoroutineScope()
     val post = remember(postHolder) { postHolder.get() }
+    val isFold = remember(postHolder) {
+        post.is_fold == 1 || post.fold_comment_status != 0
+    }
+    var isFoldExpanded by rememberSaveable(post.id) {
+        mutableStateOf(false)
+    }
     val hasPadding = remember(key1 = postHolder, key2 = immersiveMode) {
         postHolder.get { floor > 1 } && !immersiveMode
     }
@@ -1780,7 +1813,20 @@ fun PostCard(
             .fillMaxWidth()
             .padding(vertical = 8.dp, horizontal = 16.dp)
     ) {
-        LongClickMenu(
+        if (isFold && !isFoldExpanded) {
+            val foldTipText = remember(postHolder) {
+                if (post.fold_tip.isNotBlank()) {
+                    context.getString(R.string.tip_folded_post, post.floor, post.fold_tip)
+                } else {
+                    context.getString(R.string.tip_folded_post_default, post.floor)
+                }
+            }
+            FoldedTip(
+                text = foldTipText,
+                onClick = { isFoldExpanded = true }
+            )
+        } else {
+            LongClickMenu(
             menuState = menuState,
             indication = null,
             onClick = {
@@ -1839,6 +1885,16 @@ fun PostCard(
                         }
                     ) {
                         Text(text = stringResource(id = R.string.title_delete))
+                    }
+                }
+                if (isFold) {
+                    DropdownMenuItem(
+                        onClick = {
+                            isFoldExpanded = false
+                            menuState.expanded = false
+                        }
+                    ) {
+                        Text(text = stringResource(id = R.string.btn_fold_floor))
                     }
                 }
             }
@@ -1917,6 +1973,13 @@ fun PostCard(
                             )
                         }
 
+                        if (isFold) {
+                            Chip(
+                                text = if (post.fold_tip.isNotBlank()) post.fold_tip else stringResource(id = R.string.chip_folded_post),
+                                invertColor = false
+                            )
+                        }
+
                         contentRenders.fastForEach { it.Render() }
                     }
 
@@ -1983,6 +2046,7 @@ fun PostCard(
                     }
                 }
             )
+        }
         }
     }
 }
@@ -2053,6 +2117,11 @@ private fun SubPostItem(
                         stringResource(id = R.string.tip_lz),
                         backgroundColor = ExtendedTheme.colors.textSecondary.copy(alpha = 0.1f),
                         color = ExtendedTheme.colors.textSecondary
+                    ),
+                    "Bawu" to buildChipInlineContent(
+                        "吧务",
+                        color = ExtendedTheme.colors.primary,
+                        backgroundColor = ExtendedTheme.colors.primary.copy(alpha = 0.1f)
                     ),
                 )
             )

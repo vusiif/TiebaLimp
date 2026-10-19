@@ -477,6 +477,19 @@ interface OfficialTiebaApi {
 
     @Headers(
         "${Header.FORCE_LOGIN}: ${Header.FORCE_LOGIN_TRUE}",
+    )
+    @POST("/c/c/post/addPollPost")
+    @FormUrlEncoded
+    fun addPollPostFlow(
+        @Field("thread_id") threadId: String,
+        @Field("forum_id") forumId: String,
+        @Field("options") options: String,
+        @Field("stoken") stoken: String? = AccountUtil.getSToken(),
+        @Field("subapp_type") subappType: String = "hybrid",
+    ): Flow<CommonResponse>
+
+    @Headers(
+        "${Header.FORCE_LOGIN}: ${Header.FORCE_LOGIN_TRUE}",
         "${Header.DROP_HEADERS}: ${Header.CHARSET},${Header.CLIENT_TYPE}",
         "${Header.NO_COMMON_PARAMS}: ${Param.SWAN_GAME_VER},${Param.SDK_VER}",
     )

@@ -15,7 +15,7 @@ import com.huanchengfly.tieba.post.App
 import com.huanchengfly.tieba.post.R
 import com.zhihu.matisse.Matisse
 import com.zhihu.matisse.MimeType
-import com.zhihu.matisse.engine.impl.GlideEngine
+import com.huanchengfly.tieba.post.components.SketchImageEngine
 import com.zhihu.matisse.ui.MatisseActivity
 
 fun AppCompatActivity.registerPickMediasLauncher(callback: (PickMediasResult) -> Unit): ActivityResultLauncher<PickMediasRequest> {
@@ -127,7 +127,7 @@ object PickMediasContract : ActivityResultContract<PickMediasRequest, PickMedias
             .theme(if (ThemeUtil.isNightMode()) R.style.Matisse_Dracula else R.style.Matisse_Zhihu)
             .countable(input.maxItems > 1)
             .maxSelectable(input.maxItems)
-            .imageEngine(GlideEngine())
+            .imageEngine(SketchImageEngine())
         return Intent(context, MatisseActivity::class.java)
     }
 

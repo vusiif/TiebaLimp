@@ -213,6 +213,16 @@ object MixedTiebaApiImpl : ITiebaApi {
         opType: Int
     ): Flow<AgreeBean> = RetrofitTiebaApi.MINI_TIEBA_API.disagreeFlow(postId, threadId, op_type = opType)
 
+    override fun addPollPostFlow(
+        threadId: String,
+        forumId: String,
+        options: String,
+    ): Flow<CommonResponse> = RetrofitTiebaApi.OFFICIAL_TIEBA_API.addPollPostFlow(
+        threadId = threadId,
+        forumId = forumId,
+        options = options,
+    )
+
     override fun forumRecommend(): Call<ForumRecommend> =
         RetrofitTiebaApi.MINI_TIEBA_API.forumRecommend()
 
@@ -1246,7 +1256,7 @@ object MixedTiebaApiImpl : ITiebaApi {
                         from_smart_frs = 0,
                         immersion_video_comment_source = 0,
                         is_comm_reverse = 0,
-                        is_fold_comment_req = 0,
+                        is_fold_comment_req = 1,
                         is_jumpfloor = 0,
                         jumpfloor_num = 0,
                         need_repost_recommend_forum = 0,

@@ -343,6 +343,9 @@
     <string name="title_check_ci_update">接收自动构建版本更新</string>
     <string name="tip_check_ci_update">仅供测试</string>
     <string name="desc_permission_post_notifications">用于发送消息通知、显示一键签到进度</string>
+    <string name="title_notification_permission_tip">未开启通知权限</string>
+    <string name="desc_notification_permission_tip">开启后可及时收到回复、@我的新动态与签到提醒</string>
+    <string name="btn_enable_notification">去开启</string>
     <string name="desc_current_account">当前登录</string>
     <string name="source_code">开源代码</string>
     <string name="summary_now_account">已登录账号 %s</string>
@@ -426,6 +429,10 @@
     <string name="message_store_thread_update">贴子更新到了第 %d 楼</string>
     <string name="tip_blocked_post">由于你的屏蔽设置，第 %d 楼已被屏蔽</string>
     <string name="tip_blocked_sub_post">由于你的屏蔽设置，该回复已被屏蔽</string>
+    <string name="tip_folded_post">第 %1$d 楼已被系统折叠（%2$s），点击展开</string>
+    <string name="tip_folded_post_default">第 %d 楼已被系统折叠，点击展开</string>
+    <string name="chip_folded_post">已折叠楼层</string>
+    <string name="btn_fold_floor">收起楼层</string>
     <string name="settings_block_video">不看视频贴</string>
     <string name="btn_full_screen">全屏</string>
     <string name="btn_play">播放</string>
@@ -521,4 +528,24 @@
     <string name="release_to_load_latest_posts">松开加载最新回复</string>
     <string name="pull_to_load_latest_posts">继续上拉加载最新回复</string>
     <string name="settings_home_page_show_history_forum">首页显示最近逛的吧</string>
+    <string name="title_login_account">账号登录</string>
+    <string name="title_login_qrcode">扫码登录</string>
+    <string name="title_login_web">网页登录</string>
+    <string name="tip_qrcode_loading">正在获取二维码…</string>
+    <string name="tip_qrcode_waiting">请使用官方手机贴吧扫一扫</string>
+    <string name="tip_qrcode_scanned">已扫描，请在手机贴吧点击确认登录</string>
+    <string name="tip_qrcode_expired">二维码已过期，点击重新获取</string>
+    <string name="btn_save_and_open_tieba">保存相册并打开贴吧扫码</string>
+    <string name="btn_refresh_qrcode">刷新二维码</string>
+    <string name="toast_qrcode_saved">二维码已保存至相册，正在打开官方贴吧…</string>
+    <string name="toast_tieba_not_installed">二维码已保存至相册，未检测到官方贴吧，请手动打开贴吧从相册扫码</string>
+    <string name="title_vote">投票</string>
+    <string name="chip_vote_single">单选</string>
+    <string name="chip_vote_multi">多选</string>
+    <string name="chip_vote_polled">已投票</string>
+    <string name="chip_vote_my_choice">我的选择</string>
+    <string name="tip_vote_count">共 %1$d 人参与 · %2$d 票</string>
+    <string name="btn_submit_vote">投票</string>
+    <string name="btn_voting">正在投票…</string>
+    <string name="toast_vote_success">投票成功</string>
 </resources>

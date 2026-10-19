@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
-import android.location.LocationManager
 import android.net.Uri
 import android.webkit.CookieManager
 import android.webkit.GeolocationPermissions
@@ -45,10 +44,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.core.content.getSystemService
-import androidx.core.location.LocationManagerCompat
 import androidx.core.net.toUri
-import com.hjq.permissions.Permission
 import com.huanchengfly.tieba.post.App
 import com.huanchengfly.tieba.post.R
 import com.huanchengfly.tieba.post.arch.GlobalEvent
@@ -73,8 +69,6 @@ import com.huanchengfly.tieba.post.ui.widgets.compose.rememberSaveableWebViewSta
 import com.huanchengfly.tieba.post.ui.widgets.compose.rememberWebViewNavigator
 import com.huanchengfly.tieba.post.utils.AccountUtil
 import com.huanchengfly.tieba.post.utils.DialogUtil
-import com.huanchengfly.tieba.post.utils.PermissionUtils
-import com.huanchengfly.tieba.post.utils.PermissionUtils.PermissionData
 import com.huanchengfly.tieba.post.utils.TiebaUtil
 import com.huanchengfly.tieba.post.utils.appPreferences
 import com.huanchengfly.tieba.post.utils.compose.launchActivityForResult
@@ -484,59 +478,11 @@ class MyWebChromeClient(
         }
     }
 
-    private fun isEnabledLocationFunction(): Boolean {
-        val locationManager = context.getSystemService<LocationManager>()
-        return locationManager != null && LocationManagerCompat.isLocationEnabled(locationManager)
-    }
-
     override fun onGeolocationPermissionsShowPrompt(
         origin: String?,
         callback: GeolocationPermissions.Callback?,
     ) {
-        if (origin == null || callback == null) return
-        PermissionDialog(
-            context,
-            PermissionBean(
-                PermissionDialog.CustomPermission.PERMISSION_LOCATION,
-                origin,
-                context.getString(
-                    R.string.title_ask_permission,
-                    origin,
-                    context.getString(R.string.common_permission_location)
-                ),
-                R.drawable.ic_round_location_on
-            )
-        )
-            .setOnGrantedCallback { isForever: Boolean ->
-                PermissionUtils.askPermission(
-                    context,
-                    PermissionData(
-                        listOf(
-                            Permission.ACCESS_COARSE_LOCATION,
-                            Permission.ACCESS_FINE_LOCATION
-                        ),
-                        context.getString(R.string.usage_webview_location_permission)
-                    ),
-                    R.string.tip_no_permission,
-                    {
-                        if (isEnabledLocationFunction()) {
-                            callback.invoke(origin, true, isForever)
-                        } else {
-                            callback.invoke(origin, false, false)
-                        }
-                    }
-                ) {
-                    callback.invoke(origin, false, false)
-                }
-            }
-            .setOnDeniedCallback {
-                callback.invoke(
-                    origin,
-                    false,
-                    false
-                )
-            }
-            .show()
+        callback?.invoke(origin, false, false)
     }
 
     override fun onShowFileChooser(

@@ -144,6 +144,19 @@ interface ITiebaApi {
     ): Flow<AgreeBean>
 
     /**
+     * 提交投票
+     *
+     * @param threadId 贴子 ID
+     * @param forumId 吧 ID
+     * @param options 选项 ID，多个用逗号隔开，如 "1" 或 "1,2"
+     */
+    fun addPollPostFlow(
+        threadId: String,
+        forumId: String,
+        options: String,
+    ): Flow<CommonResponse>
+
+    /**
      * 关注吧列表
      *
      * **需登录**

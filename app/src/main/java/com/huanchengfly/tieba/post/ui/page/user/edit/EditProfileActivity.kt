@@ -59,11 +59,8 @@ import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.Dimension
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
-import com.bumptech.glide.Glide
-import com.bumptech.glide.request.target.CustomTarget
-import com.bumptech.glide.request.transition.Transition
 import com.github.panpf.sketch.compose.AsyncImage
-import com.google.accompanist.placeholder.material.placeholder
+import com.huanchengfly.tieba.post.ui.widgets.compose.placeholder
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import com.huanchengfly.tieba.post.R
 import com.huanchengfly.tieba.post.activities.BaseActivity
@@ -117,64 +114,59 @@ class EditProfileActivity : BaseActivity() {
         registerPickMediasLauncher { (_, uris) ->
             if (uris.isNotEmpty()) {
                 val sourceUri = uris[0]
-                Glide.with(this)
-                    .asFile()
-                    .load(sourceUri)
-                    .into(object : CustomTarget<File>() {
-                        override fun onLoadCleared(placeholder: Drawable?) {}
-
-                        override fun onResourceReady(
-                            resource: File,
-                            transition: Transition<in File>?
-                        ) {
-                            val sourceFileUri = Uri.fromFile(resource)
-                            val destUri = Uri.fromFile(File(cacheDir, "cropped_portrait"))
-                            val intent = UCrop.of(sourceFileUri, destUri)
-                                .withAspectRatio(1f, 1f)
-                                .withOptions(UCrop.Options().apply {
-                                    setShowCropFrame(true)
-                                    setShowCropGrid(true)
-                                    setStatusBarColor(
-                                        ColorUtils.getDarkerColor(
-                                            ThemeUtils.getColorByAttr(
-                                                this@EditProfileActivity,
-                                                R.attr.colorPrimary
-                                            )
-                                        )
-                                    )
-                                    setToolbarColor(
-                                        ThemeUtils.getColorByAttr(
-                                            this@EditProfileActivity,
-                                            R.attr.colorPrimary
-                                        )
-                                    )
-                                    setToolbarWidgetColor(
-                                        ThemeUtils.getColorByAttr(
-                                            this@EditProfileActivity,
-                                            R.attr.colorTextOnPrimary
-                                        )
-                                    )
-                                    setActiveControlsWidgetColor(
-                                        ThemeUtils.getColorByAttr(
-                                            this@EditProfileActivity,
-                                            R.attr.colorAccent
-                                        )
-                                    )
-                                    setLogoColor(
-                                        ThemeUtils.getColorByAttr(
-                                            this@EditProfileActivity,
-                                            R.attr.colorPrimary
-                                        )
-                                    )
-                                    setCompressionFormat(Bitmap.CompressFormat.JPEG)
-                                }
-                                )
-                                .getIntent(this@EditProfileActivity)
-                            uCropLauncher.launch(intent)
+                runCatching {
+                    val tempSourceFile = File(cacheDir, "temp_avatar_${System.currentTimeMillis()}.jpg")
+                    contentResolver.openInputStream(sourceUri)?.use { input ->
+                        tempSourceFile.outputStream().use { output ->
+                            input.copyTo(output)
                         }
-                    })
+                    }
+                    val sourceFileUri = Uri.fromFile(tempSourceFile)
+                    val destUri = Uri.fromFile(File(cacheDir, "cropped_portrait"))
+                    val intent = UCrop.of(sourceFileUri, destUri)
+                        .withAspectRatio(1f, 1f)
+                        .withOptions(UCrop.Options().apply {
+                            setShowCropFrame(true)
+                            setShowCropGrid(true)
+                            setStatusBarColor(
+                                ColorUtils.getDarkerColor(
+                                    ThemeUtils.getColorByAttr(
+                                        this@EditProfileActivity,
+                                        R.attr.colorPrimary
+                                    )
+                                )
+                            )
+                            setToolbarColor(
+                                ThemeUtils.getColorByAttr(
+                                    this@EditProfileActivity,
+                                    R.attr.colorPrimary
+                                )
+                            )
+                            setToolbarWidgetColor(
+                                ThemeUtils.getColorByAttr(
+                                    this@EditProfileActivity,
+                                    R.attr.colorTextOnPrimary
+                                )
+                            )
+                            setActiveControlsWidgetColor(
+                                ThemeUtils.getColorByAttr(
+                                    this@EditProfileActivity,
+                                    R.attr.colorAccent
+                                )
+                            )
+                            setLogoColor(
+                                ThemeUtils.getColorByAttr(
+                                    this@EditProfileActivity,
+                                    R.attr.colorPrimary
+                                )
+                            )
+                            setCompressionFormat(Bitmap.CompressFormat.JPEG)
+                        })
+                        .getIntent(this@EditProfileActivity)
+                    uCropLauncher.launch(intent)
+                }
             }
-            }
+        }
 
     private val viewModel: EditProfileViewModel by viewModels()
 

@@ -39,5 +39,5 @@ sweetProperty {
     }
 }
 
-rootProject.name = "TiebaLite"
+rootProject.name = "TiebaLimp"
 include(":app")

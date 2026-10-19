@@ -300,7 +300,7 @@ object EmoticonManager {
             if (resId == 0 && !emoticonFile.exists()) {
                 val loadEmoticonResult = LoadRequest(
                     context,
-                    "http://static.tieba.baidu.com/tb/editor/images/client/$it.png"
+                    "https://static.tieba.baidu.com/tb/editor/images/client/$it.png"
                 ).execute()
                 if (loadEmoticonResult is LoadResult.Success) {
                     ImageUtil.bitmapToFile(

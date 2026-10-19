@@ -14,7 +14,9 @@ import androidx.compose.material.icons.outlined.OfflinePin
 import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material.icons.outlined.WatchLater
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.rememberCoroutineScope
+import com.huanchengfly.tieba.post.utils.TiebaUtil
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,6 +42,7 @@ import com.huanchengfly.tieba.post.ui.widgets.compose.AvatarIcon
 import com.huanchengfly.tieba.post.ui.widgets.compose.BackNavigationIcon
 import com.huanchengfly.tieba.post.ui.widgets.compose.LocalSnackbarHostState
 import com.huanchengfly.tieba.post.ui.widgets.compose.MyScaffold
+import com.huanchengfly.tieba.post.ui.widgets.compose.NotificationPermissionHelper
 import com.huanchengfly.tieba.post.ui.widgets.compose.Sizes
 import com.huanchengfly.tieba.post.ui.widgets.compose.TitleCentredToolbar
 import com.huanchengfly.tieba.post.utils.isIgnoringBatteryOptimizations
@@ -68,6 +71,11 @@ fun OKSignSettingsPage(
         },
     ) { paddingValues ->
         val context = LocalContext.current
+        DisposableEffect(Unit) {
+            onDispose {
+                TiebaUtil.initAutoSign(context)
+            }
+        }
         val dataStore = context.dataStore
         val snackbarHostState = LocalSnackbarHostState.current
         PrefsScreen(
@@ -128,6 +136,11 @@ fun OKSignSettingsPage(
                     defaultChecked = false,
                     summaryOn = stringResource(id = R.string.summary_auto_sign_on),
                     summaryOff = stringResource(id = R.string.summary_auto_sign),
+                    onCheckedChange = { checked ->
+                        if (checked) {
+                            NotificationPermissionHelper.requestNotificationPermission(context)
+                        }
+                    },
                 )
             }
             prefsItem {

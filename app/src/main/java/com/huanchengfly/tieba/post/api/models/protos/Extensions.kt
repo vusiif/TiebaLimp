@@ -377,8 +377,13 @@ val Post.contentRenders: ImmutableList<PbContentRender>
     }
 
 val User.bawuType: String?
-    get() = if (is_bawu == 1) {
-        if (bawu_type == "manager") "吧主" else "小吧主"
+    get() = if (is_bawu == 1 || is_manager == 1 || bawu_type.isNotBlank()) {
+        when {
+            bawu_type == "manager" || is_manager == 1 || bawu_type == "吧主" -> "吧主"
+            bawu_type == "assist" || bawu_type == "小吧主" -> "小吧主"
+            is_bawu == 1 -> "吧主"
+            else -> null
+        }
     } else null
 
 val Post.subPostContents: ImmutableList<AnnotatedString>
@@ -418,11 +423,17 @@ fun SubPostList.getContentText(threadAuthorId: Long? = null): AnnotatedString {
             if (author?.id == threadAuthorId) {
                 appendInlineContent("Lz")
             }
+            val bType = author?.bawuType
+            if (!bType.isNullOrBlank()) {
+                appendInlineContent("Bawu", alternateText = bType)
+            }
             append(": ")
         }
     }
 
-    val contentStrings = content.renders.map { it.toAnnotationString() }
+    val contentString = buildAnnotatedString {
+        content.renders.forEach { append(it.toAnnotationString()) }
+    }
 
-    return userNameString + contentStrings.reduce { acc, annotatedString -> acc + annotatedString }
+    return userNameString + contentString
 }

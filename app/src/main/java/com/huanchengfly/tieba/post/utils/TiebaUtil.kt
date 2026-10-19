@@ -15,7 +15,7 @@ import com.huanchengfly.tieba.post.api.TiebaApi
 import com.huanchengfly.tieba.post.api.retrofit.doIfFailure
 import com.huanchengfly.tieba.post.api.retrofit.doIfSuccess
 import com.huanchengfly.tieba.post.components.dialogs.LoadingDialog
-import com.huanchengfly.tieba.post.pendingIntentFlagMutable
+import com.huanchengfly.tieba.post.pendingIntentFlagImmutable
 import com.huanchengfly.tieba.post.receivers.AutoSignAlarm
 import com.huanchengfly.tieba.post.services.OKSignService
 import com.huanchengfly.tieba.post.toastShort
@@ -55,24 +55,28 @@ object TiebaUtil {
             context,
             0,
             Intent(context, AutoSignAlarm::class.java),
-            pendingIntentFlagMutable()
+            pendingIntentFlagImmutable()
         )
         if (autoSign) {
-            val autoSignTimeStr = context.appPreferences.autoSignTime!!
+            val autoSignTimeStr = context.appPreferences.autoSignTime ?: "09:00"
             val time = autoSignTimeStr.split(":").toTypedArray()
-            val hour = time[0].toInt()
-            val minute = time[1].toInt()
-            val calendar = Calendar.getInstance()
-            calendar[Calendar.HOUR_OF_DAY] = hour
-            calendar[Calendar.MINUTE] = minute
-            if (calendar.timeInMillis >= System.currentTimeMillis()) {
-                alarmManager.setRepeating(
-                    AlarmManager.RTC_WAKEUP,
-                    calendar.timeInMillis,
-                    AlarmManager.INTERVAL_DAY,
-                    pendingIntent
-                )
+            val hour = time.getOrNull(0)?.toIntOrNull() ?: 9
+            val minute = time.getOrNull(1)?.toIntOrNull() ?: 0
+            val calendar = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, hour)
+                set(Calendar.MINUTE, minute)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
             }
+            if (calendar.timeInMillis <= System.currentTimeMillis()) {
+                calendar.add(Calendar.DAY_OF_YEAR, 1)
+            }
+            alarmManager.setRepeating(
+                AlarmManager.RTC_WAKEUP,
+                calendar.timeInMillis,
+                AlarmManager.INTERVAL_DAY,
+                pendingIntent
+            )
         } else {
             alarmManager.cancel(pendingIntent)
         }
@@ -81,16 +85,6 @@ object TiebaUtil {
     @JvmStatic
     fun startSign(context: Context) {
         context.appPreferences.signDay = Calendar.getInstance()[Calendar.DAY_OF_MONTH]
-//        OKSignService.enqueueWork(
-//            context,
-//            Intent()
-//                .setClassName(
-//                    context.packageName,
-//                    "${context.packageName}.services.OKSignService"
-//                )
-//                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-//                .setAction(OKSignService.ACTION_START_SIGN)
-//        )
         ContextCompat.startForegroundService(
             context,
             Intent()
@@ -106,14 +100,20 @@ object TiebaUtil {
     @JvmStatic
     @JvmOverloads
     fun shareText(context: Context, text: String, title: String? = null) {
-        context.startActivity(Intent().apply {
+        val shareIntent = Intent().apply {
             action = Intent.ACTION_SEND
             type = "text/plain"
             putExtra(
                 Intent.EXTRA_TEXT,
                 "${if (title != null) "「$title」\n" else ""}$text\n（分享自贴吧 Lite）"
             )
-        })
+        }
+        val chooserIntent = Intent.createChooser(shareIntent, title ?: text).apply {
+            if (context !is android.app.Activity) {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        }
+        context.startActivity(chooserIntent)
     }
 
     suspend fun reportPost(

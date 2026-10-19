@@ -1,7 +1,9 @@
 package com.huanchengfly.tieba.post.ui.page.main.notifications
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.Scaffold
 import androidx.compose.material.Tab
@@ -25,6 +27,7 @@ import com.huanchengfly.tieba.post.ui.widgets.compose.ActionItem
 import com.huanchengfly.tieba.post.ui.widgets.compose.BackNavigationIcon
 import com.huanchengfly.tieba.post.ui.widgets.compose.LazyLoadHorizontalPager
 import com.huanchengfly.tieba.post.ui.widgets.compose.MyScaffold
+import com.huanchengfly.tieba.post.ui.widgets.compose.NotificationPermissionBanner
 import com.huanchengfly.tieba.post.ui.widgets.compose.PagerTabIndicator
 import com.huanchengfly.tieba.post.ui.widgets.compose.TabRow
 import com.huanchengfly.tieba.post.ui.widgets.compose.TitleCentredToolbar
@@ -98,15 +101,21 @@ fun NotificationsPage(
             },
             modifier = Modifier.fillMaxSize(),
         ) { paddingValues ->
-            LazyLoadHorizontalPager(
-                state = pagerState,
-                contentPadding = paddingValues,
-                key = { pages[it].first },
-                modifier = Modifier.fillMaxSize(),
-                verticalAlignment = Alignment.Top,
-                userScrollEnabled = true,
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
             ) {
-                pages[it].second()
+                NotificationPermissionBanner()
+                LazyLoadHorizontalPager(
+                    state = pagerState,
+                    key = { pages[it].first },
+                    modifier = Modifier.fillMaxSize(),
+                    verticalAlignment = Alignment.Top,
+                    userScrollEnabled = true,
+                ) {
+                    pages[it].second()
+                }
             }
         }
     }
@@ -173,15 +182,21 @@ fun NotificationsPage(
         },
         modifier = Modifier.fillMaxSize(),
     ) { paddingValues ->
-        LazyLoadHorizontalPager(
-            state = pagerState,
-            contentPadding = paddingValues,
-            key = { pages[it].first },
-            modifier = Modifier.fillMaxSize(),
-            verticalAlignment = Alignment.Top,
-            userScrollEnabled = true,
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
         ) {
-            pages[it].second()
+            NotificationPermissionBanner()
+            LazyLoadHorizontalPager(
+                state = pagerState,
+                key = { pages[it].first },
+                modifier = Modifier.fillMaxSize(),
+                verticalAlignment = Alignment.Top,
+                userScrollEnabled = true,
+            ) {
+                pages[it].second()
+            }
         }
     }
 }

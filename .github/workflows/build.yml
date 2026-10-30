@@ -18,7 +18,6 @@ jobs:
           cache: gradle
 
       - name: Setup Keystore
-        if: ${{ secrets.KEYSTORE != '' && secrets.RELEASEKEYPASSWORD != '' }}
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE }}
           KEYSTORE_FILE: ${{ vars.RELEASE_KEYSTORE }}

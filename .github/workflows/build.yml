@@ -11,35 +11,32 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: "17"
           distribution: "zulu"
           cache: gradle
 
-      - name: Decode Keystore
-        id: decode_keystore
-        if: ${{ github.event_name != 'pull_request' || github.ref_type == 'tag' }}
-        uses: timheuer/base64-to-file@v1.2
-        with:
-          fileName: ${{ vars.RELEASE_KEYSTORE }}
-          fileDir: ${{ github.workspace }}
-          encodedString: ${{ secrets.KEYSTORE }}
-
-      - name: Generate keystore.properties
-        if: ${{ github.event_name != 'pull_request' || github.ref_type == 'tag' }}
+      - name: Setup Keystore
+        if: ${{ secrets.KEYSTORE != '' && secrets.RELEASEKEYPASSWORD != '' }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE }}
+          KEYSTORE_FILE: ${{ vars.RELEASE_KEYSTORE }}
+          STORE_PASSWORD: ${{ secrets.RELEASESTOREPASSWORD }}
+          KEY_ALIAS: ${{ vars.RELEASE_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.RELEASEKEYPASSWORD }}
         run: |
-          if [ -n "${{ secrets.RELEASEKEYPASSWORD }}" ]; then
-            echo keystore.file="${{ vars.RELEASE_KEYSTORE }}" >> keystore.properties
-            echo keystore.password="${{ secrets.RELEASESTOREPASSWORD }}" >> keystore.properties
-            echo keystore.key.alias="${{ vars.RELEASE_KEY_ALIAS }}" >> keystore.properties
-            echo keystore.key.password="${{ secrets.RELEASEKEYPASSWORD }}" >> keystore.properties
+          if [ -n "$KEYSTORE_BASE64" ] && [ -n "$KEYSTORE_FILE" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_FILE"
+            echo "keystore.file=$KEYSTORE_FILE" >> keystore.properties
+            echo "keystore.password=$STORE_PASSWORD" >> keystore.properties
+            echo "keystore.key.alias=$KEY_ALIAS" >> keystore.properties
+            echo "keystore.key.password=$KEY_PASSWORD" >> keystore.properties
           fi
 
       - name: Setup Gradle
-        uses: gradle/gradle-build-action@v3
+        uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-home-cache-cleanup: true
           cache-read-only: ${{ github.ref != 'refs/heads/master' && github.ref != 'refs/heads/4.0-dev' }}
 
       - name: Build with Gradle
@@ -47,18 +44,22 @@ jobs:
 
       - name: Read Output Metadata
         id: read_output_metadata
-        uses: juliangruber/read-file-action@v1
-        with:
-          path: ./app/build/outputs/apk/release/output-metadata.json
-          trim: true
+        run: |
+          METADATA_FILE="./app/build/outputs/apk/release/output-metadata.json"
+          if [ -f "$METADATA_FILE" ]; then
+            VERSION_NAME=$(jq -r '.elements[0].versionName // "unknown"' "$METADATA_FILE")
+            VERSION_CODE=$(jq -r '.elements[0].versionCode // "0"' "$METADATA_FILE")
+          else
+            VERSION_NAME="unknown"
+            VERSION_CODE="0"
+          fi
+          echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
+          echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
 
       - name: Upload Release Package
-        env:
-          version_code: ${{ fromJSON(steps.read_output_metadata.outputs.content).elements[0].versionCode }}
-          version_name: ${{ fromJSON(steps.read_output_metadata.outputs.content).elements[0].versionName }}
         uses: actions/upload-artifact@v4
         with:
-          name: "release-${{ env.version_name }}(${{ env.version_code }})"
+          name: "release-${{ steps.read_output_metadata.outputs.version_name }}(${{ steps.read_output_metadata.outputs.version_code }})"
           path: ./app/build/outputs/apk/release
 
       - name: Upload Mapping

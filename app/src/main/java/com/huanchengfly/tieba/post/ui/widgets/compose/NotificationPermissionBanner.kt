@@ -76,14 +76,31 @@ object NotificationPermissionHelper {
     }
 
     fun openNotificationSettings(context: Context) {
-        runCatching {
-            val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
-                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-                if (context !is android.app.Activity) {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val opened = runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                    putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                    if (context !is android.app.Activity) {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
                 }
+                context.startActivity(intent)
+                true
+            } else {
+                false
             }
-            context.startActivity(intent)
+        }.getOrDefault(false)
+
+        if (!opened) {
+            runCatching {
+                val fallbackIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = android.net.Uri.fromParts("package", context.packageName, null)
+                    if (context !is android.app.Activity) {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                }
+                context.startActivity(fallbackIntent)
+            }
         }
     }
 }

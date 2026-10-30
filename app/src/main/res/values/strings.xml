@@ -548,4 +548,8 @@
     <string name="btn_submit_vote">投票</string>
     <string name="btn_voting">正在投票…</string>
     <string name="toast_vote_success">投票成功</string>
+    <string name="tip_qrcode_scanned_short">已扫描</string>
+    <string name="tip_qrcode_network_error">网络连接异常，点击重新获取</string>
+    <string name="tip_vote_option_stat">%1$d 票 (%2$d%%)</string>
+    <string name="toast_share_failed">未找到可用于分享的应用</string>
 </resources>

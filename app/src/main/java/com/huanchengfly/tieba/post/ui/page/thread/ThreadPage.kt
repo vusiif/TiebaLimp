@@ -163,6 +163,7 @@ import com.huanchengfly.tieba.post.ui.widgets.compose.UserHeader
 import com.huanchengfly.tieba.post.ui.widgets.compose.VerticalDivider
 import com.huanchengfly.tieba.post.ui.widgets.compose.VerticalGrid
 import com.huanchengfly.tieba.post.ui.widgets.compose.VoteCard
+import com.huanchengfly.tieba.post.utils.PollVoteStore
 import com.huanchengfly.tieba.post.ui.widgets.compose.buildChipInlineContent
 import com.huanchengfly.tieba.post.ui.widgets.compose.rememberDialogState
 import com.huanchengfly.tieba.post.ui.widgets.compose.rememberMenuState
@@ -1410,12 +1411,15 @@ fun ThreadPage(
                                                         )
                                                     }
 
-                                                var localPollInfo by remember(thread) { mutableStateOf(thread?.get { poll_info }) }
+                                                val effectiveForumId = (curForumId?.takeIf { it > 0 } ?: thread?.get { forumId }) ?: 0L
+                                                var localPollInfo by remember(thread, threadId) {
+                                                    mutableStateOf(PollVoteStore.get(threadId, thread?.get { poll_info }))
+                                                }
                                                 localPollInfo?.takeIf { it.options.isNotEmpty() }?.let { poll ->
                                                     VoteCard(
                                                         pollInfo = poll,
                                                         threadId = threadId,
-                                                        forumId = curForumId ?: 0L,
+                                                        forumId = effectiveForumId,
                                                         onVoteSuccess = { newPoll -> localPollInfo = newPoll },
                                                         modifier = Modifier
                                                             .padding(horizontal = 16.dp)

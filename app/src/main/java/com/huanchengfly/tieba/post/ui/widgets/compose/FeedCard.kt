@@ -71,6 +71,7 @@ import com.huanchengfly.tieba.post.api.models.protos.OriginThreadInfo
 import com.huanchengfly.tieba.post.api.models.protos.PostInfoList
 import com.huanchengfly.tieba.post.api.models.protos.SimpleForum
 import com.huanchengfly.tieba.post.api.models.protos.ThreadInfo
+import com.huanchengfly.tieba.post.utils.PollVoteStore
 import com.huanchengfly.tieba.post.api.models.protos.User
 import com.huanchengfly.tieba.post.api.models.protos.bawuType
 import com.huanchengfly.tieba.post.api.models.protos.VideoInfo
@@ -629,7 +630,10 @@ fun OriginThreadCard(
     modifier: Modifier = Modifier,
 ) {
     val contentRenders = remember(originThreadInfo) { originThreadInfo.get { content.renders } }
-    var localPollInfo by remember(originThreadInfo) { mutableStateOf(originThreadInfo.get { poll_info }) }
+    val originTid = originThreadInfo.get { tid.toLongOrNull() ?: 0L }
+    var localPollInfo by remember(originThreadInfo) {
+        mutableStateOf(PollVoteStore.get(originTid, originThreadInfo.get { poll_info }))
+    }
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -825,11 +829,14 @@ fun FeedCard(
                     )
                 }
 
-            var localPollInfo by remember(item) { mutableStateOf(item.get { poll_info }) }
+            val cardThreadId = item.get { if (threadId != 0L) threadId else id }
+            var localPollInfo by remember(item) {
+                mutableStateOf(PollVoteStore.get(cardThreadId, item.get { poll_info }))
+            }
             localPollInfo?.takeIf { it.options.isNotEmpty() }?.let { poll ->
                 VoteCard(
                     pollInfo = poll,
-                    threadId = item.get { if (threadId != 0L) threadId else id },
+                    threadId = cardThreadId,
                     forumId = item.get { forumId },
                     onVoteSuccess = { newPoll -> localPollInfo = newPoll },
                 )
@@ -923,11 +930,14 @@ fun FeedCard(
                     )
                 }
 
-            var localPollInfo by remember(item) { mutableStateOf(item.get { poll_info }) }
+            val pfcThreadId = item.get { thread_id }
+            var localPollInfo by remember(item) {
+                mutableStateOf(PollVoteStore.get(pfcThreadId, item.get { poll_info }))
+            }
             localPollInfo?.takeIf { it.options.isNotEmpty() }?.let { poll ->
                 VoteCard(
                     pollInfo = poll,
-                    threadId = item.get { thread_id },
+                    threadId = pfcThreadId,
                     forumId = item.get { forum_id },
                     onVoteSuccess = { newPoll -> localPollInfo = newPoll },
                 )

@@ -144,7 +144,7 @@ class OKSignService : IntentService(TAG), CoroutineScope, ProgressListener {
         )
     }
 
-    private fun updateNotification(title: String, text: String?) {
+    private fun updateNotification(title: String, text: String?, isOngoing: Boolean = true) {
         if (ActivityCompat.checkSelfPermission(
                 this,
                 Manifest.permission.POST_NOTIFICATIONS
@@ -154,7 +154,9 @@ class OKSignService : IntentService(TAG), CoroutineScope, ProgressListener {
         }
         val notification = buildNotification(title, text)
             .build()
-        notification.flags = notification.flags.addFlag(NotificationCompat.FLAG_ONGOING_EVENT)
+        if (isOngoing) {
+            notification.flags = notification.flags.addFlag(NotificationCompat.FLAG_ONGOING_EVENT)
+        }
         notificationManager.notify(NOTIFICATION_ID, notification)
     }
 
@@ -236,7 +238,7 @@ class OKSignService : IntentService(TAG), CoroutineScope, ProgressListener {
         lastSignData.let {
             if (it == null) {
                 ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_DETACH)
-                updateNotification(getString(R.string.title_oksign_fail), errorMsg)
+                updateNotification(getString(R.string.title_oksign_fail), errorMsg, isOngoing = false)
             } else {
                 updateNotification(
                     getString(

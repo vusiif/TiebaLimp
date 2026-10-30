@@ -115,7 +115,7 @@ class EditProfileActivity : BaseActivity() {
             if (uris.isNotEmpty()) {
                 val sourceUri = uris[0]
                 runCatching {
-                    val tempSourceFile = File(cacheDir, "temp_avatar_${System.currentTimeMillis()}.jpg")
+                    val tempSourceFile = File(cacheDir, "temp_avatar.jpg")
                     contentResolver.openInputStream(sourceUri)?.use { input ->
                         tempSourceFile.outputStream().use { output ->
                             input.copyTo(output)

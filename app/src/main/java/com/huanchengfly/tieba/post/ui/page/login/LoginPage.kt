@@ -376,7 +376,7 @@ fun QrLoginContent(
             if (pollRes.isFailure) {
                 consecutiveErrors++
                 if (consecutiveErrors >= 5) {
-                    qrState = QrLoginState.Expired
+                    qrState = QrLoginState.Error(context.getString(R.string.tip_qrcode_network_error))
                     break
                 }
                 delay(2000L)
@@ -477,7 +477,7 @@ fun QrLoginContent(
                                         )
                                         Spacer(modifier = Modifier.height(8.dp))
                                         Text(
-                                            text = "已扫描",
+                                            text = stringResource(R.string.tip_qrcode_scanned_short),
                                             color = Color.White,
                                             style = MaterialTheme.typography.subtitle1
                                         )
@@ -601,29 +601,23 @@ private fun saveAccountAndFinish(
     onSuccess: (() -> Unit)? = null,
     onFailure: (() -> Unit)? = null,
 ) {
-    if (!baiduId.isNullOrEmpty() && ClientUtils.baiduId.isNullOrEmpty()) {
-        coroutineScope.launch {
+    coroutineScope.launch {
+        if (!baiduId.isNullOrEmpty() && ClientUtils.baiduId.isNullOrEmpty()) {
             ClientUtils.saveBaiduId(context, baiduId)
         }
-    }
-    coroutineScope.launch {
         snackbarHostState.showSnackbar(
             context.getString(R.string.text_please_wait),
             duration = SnackbarDuration.Indefinite
         )
-    }
-    coroutineScope.launch {
         AccountUtil.fetchAccountFlow(bduss, sToken, cookieStr)
             .catch {
-                coroutineScope.launch {
-                    snackbarHostState.currentSnackbarData?.dismiss()
-                    snackbarHostState.showSnackbar(
-                        context.getString(
-                            R.string.text_login_failed,
-                            it.getErrorMessage()
-                        ), duration = SnackbarDuration.Short
-                    )
-                }
+                snackbarHostState.currentSnackbarData?.dismiss()
+                snackbarHostState.showSnackbar(
+                    context.getString(
+                        R.string.text_login_failed,
+                        it.getErrorMessage()
+                    ), duration = SnackbarDuration.Short
+                )
                 onFailure?.invoke()
             }
             .flowOn(Dispatchers.Main)
@@ -638,8 +632,6 @@ private fun saveAccountAndFinish(
                                 context.getString(R.string.text_login_success),
                                 duration = SnackbarDuration.Short
                             )
-                        }
-                        coroutineScope.launch {
                             delay(1500L)
                             navigator?.navigateUp()
                         }

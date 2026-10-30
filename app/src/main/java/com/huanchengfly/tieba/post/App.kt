@@ -91,13 +91,16 @@ class App : Application(), SketchFactory {
         ThemeUtils.init(ThemeDelegate)
         registerActivityLifecycleCallbacks(ClipBoardLinkDetector)
         registerActivityLifecycleCallbacks(OAIDGetter)
-        thread {
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
             try {
                 if (Config.userAgent == null) {
                     Config.userAgent = WebSettings.getDefaultUserAgent(this@App)
                 }
-            } catch (ignored: Throwable) {
+            } catch (_: Throwable) {
+                Config.userAgent = System.getProperty("http.agent")
             }
+        }
+        thread {
             BlockManager.init()
             EmoticonManager.init(this@App)
         }

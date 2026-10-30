@@ -52,6 +52,7 @@ import com.huanchengfly.tieba.post.api.models.protos.PollOption
 import com.huanchengfly.tieba.post.api.retrofit.exception.getErrorMessage
 import com.huanchengfly.tieba.post.ui.common.theme.compose.ExtendedTheme
 import com.huanchengfly.tieba.post.utils.AccountUtil
+import com.huanchengfly.tieba.post.utils.PollVoteStore
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 import kotlin.math.max
@@ -66,7 +67,9 @@ fun VoteCard(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    var currentPollInfo by remember(pollInfo) { mutableStateOf(pollInfo) }
+    var currentPollInfo by remember(pollInfo, threadId) {
+        mutableStateOf(PollVoteStore.get(threadId, pollInfo) ?: pollInfo)
+    }
     var selectedOptionIds by remember { mutableStateOf<Set<Int>>(emptySet()) }
     var isSubmitting by remember { mutableStateOf(false) }
 
@@ -212,6 +215,7 @@ fun VoteCard(
                                     total_poll = currentPollInfo.total_poll + selectedOptionIds.size,
                                     options = updatedOptions
                                 )
+                                PollVoteStore.update(threadId, newPoll)
                                 currentPollInfo = newPoll
                                 onVoteSuccess?.invoke(newPoll)
                             }
@@ -300,7 +304,7 @@ private fun VotedOptionRow(
                 modifier = Modifier.weight(1f)
             )
             Text(
-                text = "${option.num} 票 (${percentage}%)",
+                text = stringResource(R.string.tip_vote_option_stat, option.num, percentage),
                 style = MaterialTheme.typography.caption.copy(
                     fontWeight = if (isMyChoice) FontWeight.Bold else FontWeight.Normal
                 ),

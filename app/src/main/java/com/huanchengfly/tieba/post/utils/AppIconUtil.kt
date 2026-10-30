@@ -8,10 +8,11 @@ import kotlinx.collections.immutable.persistentListOf
 
 
 object LauncherIcons {
-    const val NEW_ICON = "com.huanchengfly.tieba.post.MainActivityV2"
+    const val NEW_ICON = "com.huanchengfly.tieba.post.MainActivityIconDefault"
     const val NEW_ICON_THEMED = "com.huanchengfly.tieba.post.MainActivityIconThemed"
     const val NEW_ICON_INVERT = "com.huanchengfly.tieba.post.MainActivityIconInvert"
     const val OLD_ICON = "com.huanchengfly.tieba.post.MainActivityIconOld"
+    const val LEGACY_MAIN_ACTIVITY_V2 = "com.huanchengfly.tieba.post.MainActivityV2"
 
     const val DEFAULT_ICON = NEW_ICON
 
@@ -38,13 +39,29 @@ object AppIconUtil {
         icon: String = appPreferences.appIcon ?: LauncherIcons.NEW_ICON,
         isThemed: Boolean = appPreferences.useThemedIcon,
     ) {
-        val useThemedIcon = isThemed && LauncherIcons.SUPPORT_THEMED_ICON.contains(icon)
-        var newIcon = if (LauncherIcons.ICONS.contains(icon)) {
-            icon
+        val normalizedIcon = if (icon == LauncherIcons.LEGACY_MAIN_ACTIVITY_V2) {
+            LauncherIcons.NEW_ICON
+        } else icon
+        val useThemedIcon = isThemed && LauncherIcons.SUPPORT_THEMED_ICON.contains(normalizedIcon)
+        var newIcon = if (LauncherIcons.ICONS.contains(normalizedIcon)) {
+            normalizedIcon
         } else LauncherIcons.DEFAULT_ICON
         if (useThemedIcon) {
             newIcon = LauncherIcons.THEMED_ICON_MAPPING[newIcon] ?: newIcon
         }
+
+        // MainActivityV2 must always remain enabled as the base activity for aliases and deep links
+        context.packageManager.enableComponent(ComponentName(context, LauncherIcons.LEGACY_MAIN_ACTIVITY_V2))
+
+        val targetComponent = ComponentName(context, newIcon)
+        val isTargetEnabled = context.packageManager.getComponentEnabledSetting(targetComponent) == PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+        val areOthersDisabled = LauncherIcons.ICONS.filter { it != newIcon }.all {
+            context.packageManager.getComponentEnabledSetting(ComponentName(context, it)) == PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+        }
+        if (isTargetEnabled && areOthersDisabled) {
+            return
+        }
+
         LauncherIcons.ICONS.forEach {
             if (it == newIcon) {
                 context.packageManager.enableComponent(ComponentName(context, it))

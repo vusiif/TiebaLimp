@@ -584,4 +584,9 @@
     <string name="rule_type_ip">IP 属地</string>
     <string name="rule_type_level">等级门限</string>
     <string name="rule_type_user">用户</string>
+    <string name="title_gallery_mode">只看图</string>
+    <string name="title_thread_mode">楼层模式</string>
+    <string name="tip_empty_gallery">当前已加载楼层暂无图片</string>
+    <string name="btn_jump_to_post">定位</string>
+    <string name="toast_jump_to_floor">已定位至第 %d 楼</string>
 </resources>

@@ -37,6 +37,7 @@ import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.DropdownMenuItem
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.Icon
+import androidx.compose.material.IconButton
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.ModalBottomSheetLayout
 import androidx.compose.material.ModalBottomSheetValue
@@ -49,6 +50,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ChromeReaderMode
 import androidx.compose.material.icons.automirrored.rounded.ChromeReaderMode
 import androidx.compose.material.icons.automirrored.rounded.Sort
+import androidx.compose.material.icons.outlined.BrowseGallery
+import androidx.compose.material.icons.outlined.ViewAgenda
 import androidx.compose.material.icons.rounded.AlignVerticalTop
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Delete
@@ -175,6 +178,8 @@ import com.huanchengfly.tieba.post.ui.widgets.compose.FloorBookmarkEditDialog
 import com.huanchengfly.tieba.post.ui.widgets.compose.FloorBookmarksDialog
 import com.huanchengfly.tieba.post.ui.widgets.compose.PredictiveBackBox
 import com.huanchengfly.tieba.post.ui.widgets.compose.ResumeReadingPill
+import com.huanchengfly.tieba.post.ui.widgets.compose.ThreadGalleryView
+import com.huanchengfly.tieba.post.ui.widgets.compose.extractGalleryImages
 import com.huanchengfly.tieba.post.utils.DateTimeUtils.getRelativeTimeString
 import com.huanchengfly.tieba.post.utils.HistoryUtil
 import com.huanchengfly.tieba.post.utils.StringUtil
@@ -617,12 +622,13 @@ fun ThreadPage(
         initial = persistentListOf()
     )
 
+    var isGalleryMode by rememberSaveable { mutableStateOf(false) }
     val isEmpty by remember {
         derivedStateOf { data.isEmpty() && firstPost == null }
     }
-    val enablePullRefresh by remember {
+    val enablePullRefresh by remember(isGalleryMode, hasPrevious, curSortType) {
         derivedStateOf {
-            hasPrevious || curSortType == ThreadSortType.SORT_TYPE_DESC
+            !isGalleryMode && (hasPrevious || curSortType == ThreadSortType.SORT_TYPE_DESC)
         }
     }
     val loadMoreEnd by remember {
@@ -682,6 +688,15 @@ fun ThreadPage(
     var readingProgress by remember { mutableStateOf<ThreadHistoryInfoBean?>(null) }
     var showResumePill by remember { mutableStateOf(false) }
     var pendingScrollToPostId by remember { mutableStateOf<Long?>(null) }
+    val galleryImages by remember(firstPost, firstPostContentRenders, data) {
+        derivedStateOf {
+            extractGalleryImages(
+                firstPost = firstPost?.get { this },
+                firstPostContentRenders = firstPostContentRenders,
+                posts = data
+            )
+        }
+    }
 
     LaunchedEffect(threadId) {
         if (postId == 0L) {
@@ -1255,7 +1270,9 @@ fun ThreadPage(
     }
 
     val handleBack: () -> Unit = {
-        if (isCollected) {
+        if (isGalleryMode) {
+            isGalleryMode = false
+        } else if (isCollected) {
             readFloorBeforeBack = lastVisibilityPost?.get { floor } ?: 0
             if (readFloorBeforeBack != 0) {
                 updateCollectMarkDialogState.show()
@@ -1269,7 +1286,7 @@ fun ThreadPage(
 
     ProvideNavigator(navigator = navigator) {
         PredictiveBackBox(
-            enabled = !bottomSheetState.isVisible,
+            enabled = !bottomSheetState.isVisible && !isGalleryMode,
             currentScreen = ThreadPageDestination,
             onBackConfirm = { reset ->
                 if (isCollected) {
@@ -1285,6 +1302,9 @@ fun ThreadPage(
                 }
             }
         ) {
+            MyBackHandler(enabled = isGalleryMode) {
+                isGalleryMode = false
+            }
             StateScreen(
             modifier = Modifier.fillMaxSize(),
             isEmpty = isEmpty,
@@ -1322,7 +1342,9 @@ fun ThreadPage(
                                     forumName
                                 )
                             )
-                        }
+                        },
+                        isGalleryMode = isGalleryMode,
+                        onToggleGalleryMode = { isGalleryMode = !isGalleryMode }
                     )
                 },
                 bottomBar = {
@@ -1378,6 +1400,7 @@ fun ThreadPage(
                             isCollected = isCollected,
                             isImmersiveMode = isImmersiveMode,
                             isDesc = curSortType == ThreadSortType.SORT_TYPE_DESC,
+                            isGalleryMode = isGalleryMode,
                             canDelete = { author?.get { id } == user.get { id } },
                             onSeeLzClick = {
                                 viewModel.send(
@@ -1442,6 +1465,10 @@ fun ThreadPage(
                                 )
                                 closeBottomSheet()
                             },
+                            onGalleryModeClick = {
+                                isGalleryMode = !isGalleryMode
+                                closeBottomSheet()
+                            },
                             onJumpPageClick = {
                                 closeBottomSheet()
                                 jumpToPageDialogState.show()
@@ -1499,7 +1526,64 @@ fun ThreadPage(
                             .fillMaxSize()
                             .pullRefresh(state = pullRefreshState, enabled = enablePullRefresh)
                     ) {
-                        LoadMoreLayout(
+                        if (isGalleryMode) {
+                            ThreadGalleryView(
+                                images = galleryImages,
+                                hasMore = hasMore,
+                                isLoadingMore = isLoadingMore,
+                                onLoadMore = {
+                                    if (hasMore) {
+                                        viewModel.send(
+                                            ThreadUiIntent.LoadMore(
+                                                threadId = threadId,
+                                                page = if (curSortType == ThreadSortType.SORT_TYPE_DESC) totalPage - currentPageMax
+                                                else currentPageMax + 1,
+                                                forumId = forumId,
+                                                postId = nextPagePostId,
+                                                seeLz = isSeeLz,
+                                                sortType = curSortType,
+                                                postIds = data.map { it.post.get { id } }
+                                            )
+                                        )
+                                    }
+                                },
+                                onJumpToFloor = { floor, targetPid ->
+                                    isGalleryMode = false
+                                    if (floor == 1L) {
+                                        coroutineScope.launch {
+                                            lazyListState.animateScrollToItem(1)
+                                        }
+                                    } else {
+                                        val indexInData = data.indexOfFirst { it.post.get { id } == targetPid }
+                                        if (indexInData != -1) {
+                                            coroutineScope.launch {
+                                                val baseOffset = 2 + (if (hasPrevious) 1 else 0)
+                                                lazyListState.animateScrollToItem(baseOffset + indexInData)
+                                            }
+                                        } else {
+                                            pendingScrollToPostId = targetPid
+                                            viewModel.send(
+                                                ThreadUiIntent.Load(
+                                                    threadId = threadId,
+                                                    page = 0,
+                                                    postId = targetPid,
+                                                    forumId = curForumId,
+                                                    seeLz = isSeeLz,
+                                                    sortType = curSortType
+                                                )
+                                            )
+                                        }
+                                    }
+                                    coroutineScope.launch {
+                                        scaffoldState.snackbarHostState.showSnackbar(
+                                            String.format(context.getString(R.string.toast_jump_to_floor), floor)
+                                        )
+                                    }
+                                },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            LoadMoreLayout(
                             isLoading = isLoadingMore,
                             onLoadMore = {
                                 if (hasMore) {
@@ -1819,6 +1903,7 @@ fun ThreadPage(
                                 }
                             }
                         }
+                        }
 
                         PullRefreshIndicator(
                             refreshing = isRefreshing,
@@ -1829,7 +1914,7 @@ fun ThreadPage(
                         )
 
                         ResumeReadingPill(
-                            visible = showResumePill,
+                            visible = showResumePill && !isGalleryMode,
                             floor = readingProgress?.floor.orEmpty(),
                             onJump = onJumpToResume,
                             onDismiss = { showResumePill = false },
@@ -1850,6 +1935,8 @@ private fun TopBar(
     forum: ImmutableHolder<SimpleForum>?,
     onBack: () -> Unit,
     onForumClick: () -> Unit,
+    isGalleryMode: Boolean = false,
+    onToggleGalleryMode: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     TitleCentredToolbar(
@@ -1888,6 +1975,17 @@ private fun TopBar(
         },
         navigationIcon = {
             BackNavigationIcon(onBack)
+        },
+        actions = {
+            IconButton(onClick = onToggleGalleryMode) {
+                Icon(
+                    imageVector = if (isGalleryMode) Icons.Outlined.ViewAgenda else Icons.Outlined.BrowseGallery,
+                    contentDescription = stringResource(
+                        id = if (isGalleryMode) R.string.title_thread_mode else R.string.title_gallery_mode
+                    ),
+                    tint = ExtendedTheme.colors.onTopBar
+                )
+            }
         },
         modifier = modifier
     )
@@ -2410,11 +2508,13 @@ private fun ThreadMenu(
     isCollected: Boolean,
     isImmersiveMode: Boolean,
     isDesc: Boolean,
+    isGalleryMode: Boolean = false,
     canDelete: () -> Boolean,
     onSeeLzClick: () -> Unit,
     onCollectClick: () -> Unit,
     onImmersiveModeClick: () -> Unit,
     onDescClick: () -> Unit,
+    onGalleryModeClick: () -> Unit = {},
     onJumpPageClick: () -> Unit,
     onBookmarksClick: () -> Unit = {},
     onShareClick: () -> Unit,
@@ -2527,6 +2627,13 @@ private fun ThreadMenu(
             }
         }
         Column {
+            ListMenuItem(
+                icon = if (isGalleryMode) Icons.Outlined.ViewAgenda else Icons.Outlined.BrowseGallery,
+                text = if (isGalleryMode) stringResource(id = R.string.title_thread_mode) else stringResource(id = R.string.title_gallery_mode),
+                iconColor = if (isGalleryMode) MaterialTheme.colors.secondary else ExtendedTheme.colors.text,
+                onClick = onGalleryModeClick,
+                modifier = Modifier.fillMaxWidth(),
+            )
             ListMenuItem(
                 icon = Icons.Rounded.RocketLaunch,
                 text = stringResource(id = R.string.title_jump_page),

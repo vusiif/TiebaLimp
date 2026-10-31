@@ -20,8 +20,11 @@ class BlockListViewModel :
             is BlockListPartialChange.Load.Failure -> CommonUiEvent.Toast(partialChange.error.getErrorMessage())
             is BlockListPartialChange.Add.Failure -> CommonUiEvent.Toast(partialChange.error.getErrorMessage())
             is BlockListPartialChange.Delete.Failure -> CommonUiEvent.Toast(partialChange.error.getErrorMessage())
+            is BlockListPartialChange.Import.Failure -> CommonUiEvent.Toast(partialChange.error.getErrorMessage())
             is BlockListPartialChange.Add.Success -> BlockListUiEvent.Success.Add
             is BlockListPartialChange.Delete.Success -> BlockListUiEvent.Success.Delete
+            is BlockListPartialChange.Import.Success -> BlockListUiEvent.Success.Import(partialChange.count)
+            is BlockListPartialChange.Clear.Success -> BlockListUiEvent.Success.Clear
             else -> null
         }
 
@@ -35,6 +38,10 @@ class BlockListViewModel :
                 intentFlow.filterIsInstance<BlockListUiIntent.Add>()
                     .flatMapConcat { it.producePartialChange() },
                 intentFlow.filterIsInstance<BlockListUiIntent.Delete>()
+                    .flatMapConcat { it.producePartialChange() },
+                intentFlow.filterIsInstance<BlockListUiIntent.ImportRules>()
+                    .flatMapConcat { it.producePartialChange() },
+                intentFlow.filterIsInstance<BlockListUiIntent.Clear>()
                     .flatMapConcat { it.producePartialChange() },
             )
 
@@ -51,7 +58,14 @@ class BlockListViewModel :
         private fun BlockListUiIntent.Add.producePartialChange(): Flow<BlockListPartialChange.Add> =
             flow<BlockListPartialChange.Add> {
                 val block = Block(
-                    category = category, type = Block.TYPE_KEYWORD, keywords = keywords.toJson()
+                    category = category,
+                    type = type,
+                    keywords = if (type == Block.TYPE_KEYWORD) keywords.toJson() else null,
+                    username = username,
+                    uid = uid,
+                    pattern = pattern,
+                    minLevel = minLevel,
+                    ipRegion = ipRegion,
                 )
                 BlockManager.addBlock(block)
                 emit(BlockListPartialChange.Add.Success(block))
@@ -62,6 +76,18 @@ class BlockListViewModel :
                 BlockManager.removeBlock(id)
                 emit(BlockListPartialChange.Delete.Success(id))
             }.catch { emit(BlockListPartialChange.Delete.Failure(it)) }
+
+        private fun BlockListUiIntent.ImportRules.producePartialChange(): Flow<BlockListPartialChange.Import> =
+            flow<BlockListPartialChange.Import> {
+                val count = BlockManager.importRulesFromJson(json)
+                emit(BlockListPartialChange.Import.Success(count, BlockManager.blackList, BlockManager.whiteList))
+            }.catch { emit(BlockListPartialChange.Import.Failure(it)) }
+
+        private fun BlockListUiIntent.Clear.producePartialChange(): Flow<BlockListPartialChange.Clear> =
+            flow<BlockListPartialChange.Clear> {
+                BlockManager.clearAll(category)
+                emit(BlockListPartialChange.Clear.Success(BlockManager.blackList, BlockManager.whiteList))
+            }.catch { emit(BlockListPartialChange.Clear.Failure(it)) }
     }
 }
 
@@ -70,11 +96,25 @@ sealed interface BlockListUiIntent : UiIntent {
 
     data class Add(
         val category: Int,
-        val keywords: List<String>
+        val type: Int = Block.TYPE_KEYWORD,
+        val keywords: List<String> = emptyList(),
+        val username: String? = null,
+        val uid: String? = null,
+        val pattern: String? = null,
+        val minLevel: Int = 0,
+        val ipRegion: String? = null,
     ) : BlockListUiIntent
 
     data class Delete(
         val id: Long,
+    ) : BlockListUiIntent
+
+    data class ImportRules(
+        val json: String,
+    ) : BlockListUiIntent
+
+    data class Clear(
+        val category: Int? = null,
     ) : BlockListUiIntent
 }
 
@@ -142,6 +182,28 @@ sealed interface BlockListPartialChange : PartialChange<BlockListUiState> {
 
         data class Failure(val error: Throwable) : Delete()
     }
+
+    sealed class Import : BlockListPartialChange {
+        override fun reduce(oldState: BlockListUiState): BlockListUiState =
+            when (this) {
+                is Success -> oldState.copy(blackList = blackList, whiteList = whiteList)
+                is Failure -> oldState
+            }
+
+        data class Success(val count: Int, val blackList: List<Block>, val whiteList: List<Block>) : Import()
+        data class Failure(val error: Throwable) : Import()
+    }
+
+    sealed class Clear : BlockListPartialChange {
+        override fun reduce(oldState: BlockListUiState): BlockListUiState =
+            when (this) {
+                is Success -> oldState.copy(blackList = blackList, whiteList = whiteList)
+                is Failure -> oldState
+            }
+
+        data class Success(val blackList: List<Block>, val whiteList: List<Block>) : Clear()
+        data class Failure(val error: Throwable) : Clear()
+    }
 }
 
 data class BlockListUiState(
@@ -154,5 +216,7 @@ sealed interface BlockListUiEvent : UiEvent {
     sealed interface Success : BlockListUiEvent {
         object Add : Success
         object Delete : Success
+        data class Import(val count: Int) : Success
+        object Clear : Success
     }
 }

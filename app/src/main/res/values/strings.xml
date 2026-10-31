@@ -564,4 +564,24 @@
     <string name="btn_delete_bookmark">删除书签</string>
     <string name="toast_bookmark_saved">已添加至本帖书签</string>
     <string name="toast_bookmark_deleted">已删除书签</string>
+    <string name="block_type_regex">正则表达式</string>
+    <string name="block_type_ip_region">IP 属地</string>
+    <string name="block_type_level">等级门限</string>
+    <string name="tip_regex_invalid">正则表达式语法错误</string>
+    <string name="tip_regex_desc">匹配帖标题或正文内容（支持标准正则语法）</string>
+    <string name="tip_level_threshold_desc">屏蔽吧内等级低于指定门限的发言</string>
+    <string name="tip_ip_region_desc">匹配发言用户的 IP 归属地，如：北京、海外</string>
+    <string name="btn_export_rules">导出规则</string>
+    <string name="btn_import_rules">导入规则</string>
+    <string name="btn_clear_rules">清空规则</string>
+    <string name="toast_export_success">已导出 %d 条规则到剪贴板</string>
+    <string name="toast_import_success">成功导入 %d 条规则</string>
+    <string name="title_import_rules">导入过滤规则</string>
+    <string name="hint_import_rules">请在此粘贴规则 JSON 内容</string>
+    <string name="btn_paste_from_clipboard">从剪贴板粘贴</string>
+    <string name="rule_type_keyword">关键词</string>
+    <string name="rule_type_regex">正则表达式</string>
+    <string name="rule_type_ip">IP 属地</string>
+    <string name="rule_type_level">等级门限</string>
+    <string name="rule_type_user">用户</string>
 </resources>

@@ -168,6 +168,11 @@ import com.huanchengfly.tieba.post.ui.widgets.compose.buildChipInlineContent
 import com.huanchengfly.tieba.post.ui.widgets.compose.rememberDialogState
 import com.huanchengfly.tieba.post.ui.widgets.compose.rememberMenuState
 import com.huanchengfly.tieba.post.ui.widgets.compose.states.StateScreen
+import androidx.compose.material.icons.rounded.Bookmarks
+import com.huanchengfly.tieba.post.models.database.FloorBookmark
+import com.huanchengfly.tieba.post.utils.FloorBookmarkUtil
+import com.huanchengfly.tieba.post.ui.widgets.compose.FloorBookmarkEditDialog
+import com.huanchengfly.tieba.post.ui.widgets.compose.FloorBookmarksDialog
 import com.huanchengfly.tieba.post.ui.widgets.compose.PredictiveBackBox
 import com.huanchengfly.tieba.post.ui.widgets.compose.ResumeReadingPill
 import com.huanchengfly.tieba.post.utils.DateTimeUtils.getRelativeTimeString
@@ -886,6 +891,95 @@ fun ThreadPage(
         )
     }
 
+    var bookmarkTargetPost by remember { mutableStateOf<Post?>(null) }
+    var bookmarkInitialNote by remember { mutableStateOf("") }
+    var bookmarkIsExisting by remember { mutableStateOf(false) }
+    val bookmarkEditDialogState = rememberDialogState()
+
+    var threadBookmarks by remember { mutableStateOf<List<FloorBookmark>>(emptyList()) }
+    val bookmarksDialogState = rememberDialogState()
+
+    val openBookmarkEdit: (Post) -> Unit = { post ->
+        bookmarkTargetPost = post
+        coroutineScope.launch {
+            val existing = FloorBookmarkUtil.findBookmark(threadId, post.id)
+            bookmarkIsExisting = existing != null
+            bookmarkInitialNote = existing?.note.orEmpty()
+            bookmarkEditDialogState.show()
+        }
+    }
+
+    FloorBookmarkEditDialog(
+        dialogState = bookmarkEditDialogState,
+        floor = bookmarkTargetPost?.floor ?: 0,
+        authorName = bookmarkTargetPost?.author?.nameShow.takeIf { !it.isNullOrEmpty() }
+            ?: bookmarkTargetPost?.author?.name.orEmpty(),
+        contentSnippet = bookmarkTargetPost?.content?.plainText.orEmpty(),
+        initialNote = bookmarkInitialNote,
+        isExisting = bookmarkIsExisting,
+        onSave = { note ->
+            val target = bookmarkTargetPost ?: return@FloorBookmarkEditDialog
+            coroutineScope.launch {
+                FloorBookmarkUtil.addOrUpdateBookmark(
+                    threadId = threadId,
+                    threadTitle = threadTitle,
+                    postId = target.id,
+                    floor = target.floor,
+                    authorName = target.author?.nameShow.takeIf { !it.isNullOrEmpty() }
+                        ?: target.author?.name.orEmpty(),
+                    contentSnippet = target.content.plainText,
+                    note = note
+                )
+                context.toastShort(R.string.toast_bookmark_saved)
+            }
+        },
+        onDelete = {
+            val target = bookmarkTargetPost ?: return@FloorBookmarkEditDialog
+            coroutineScope.launch {
+                FloorBookmarkUtil.deleteBookmark(threadId, target.id)
+                context.toastShort(R.string.toast_bookmark_deleted)
+            }
+        }
+    )
+
+    FloorBookmarksDialog(
+        dialogState = bookmarksDialogState,
+        bookmarks = threadBookmarks,
+        onSelectBookmark = { bookmark ->
+            val targetPid = bookmark.postId.toLongOrNull() ?: 0L
+            val targetFloor = bookmark.floor
+            if (targetPid > 0L) {
+                val indexInData = data.indexOfFirst { it.post.get { id } == targetPid }
+                if (indexInData != -1) {
+                    coroutineScope.launch {
+                        val baseOffset = 2 + (if (hasPrevious) 1 else 0)
+                        lazyListState.animateScrollToItem(baseOffset + indexInData)
+                    }
+                } else {
+                    pendingScrollToPostId = targetPid
+                    viewModel.send(
+                        ThreadUiIntent.Load(
+                            threadId = threadId,
+                            page = 0,
+                            postId = targetPid,
+                            forumId = curForumId,
+                            seeLz = isSeeLz,
+                            sortType = curSortType
+                        )
+                    )
+                }
+                context.toastShort(context.getString(R.string.toast_jump_to_reading_history, targetFloor.toString()))
+            }
+        },
+        onDeleteBookmark = { bookmark ->
+            coroutineScope.launch {
+                FloorBookmarkUtil.deleteBookmarkById(bookmark.id)
+                threadBookmarks = FloorBookmarkUtil.getBookmarks(threadId)
+                context.toastShort(R.string.toast_bookmark_deleted)
+            }
+        }
+    )
+
     val jumpToPageDialogState = rememberDialogState()
     PromptDialog(
         onConfirm = {
@@ -1084,6 +1178,9 @@ fun ThreadPage(
                         )
                     }
                 }
+            },
+            onMenuBookmarkClick = {
+                openBookmarkEdit(it)
             },
             onMenuDeleteClick = {
                 deletePost = it.wrapImmutable()
@@ -1349,6 +1446,13 @@ fun ThreadPage(
                                 closeBottomSheet()
                                 jumpToPageDialogState.show()
                             },
+                            onBookmarksClick = {
+                                closeBottomSheet()
+                                coroutineScope.launch {
+                                    threadBookmarks = FloorBookmarkUtil.getBookmarks(threadId)
+                                    bookmarksDialogState.show()
+                                }
+                            },
                             onShareClick = {
                                 TiebaUtil.shareText(
                                     context,
@@ -1485,6 +1589,9 @@ fun ThreadPage(
                                                                 it.floor
                                                             )
                                                         )
+                                                    },
+                                                    onMenuBookmarkClick = {
+                                                        openBookmarkEdit(it)
                                                     },
                                                 ) {
                                                     deletePost = null
@@ -1889,6 +1996,7 @@ fun PostCard(
     onOpenSubPosts: (subPostId: Long) -> Unit = {},
     onMenuCopyClick: ((String) -> Unit)? = null,
     onMenuFavoriteClick: ((Post) -> Unit)? = null,
+    onMenuBookmarkClick: ((Post) -> Unit)? = null,
     onMenuDeleteClick: ((Post) -> Unit)? = null,
 ) {
     val context = LocalContext.current
@@ -1992,6 +2100,16 @@ fun PostCard(
                         } else {
                             Text(text = stringResource(id = R.string.title_collect_floor))
                         }
+                    }
+                }
+                if (onMenuBookmarkClick != null) {
+                    DropdownMenuItem(
+                        onClick = {
+                            onMenuBookmarkClick(post)
+                            menuState.expanded = false
+                        }
+                    ) {
+                        Text(text = stringResource(id = R.string.title_add_floor_bookmark))
                     }
                 }
                 if (canDelete(post) && onMenuDeleteClick != null) {
@@ -2298,6 +2416,7 @@ private fun ThreadMenu(
     onImmersiveModeClick: () -> Unit,
     onDescClick: () -> Unit,
     onJumpPageClick: () -> Unit,
+    onBookmarksClick: () -> Unit = {},
     onShareClick: () -> Unit,
     onCopyLinkClick: () -> Unit,
     onReportClick: () -> Unit,
@@ -2413,6 +2532,13 @@ private fun ThreadMenu(
                 text = stringResource(id = R.string.title_jump_page),
                 iconColor = ExtendedTheme.colors.text,
                 onClick = onJumpPageClick,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            ListMenuItem(
+                icon = Icons.Rounded.Bookmarks,
+                text = stringResource(id = R.string.title_thread_bookmarks),
+                iconColor = ExtendedTheme.colors.text,
+                onClick = onBookmarksClick,
                 modifier = Modifier.fillMaxWidth(),
             )
             ListMenuItem(

@@ -555,4 +555,13 @@
     <string name="tip_reading_history">上次读到第 %1$s 楼</string>
     <string name="btn_jump_to_reading_history">跳转</string>
     <string name="toast_jump_to_reading_history">已跳转至第 %1$s 楼</string>
+    <string name="title_add_floor_bookmark">添加书签</string>
+    <string name="title_edit_floor_bookmark">编辑书签</string>
+    <string name="title_thread_bookmarks">本帖书签</string>
+    <string name="hint_bookmark_note">备注（选填，如：重要线索、精彩回复）</string>
+    <string name="tip_empty_bookmarks">本帖暂无书签\n可在任意楼层菜单中点击「添加书签」</string>
+    <string name="btn_save_bookmark">保存书签</string>
+    <string name="btn_delete_bookmark">删除书签</string>
+    <string name="toast_bookmark_saved">已添加至本帖书签</string>
+    <string name="toast_bookmark_deleted">已删除书签</string>
 </resources>

@@ -552,4 +552,7 @@
     <string name="tip_qrcode_network_error">网络连接异常，点击重新获取</string>
     <string name="tip_vote_option_stat">%1$d 票 (%2$d%%)</string>
     <string name="toast_share_failed">未找到可用于分享的应用</string>
+    <string name="tip_reading_history">上次读到第 %1$s 楼</string>
+    <string name="btn_jump_to_reading_history">跳转</string>
+    <string name="toast_jump_to_reading_history">已跳转至第 %1$s 楼</string>
 </resources>

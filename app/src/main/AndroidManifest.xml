@@ -54,6 +54,7 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="true"
+        android:enableOnBackInvokedCallback="true"
         tools:ignore="UnusedAttribute">
         <service
             android:name=".services.OKSignService"

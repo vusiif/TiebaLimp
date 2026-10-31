@@ -1,5 +1,7 @@
 package com.huanchengfly.tieba.post.utils
 
+import com.huanchengfly.tieba.post.fromJson
+import com.huanchengfly.tieba.post.models.ThreadHistoryInfoBean
 import com.huanchengfly.tieba.post.models.database.History
 import com.huanchengfly.tieba.post.utils.extension.findFlow
 import kotlinx.coroutines.flow.Flow
@@ -51,6 +53,15 @@ object HistoryUtil {
             .limit(PAGE_SIZE)
             .offset(page * 100)
             .findFlow()
+    }
+
+    fun getHistory(data: String, type: Int = TYPE_THREAD): History? {
+        return LitePal.where("data = ? and type = ?", data, type.toString()).findFirst(History::class.java)
+    }
+
+    fun getThreadProgress(threadId: Long): ThreadHistoryInfoBean? {
+        val history = getHistory(threadId.toString(), TYPE_THREAD) ?: return null
+        return history.extras?.fromJson<ThreadHistoryInfoBean>()
     }
 
     private fun update(history: History): Boolean {

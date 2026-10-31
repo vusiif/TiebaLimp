@@ -168,6 +168,8 @@ import com.huanchengfly.tieba.post.ui.widgets.compose.buildChipInlineContent
 import com.huanchengfly.tieba.post.ui.widgets.compose.rememberDialogState
 import com.huanchengfly.tieba.post.ui.widgets.compose.rememberMenuState
 import com.huanchengfly.tieba.post.ui.widgets.compose.states.StateScreen
+import com.huanchengfly.tieba.post.ui.widgets.compose.PredictiveBackBox
+import com.huanchengfly.tieba.post.ui.widgets.compose.ResumeReadingPill
 import com.huanchengfly.tieba.post.utils.DateTimeUtils.getRelativeTimeString
 import com.huanchengfly.tieba.post.utils.HistoryUtil
 import com.huanchengfly.tieba.post.utils.StringUtil
@@ -181,7 +183,10 @@ import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlin.concurrent.thread
 import kotlin.math.max
@@ -471,8 +476,8 @@ private fun ThreadLoadMoreIndicator(
                             modifier = Modifier.padding(horizontal = 8.dp)
                         )
                     }
-                }
             }
+        }
         }
     }
 }
@@ -668,6 +673,82 @@ fun ThreadPage(
     }
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
+
+    var readingProgress by remember { mutableStateOf<ThreadHistoryInfoBean?>(null) }
+    var showResumePill by remember { mutableStateOf(false) }
+    var pendingScrollToPostId by remember { mutableStateOf<Long?>(null) }
+
+    LaunchedEffect(threadId) {
+        if (postId == 0L) {
+            val progress = withContext(Dispatchers.IO) {
+                runCatching { HistoryUtil.getThreadProgress(threadId) }.getOrNull()
+            }
+            val floor = progress?.floor?.toIntOrNull() ?: 0
+            val pid = progress?.pid?.toLongOrNull() ?: 0L
+            if (floor > 1 && pid > 0L) {
+                readingProgress = progress
+                showResumePill = true
+            }
+        }
+    }
+
+    LaunchedEffect(showResumePill) {
+        if (showResumePill) {
+            delay(8000)
+            showResumePill = false
+        }
+    }
+
+    LaunchedEffect(lastVisibilityPostId) {
+        if (showResumePill) {
+            val currentFloor = lastVisibilityPost?.get { floor } ?: 0
+            val targetFloor = readingProgress?.floor?.toIntOrNull() ?: 0
+            if (currentFloor > 5 || (targetFloor > 0 && currentFloor >= targetFloor)) {
+                showResumePill = false
+            }
+        }
+    }
+
+    LaunchedEffect(data, pendingScrollToPostId) {
+        val targetId = pendingScrollToPostId ?: return@LaunchedEffect
+        val indexInData = data.indexOfFirst { it.post.get { id } == targetId }
+        if (indexInData != -1) {
+            pendingScrollToPostId = null
+            val baseOffset = 2 + (if (hasPrevious) 1 else 0)
+            lazyListState.animateScrollToItem(baseOffset + indexInData)
+        }
+    }
+
+    val onJumpToResume: () -> Unit = {
+        readingProgress?.let { progress ->
+            val targetPid = progress.pid?.toLongOrNull() ?: 0L
+            val targetFloor = progress.floor.orEmpty()
+            showResumePill = false
+            if (targetPid > 0L) {
+                val indexInData = data.indexOfFirst { it.post.get { id } == targetPid }
+                if (indexInData != -1) {
+                    coroutineScope.launch {
+                        val baseOffset = 2 + (if (hasPrevious) 1 else 0)
+                        lazyListState.animateScrollToItem(baseOffset + indexInData)
+                    }
+                } else {
+                    pendingScrollToPostId = targetPid
+                    viewModel.send(
+                        ThreadUiIntent.Load(
+                            threadId = threadId,
+                            page = 0,
+                            postId = targetPid,
+                            forumId = curForumId,
+                            seeLz = isSeeLz,
+                            sortType = curSortType
+                        )
+                    )
+                }
+                context.toastShort(context.getString(R.string.toast_jump_to_reading_history, targetFloor))
+            }
+        }
+    }
+
     val openBottomSheet = {
         coroutineScope.launch {
             bottomSheetState.show()
@@ -762,17 +843,7 @@ fun ThreadPage(
     ) {
         Text(text = stringResource(R.string.message_update_collect_mark, readFloorBeforeBack))
     }
-    MyBackHandler(
-        enabled = isCollected && !bottomSheetState.isVisible,
-        currentScreen = ThreadPageDestination
-    ) {
-        readFloorBeforeBack = lastVisibilityPost?.get { floor } ?: 0
-        if (readFloorBeforeBack != 0) {
-            updateCollectMarkDialogState.show()
-        } else {
-            navigator.navigateUp()
-        }
-    }
+
 
     val confirmDeleteDialogState = rememberDialogState()
     var deletePost by remember { mutableStateOf<ImmutableHolder<Post>?>(null) }
@@ -1086,8 +1157,38 @@ fun ThreadPage(
         }
     }
 
+    val handleBack: () -> Unit = {
+        if (isCollected) {
+            readFloorBeforeBack = lastVisibilityPost?.get { floor } ?: 0
+            if (readFloorBeforeBack != 0) {
+                updateCollectMarkDialogState.show()
+            } else {
+                navigator.navigateUp()
+            }
+        } else {
+            navigator.navigateUp()
+        }
+    }
+
     ProvideNavigator(navigator = navigator) {
-        StateScreen(
+        PredictiveBackBox(
+            enabled = !bottomSheetState.isVisible,
+            currentScreen = ThreadPageDestination,
+            onBackConfirm = { reset ->
+                if (isCollected) {
+                    readFloorBeforeBack = lastVisibilityPost?.get { floor } ?: 0
+                    if (readFloorBeforeBack != 0) {
+                        reset()
+                        updateCollectMarkDialogState.show()
+                    } else {
+                        navigator.navigateUp()
+                    }
+                } else {
+                    navigator.navigateUp()
+                }
+            }
+        ) {
+            StateScreen(
             modifier = Modifier.fillMaxSize(),
             isEmpty = isEmpty,
             isError = isError,
@@ -1116,7 +1217,7 @@ fun ThreadPage(
                 topBar = {
                     TopBar(
                         forum = forum,
-                        onBack = { navigator.navigateUp() },
+                        onBack = handleBack,
                         onForumClick = {
                             val forumName = forum?.get { name }
                             if (forumName != null) navigator.navigate(
@@ -1291,6 +1392,7 @@ fun ThreadPage(
                 ) {
                     Box(
                         modifier = Modifier
+                            .fillMaxSize()
                             .pullRefresh(state = pullRefreshState, enabled = enablePullRefresh)
                     ) {
                         LoadMoreLayout(
@@ -1618,9 +1720,20 @@ fun ThreadPage(
                             backgroundColor = ExtendedTheme.colors.pullRefreshIndicator,
                             contentColor = ExtendedTheme.colors.primary,
                         )
+
+                        ResumeReadingPill(
+                            visible = showResumePill,
+                            floor = readingProgress?.floor.orEmpty(),
+                            onJump = onJumpToResume,
+                            onDismiss = { showResumePill = false },
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = 16.dp)
+                        )
                     }
                 }
             }
+        }
         }
     }
 }

@@ -444,7 +444,7 @@ class App : Application(), SketchFactory {
                                 packageName
                             )
                         )
-                    } else if (ThemeUtil.isNightMode()) {
+                    } else if (ThemeUtil.isNightMode(theme)) {
                         context.getColorCompat(
                             resources.getIdentifier(
                                 "theme_color_background_$theme",

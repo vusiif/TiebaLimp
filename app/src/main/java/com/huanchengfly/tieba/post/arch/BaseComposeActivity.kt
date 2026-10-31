@@ -1,6 +1,7 @@
 package com.huanchengfly.tieba.post.arch
 
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.os.Parcelable
 import android.widget.Toast
@@ -62,6 +63,10 @@ abstract class BaseComposeActivity : BaseActivity() {
         super.onCreate(savedInstanceState)
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
+            window.isStatusBarContrastEnforced = false
+        }
         setContent {
             TiebaLiteTheme {
                 val systemUiController = rememberSystemUiController()

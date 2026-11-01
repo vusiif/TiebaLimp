@@ -153,7 +153,7 @@ object StringUtil {
         }
         return if (portrait.startsWith("http://") || portrait.startsWith("https://")) {
             portrait
-        } else "http://tb.himg.baidu.com/sys/portrait/item/$portrait"
+        } else "https://tb.himg.baidu.com/sys/portrait/item/$portrait"
     }
 
     @JvmStatic
@@ -163,7 +163,7 @@ object StringUtil {
         }
         return if (portrait.startsWith("http://") || portrait.startsWith("https://")) {
             portrait
-        } else "http://tb.himg.baidu.com/sys/portraith/item/$portrait"
+        } else "https://tb.himg.baidu.com/sys/portraith/item/$portrait"
     }
 
     fun String.getShortNumString(): String {

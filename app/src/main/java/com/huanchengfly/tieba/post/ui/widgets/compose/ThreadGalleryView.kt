@@ -135,11 +135,12 @@ fun ThreadGalleryView(
 ) {
     val gridState = rememberLazyStaggeredGridState()
 
-    val shouldLoadMore by remember {
+    val shouldLoadMore by remember(images, hasMore) {
         derivedStateOf {
             val totalItems = images.size
-            if (totalItems == 0) false
-            else {
+            if (totalItems == 0) {
+                hasMore
+            } else {
                 val lastVisibleItem = gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
                 lastVisibleItem >= totalItems - 4
             }
@@ -152,28 +153,45 @@ fun ThreadGalleryView(
         }
     }
 
-    if (images.isEmpty() && !isLoadingMore) {
+    if (images.isEmpty()) {
         Box(
             modifier = modifier
                 .fillMaxSize()
                 .padding(contentPadding),
             contentAlignment = Alignment.Center
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.BrowseGallery,
-                    contentDescription = null,
-                    tint = ExtendedTheme.colors.textSecondary.copy(alpha = 0.5f),
-                    modifier = Modifier.size(64.dp)
-                )
-                Text(
-                    text = stringResource(id = R.string.tip_empty_gallery),
-                    style = MaterialTheme.typography.body2,
-                    color = ExtendedTheme.colors.textSecondary
-                )
+            if (isLoadingMore || hasMore) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    CircularProgressIndicator(
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(32.dp)
+                    )
+                    Text(
+                        text = stringResource(id = R.string.tip_loading_gallery),
+                        style = MaterialTheme.typography.body2,
+                        color = ExtendedTheme.colors.textSecondary
+                    )
+                }
+            } else {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.BrowseGallery,
+                        contentDescription = null,
+                        tint = ExtendedTheme.colors.textSecondary.copy(alpha = 0.5f),
+                        modifier = Modifier.size(64.dp)
+                    )
+                    Text(
+                        text = stringResource(id = R.string.tip_empty_gallery),
+                        style = MaterialTheme.typography.body2,
+                        color = ExtendedTheme.colors.textSecondary
+                    )
+                }
             }
         }
     } else {

@@ -2,6 +2,18 @@
 <data-extraction-rules xmlns:tools="http://schemas.android.com/tools">
     <cloud-backup>
         <exclude
+            domain="database"
+            path="tblite.db" />
+        <exclude
+            domain="database"
+            path="tblite.db-journal" />
+        <exclude
+            domain="database"
+            path="tblite.db-wal" />
+        <exclude
+            domain="database"
+            path="tblite.db-shm" />
+        <exclude
             domain="sharedpref"
             path="crash.xml" />
         <exclude
@@ -10,6 +22,18 @@
             tools:ignore="FullBackupContent" />
     </cloud-backup>
     <device-transfer>
+        <exclude
+            domain="database"
+            path="tblite.db" />
+        <exclude
+            domain="database"
+            path="tblite.db-journal" />
+        <exclude
+            domain="database"
+            path="tblite.db-wal" />
+        <exclude
+            domain="database"
+            path="tblite.db-shm" />
         <exclude
             domain="sharedpref"
             path="crash.xml" />

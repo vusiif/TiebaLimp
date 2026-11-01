@@ -258,6 +258,7 @@ internal fun ReplyPageContent(
         }
     }
 
+    var isDraftLoaded by remember { mutableStateOf(false) }
     val curTextFlow = remember { MutableStateFlow("") }
     val curText by curTextFlow.collectAsState()
     LaunchedEffect(Unit) {
@@ -265,8 +266,7 @@ internal fun ReplyPageContent(
             .sample(500)
             .distinctUntilChanged()
             .collect {
-                Log.i("ReplyPage", "collect: $it")
-                if (!replySuccess) {
+                if (isDraftLoaded && !replySuccess) {
                     thread {
                         Draft(hash, it).saveOrUpdate("hash = ?", hash)
                     }
@@ -279,6 +279,7 @@ internal fun ReplyPageContent(
                 if (it != null) {
                     setText(it.content)
                 }
+                isDraftLoaded = true
             }
     }
     val textLength by remember { derivedStateOf { curText.length } }

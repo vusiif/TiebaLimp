@@ -7,8 +7,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.datastore.core.DataMigration
 import androidx.datastore.core.DataStore
@@ -60,18 +63,29 @@ fun <T> rememberPreferenceAsMutableState(
     defaultValue: T
 ): MutableState<T> {
     val dataStore = LocalContext.current.dataStore
+    val coroutineScope = rememberCoroutineScope()
+    val persistedValue by rememberPreferenceAsState(key, defaultValue)
     val state = remember { mutableStateOf(defaultValue) }
 
-    LaunchedEffect(Unit) {
-        dataStore.data.map { it[key] ?: defaultValue }.distinctUntilChanged()
-            .collect { state.value = it }
+    LaunchedEffect(persistedValue) {
+        state.value = persistedValue
     }
 
-    LaunchedEffect(state.value) {
-        dataStore.edit { it[key] = state.value }
-    }
+    return remember(key, dataStore) {
+        object : MutableState<T> {
+            override var value: T
+                get() = state.value
+                set(newVal) {
+                    state.value = newVal
+                    coroutineScope.launch {
+                        dataStore.edit { it[key] = newVal }
+                    }
+                }
 
-    return state
+            override fun component1(): T = value
+            override fun component2(): (T) -> Unit = { value = it }
+        }
+    }
 }
 
 @Composable
@@ -80,18 +94,12 @@ fun <T> rememberPreferenceAsState(
     defaultValue: T
 ): State<T> {
     val dataStore = LocalContext.current.dataStore
-    val state = remember { mutableStateOf(defaultValue) }
-
-    LaunchedEffect(Unit) {
-        dataStore.data.map { it[key] ?: defaultValue }.distinctUntilChanged()
-            .collect { state.value = it }
+    val preferenceFlow = remember(dataStore, key, defaultValue) {
+        dataStore.data
+            .map { it[key] ?: defaultValue }
+            .distinctUntilChanged()
     }
-
-    LaunchedEffect(state.value) {
-        dataStore.edit { it[key] = state.value }
-    }
-
-    return state
+    return preferenceFlow.collectAsState(initial = defaultValue)
 }
 
 @SuppressLint("FlowOperatorInvokedInComposition")

@@ -146,7 +146,8 @@ object BlockManager {
                     val pattern = block.pattern
                     if (!pattern.isNullOrBlank()) {
                         val regex = getOrCompileRegex(pattern)
-                        if (regex != null && regex.containsMatchIn(content)) {
+                        val boundedContent = if (content.length > 4000) content.subSequence(0, 4000) else content
+                        if (regex != null && regex.containsMatchIn(boundedContent)) {
                             return false
                         }
                     }
@@ -168,7 +169,8 @@ object BlockManager {
                     val pattern = block.pattern
                     if (!pattern.isNullOrBlank()) {
                         val regex = getOrCompileRegex(pattern)
-                        if (regex != null && regex.containsMatchIn(content)) {
+                        val boundedContent = if (content.length > 4000) content.subSequence(0, 4000) else content
+                        if (regex != null && regex.containsMatchIn(boundedContent)) {
                             return true
                         }
                     }
@@ -252,6 +254,22 @@ object BlockManager {
         return GsonUtil.getGson().toJson(dtos)
     }
 
+    fun isDuplicateRule(newBlock: Block): Boolean {
+        return blockList.any { existing ->
+            existing.category == newBlock.category &&
+            existing.type == newBlock.type &&
+            when (newBlock.type) {
+                Block.TYPE_KEYWORD -> existing.keywords == newBlock.keywords
+                Block.TYPE_USER -> (existing.uid != null && existing.uid == newBlock.uid) ||
+                        (!existing.username.isNullOrBlank() && existing.username == newBlock.username)
+                Block.TYPE_REGEX -> existing.pattern == newBlock.pattern
+                Block.TYPE_USER_LEVEL -> existing.minLevel == newBlock.minLevel
+                Block.TYPE_IP_REGION -> existing.ipRegion?.trim().equals(newBlock.ipRegion?.trim(), ignoreCase = true)
+                else -> false
+            }
+        }
+    }
+
     fun importRulesFromJson(json: String): Int {
         if (json.isBlank()) return 0
         val gson = GsonUtil.getGson()
@@ -260,23 +278,40 @@ object BlockManager {
             gson.fromJson<List<BlockRuleDto>>(json, type)
         }.getOrNull() ?: emptyList()
 
+        if (importedList.isEmpty()) return 0
+
         var count = 0
-        for (dto in importedList) {
+        val validList = importedList.take(500)
+        for (dto in validList) {
+            val category = dto.category.takeIf { it == Block.CATEGORY_BLACK_LIST || it == Block.CATEGORY_WHITE_LIST } ?: continue
+            val ruleType = dto.type.takeIf { it in Block.TYPE_KEYWORD..Block.TYPE_IP_REGION } ?: continue
+
+            if (ruleType == Block.TYPE_REGEX) {
+                val p = dto.pattern?.trim()
+                if (p.isNullOrBlank() || p.length > 200 || runCatching { Regex(p) }.isFailure) {
+                    continue
+                }
+            }
+
             val block = Block(
-                category = dto.category,
-                type = dto.type,
+                category = category,
+                type = ruleType,
                 keywords = dto.keywords?.let { gson.toJson(it) },
-                username = dto.username,
-                uid = dto.uid,
-                pattern = dto.pattern,
+                username = dto.username?.trim(),
+                uid = dto.uid?.trim(),
+                pattern = dto.pattern?.trim(),
                 minLevel = dto.minLevel ?: 0,
-                ipRegion = dto.ipRegion,
+                ipRegion = dto.ipRegion?.trim(),
             )
+
+            if (isDuplicateRule(block)) continue
+
             block.save()
             blockList.add(block)
             count++
         }
         compiledRegexCache.clear()
+        parsedKeywordsCache.clear()
         return count
     }
 

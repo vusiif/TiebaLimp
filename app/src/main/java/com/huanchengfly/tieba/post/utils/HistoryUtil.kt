@@ -21,11 +21,11 @@ object HistoryUtil {
     }
 
     @JvmOverloads
-    fun saveHistory(history: History, async: Boolean = true) {
+    fun saveHistory(history: History, async: Boolean = true, incrementCount: Boolean = true) {
         if (async) {
-            saveOrUpdateAsync(history)
+            saveOrUpdateAsync(history, incrementCount)
         } else {
-            saveOrUpdate(history)
+            saveOrUpdate(history, incrementCount)
         }
     }
 
@@ -64,67 +64,60 @@ object HistoryUtil {
         return history.extras?.fromJson<ThreadHistoryInfoBean>()
     }
 
-    private fun update(history: History): Boolean {
-        val historyBean = LitePal.where("data = ?", history.data).findFirst(
+    fun updateThreadProgress(threadId: Long, extras: String): Boolean = synchronized(this) {
+        val historyBean = LitePal.where("data = ? and type = ?", threadId.toString(), TYPE_THREAD.toString())
+            .findFirst(History::class.java)
+        if (historyBean != null) {
+            historyBean.copy(
+                timestamp = System.currentTimeMillis(),
+                extras = extras
+            ).update(historyBean.id) > 0
+        } else {
+            false
+        }
+    }
+
+    private fun update(history: History, incrementCount: Boolean = true): Boolean {
+        val historyBean = LitePal.where("data = ? and type = ?", history.data, history.type.toString()).findFirst(
             History::class.java
         )
         if (historyBean != null) {
             historyBean.copy(
                 timestamp = System.currentTimeMillis(),
-                title = history.title,
-                extras = history.extras,
-                avatar = history.avatar,
-                username = history.username,
-                count = historyBean.count + 1
+                title = history.title.ifBlank { historyBean.title },
+                extras = history.extras ?: historyBean.extras,
+                avatar = history.avatar ?: historyBean.avatar,
+                username = history.username ?: historyBean.username,
+                count = if (incrementCount) historyBean.count + 1 else historyBean.count
             ).update(historyBean.id)
             return true
         }
         return false
     }
 
-    private fun updateAsync(
-        history: History,
-        callback: ((Boolean) -> Unit)? = null,
-    ) {
-        LitePal.where("data = ?", history.data).findFirstAsync<History?>()
-            .listen {
-                if (it == null) {
-                    callback?.invoke(false)
-                } else {
-                    history.copy(
-                        timestamp = System.currentTimeMillis(),
-                        count = it.count + 1
-                    ).updateAsync(it.id).listen {
-                        callback?.invoke(true)
-                    }
-                }
-            }
-    }
-
-    private fun saveOrUpdate(history: History, async: Boolean = false) {
-        if (update(history)) {
+    @Synchronized
+    private fun saveOrUpdate(history: History, incrementCount: Boolean = true) {
+        if (update(history, incrementCount)) {
             return
         }
         val saveHistory = history.copy(count = 1, timestamp = System.currentTimeMillis())
-        if (async) {
-            saveHistory.saveAsync().listen(null)
-        } else {
-            saveHistory.save()
-        }
+        saveHistory.save()
     }
 
     private fun saveOrUpdateAsync(
         history: History,
+        incrementCount: Boolean = true,
         callback: ((Boolean) -> Unit)? = null
     ) {
-        updateAsync(history) { success ->
-            if (!success) {
-                history.copy(count = 1, timestamp = System.currentTimeMillis())
-                    .saveAsync()
-                    .listen {
-                        callback?.invoke(it)
-                    }
+        kotlin.concurrent.thread {
+            val success = synchronized(HistoryUtil) {
+                if (update(history, incrementCount)) {
+                    true
+                } else {
+                    history.copy(count = 1, timestamp = System.currentTimeMillis()).save()
+                }
             }
+            callback?.invoke(success)
         }
     }
 }

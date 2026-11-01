@@ -1052,35 +1052,33 @@ fun ThreadPage(
 
     var savedHistory by remember { mutableStateOf(false) }
     LaunchedEffect(threadId, threadTitle, author, lastVisibilityPostId) {
-        val saveHistory = {
-            thread {
-                runCatching {
-                    if (threadTitle.isNotBlank()) {
-                        HistoryUtil.saveHistory(
-                            History(
-                                title = threadTitle,
-                                data = threadId.toString(),
-                                type = HistoryUtil.TYPE_THREAD,
-                                extras = ThreadHistoryInfoBean(
-                                    isSeeLz = isSeeLz,
-                                    pid = lastVisibilityPostId.toString(),
-                                    forumName = forum?.get { name },
-                                    floor = lastVisibilityPost?.get { floor }?.toString()
-                                ).toJson(),
-                                avatar = StringUtil.getAvatarUrl(author?.get { portrait }),
-                                username = author?.get { nameShow }
-                            ),
-                            async = true
-                        )
-                        savedHistory = true
-                        Log.i("ThreadPage", "saveHistory $lastVisibilityPostId")
-                    }
-                }
-            }
+        if (threadTitle.isBlank()) return@LaunchedEffect
+
+        if (savedHistory && lastVisibilityPostId != 0L) {
+            delay(600)
         }
 
-        if (!savedHistory || lastVisibilityPostId != 0L) {
-            saveHistory()
+        withContext(Dispatchers.IO) {
+            runCatching {
+                HistoryUtil.saveHistory(
+                    History(
+                        title = threadTitle,
+                        data = threadId.toString(),
+                        type = HistoryUtil.TYPE_THREAD,
+                        extras = ThreadHistoryInfoBean(
+                            isSeeLz = isSeeLz,
+                            pid = lastVisibilityPostId.toString(),
+                            forumName = forum?.get { name },
+                            floor = lastVisibilityPost?.get { floor }?.toString()
+                        ).toJson(),
+                        avatar = StringUtil.getAvatarUrl(author?.get { portrait }),
+                        username = author?.get { nameShow }
+                    ),
+                    async = false,
+                    incrementCount = !savedHistory
+                )
+                savedHistory = true
+            }
         }
     }
 

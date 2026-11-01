@@ -45,10 +45,8 @@ abstract class BaseViewModel<
 
     val uiState = partialChangeProducer.toPartialChangeFlow(_intentFlow)
         .onEach {
-            Log.i("ViewModel", "partialChange $it")
             val event = dispatchEvent(it)
             if (event != null) {
-                Log.i("ViewModel", "event $event")
                 _internalUiEventFlow.emit(event)
             }
         }
@@ -62,7 +60,6 @@ abstract class BaseViewModel<
     protected open fun dispatchEvent(partialChange: PC): UiEvent? = null
 
     fun send(intent: Intent) {
-        Log.i("ViewModel", "send $intent")
         viewModelScope.launch {
             _intentFlow.emit(intent)
         }

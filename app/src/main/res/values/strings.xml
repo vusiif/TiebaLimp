@@ -589,4 +589,6 @@
     <string name="tip_empty_gallery">当前已加载楼层暂无图片</string>
     <string name="btn_jump_to_post">定位</string>
     <string name="toast_jump_to_floor">已定位至第 %d 楼</string>
+    <string name="tip_confirm_clear_blacklist">确定清空全部黑名单规则吗？</string>
+    <string name="tip_confirm_clear_whitelist">确定清空全部白名单规则吗？</string>
 </resources>

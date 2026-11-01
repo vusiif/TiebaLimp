@@ -964,7 +964,12 @@ fun ThreadPage(
         onSelectBookmark = { bookmark ->
             val targetPid = bookmark.postId.toLongOrNull() ?: 0L
             val targetFloor = bookmark.floor
-            if (targetPid > 0L) {
+            if (targetFloor == 1 || (targetPid > 0L && firstPost?.get { id } == targetPid)) {
+                coroutineScope.launch {
+                    lazyListState.animateScrollToItem(0)
+                }
+                context.toastShort(context.getString(R.string.toast_jump_to_reading_history, "1"))
+            } else if (targetPid > 0L) {
                 val indexInData = data.indexOfFirst { it.post.get { id } == targetPid }
                 if (indexInData != -1) {
                     coroutineScope.launch {
@@ -1553,7 +1558,7 @@ fun ThreadPage(
                                     isGalleryMode = false
                                     if (floor == 1L) {
                                         coroutineScope.launch {
-                                            lazyListState.animateScrollToItem(1)
+                                            lazyListState.animateScrollToItem(0)
                                         }
                                     } else {
                                         val indexInData = data.indexOfFirst { it.post.get { id } == targetPid }
@@ -1810,8 +1815,8 @@ fun ThreadPage(
                                 if (curSortType == ThreadSortType.SORT_TYPE_DESC) {
                                     latestPosts(true)
                                 }
-                                item(key = "LoadPreviousBtn") {
-                                    if (hasPrevious) {
+                                if (hasPrevious) {
+                                    item(key = "LoadPreviousBtn") {
                                         Container {
                                             Row(
                                                 modifier = Modifier

@@ -148,8 +148,10 @@ fun BlockListPage(
         title = { Text(text = stringResource(id = R.string.btn_clear_rules)) },
         content = {
             Text(
-                text = if (pagerState.currentPage == 0) "确定清空全部黑名单规则吗？"
-                else "确定清空全部白名单规则吗？"
+                text = stringResource(
+                    id = if (pagerState.currentPage == 0) R.string.tip_confirm_clear_blacklist
+                    else R.string.tip_confirm_clear_whitelist
+                )
             )
         }
     )

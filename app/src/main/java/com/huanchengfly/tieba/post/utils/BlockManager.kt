@@ -7,6 +7,7 @@ import com.huanchengfly.tieba.post.api.models.protos.SubPostList
 import com.huanchengfly.tieba.post.api.models.protos.ThreadInfo
 import com.huanchengfly.tieba.post.api.models.protos.abstractText
 import com.huanchengfly.tieba.post.api.models.protos.plainText
+import com.huanchengfly.tieba.post.fromJson
 import com.huanchengfly.tieba.post.models.database.Block
 import com.huanchengfly.tieba.post.models.database.Block.Companion.getKeywords
 import org.litepal.LitePal
@@ -18,6 +19,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 object BlockManager {
     private val blockList: MutableList<Block> = CopyOnWriteArrayList()
     private val compiledRegexCache = ConcurrentHashMap<String, Regex?>()
+    private val parsedKeywordsCache = ConcurrentHashMap<String, List<String>>()
 
     val blackList: List<Block>
         get() = blockList.filter { it.category == Block.CATEGORY_BLACK_LIST }
@@ -41,6 +43,13 @@ object BlockManager {
             runCatching {
                 Regex(pattern, setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE))
             }.getOrNull()
+        }
+    }
+
+    private fun getOrParseKeywords(raw: String?): List<String> {
+        if (raw.isNullOrBlank()) return emptyList()
+        return parsedKeywordsCache.computeIfAbsent(raw) {
+            runCatching { raw.fromJson<List<String>>() }.getOrNull() ?: emptyList()
         }
     }
 
@@ -84,6 +93,7 @@ object BlockManager {
             blockList.removeAll { it.category == category }
         }
         compiledRegexCache.clear()
+        parsedKeywordsCache.clear()
     }
 
     fun init() {
@@ -91,6 +101,7 @@ object BlockManager {
             blockList.clear()
             blockList.addAll(blocks)
             compiledRegexCache.clear()
+            parsedKeywordsCache.clear()
         }
     }
 
@@ -105,86 +116,120 @@ object BlockManager {
 
     fun isWhitelistedUser(userId: Long = 0L, userName: String? = null): Boolean {
         if (userId <= 0L && userName.isNullOrBlank()) return false
-        return whiteList.any { block ->
-            block.type == Block.TYPE_USER && (
-                (userId > 0L && block.uid == userId.toString()) ||
-                (!userName.isNullOrBlank() && block.username == userName)
-            )
+        for (block in blockList) {
+            if (block.category == Block.CATEGORY_WHITE_LIST && block.type == Block.TYPE_USER) {
+                if ((userId > 0L && block.uid == userId.toString()) ||
+                    (!userName.isNullOrBlank() && block.username == userName)
+                ) {
+                    return true
+                }
+            }
         }
+        return false
     }
 
     fun shouldBlockContent(content: CharSequence?): Boolean {
         if (content.isNullOrEmpty()) return false
         val contentStr = content.toString()
 
-        val blackKeywords = blackList.filter { it.type == Block.TYPE_KEYWORD }
-        val whiteKeywords = whiteList.filter { it.type == Block.TYPE_KEYWORD }
-        val blackRegexes = blackList.filter { it.type == Block.TYPE_REGEX && !it.pattern.isNullOrBlank() }
-        val whiteRegexes = whiteList.filter { it.type == Block.TYPE_REGEX && !it.pattern.isNullOrBlank() }
-
-        val matchesWhiteKeyword = whiteKeywords.any { block ->
-            val kws = block.getKeywords()
-            kws.isNotEmpty() && kws.all { contentStr.contains(it, ignoreCase = true) }
-        }
-        val matchesWhiteRegex = whiteRegexes.any { block ->
-            val regex = getOrCompileRegex(block.pattern!!)
-            regex != null && regex.containsMatchIn(content)
-        }
-        if (matchesWhiteKeyword || matchesWhiteRegex) {
-            return false
-        }
-
-        val matchesBlackKeyword = blackKeywords.any { block ->
-            val kws = block.getKeywords()
-            kws.isNotEmpty() && kws.all { contentStr.contains(it, ignoreCase = true) }
-        }
-        if (matchesBlackKeyword) {
-            return true
+        // 1. Whitelist pass (no temporary allocations)
+        for (block in blockList) {
+            if (block.category != Block.CATEGORY_WHITE_LIST) continue
+            when (block.type) {
+                Block.TYPE_KEYWORD -> {
+                    val kws = getOrParseKeywords(block.keywords)
+                    if (kws.isNotEmpty() && kws.all { contentStr.contains(it, ignoreCase = true) }) {
+                        return false
+                    }
+                }
+                Block.TYPE_REGEX -> {
+                    val pattern = block.pattern
+                    if (!pattern.isNullOrBlank()) {
+                        val regex = getOrCompileRegex(pattern)
+                        if (regex != null && regex.containsMatchIn(content)) {
+                            return false
+                        }
+                    }
+                }
+            }
         }
 
-        val matchesBlackRegex = blackRegexes.any { block ->
-            val regex = getOrCompileRegex(block.pattern!!)
-            regex != null && regex.containsMatchIn(content)
+        // 2. Blacklist pass (no temporary allocations)
+        for (block in blockList) {
+            if (block.category != Block.CATEGORY_BLACK_LIST) continue
+            when (block.type) {
+                Block.TYPE_KEYWORD -> {
+                    val kws = getOrParseKeywords(block.keywords)
+                    if (kws.isNotEmpty() && kws.all { contentStr.contains(it, ignoreCase = true) }) {
+                        return true
+                    }
+                }
+                Block.TYPE_REGEX -> {
+                    val pattern = block.pattern
+                    if (!pattern.isNullOrBlank()) {
+                        val regex = getOrCompileRegex(pattern)
+                        if (regex != null && regex.containsMatchIn(content)) {
+                            return true
+                        }
+                    }
+                }
+            }
         }
-        return matchesBlackRegex
+
+        return false
     }
 
     fun shouldBlockUser(userId: Long = 0L, userName: String? = null): Boolean {
         if (isWhitelistedUser(userId, userName)) return false
-        return blackList.any { block ->
-            block.type == Block.TYPE_USER && (
-                (userId > 0L && block.uid == userId.toString()) ||
-                (!userName.isNullOrBlank() && block.username == userName)
-            )
+        for (block in blockList) {
+            if (block.category == Block.CATEGORY_BLACK_LIST && block.type == Block.TYPE_USER) {
+                if ((userId > 0L && block.uid == userId.toString()) ||
+                    (!userName.isNullOrBlank() && block.username == userName)
+                ) {
+                    return true
+                }
+            }
         }
+        return false
     }
 
     fun shouldBlockIp(rawIp: String?): Boolean {
         val cleanIp = normalizeIpAddress(rawIp)
         if (cleanIp.isEmpty()) return false
 
-        val blackIps = blackList.filter { it.type == Block.TYPE_IP_REGION && !it.ipRegion.isNullOrBlank() }
-        val whiteIps = whiteList.filter { it.type == Block.TYPE_IP_REGION && !it.ipRegion.isNullOrBlank() }
-
-        val matchesWhite = whiteIps.any { block ->
-            val target = block.ipRegion!!.trim()
-            cleanIp.contains(target, ignoreCase = true) || target.contains(cleanIp, ignoreCase = true)
+        // Check whitelist
+        for (block in blockList) {
+            if (block.category == Block.CATEGORY_WHITE_LIST && block.type == Block.TYPE_IP_REGION) {
+                val target = block.ipRegion?.trim().orEmpty()
+                if (target.isNotEmpty() && (cleanIp.contains(target, ignoreCase = true) || target.contains(cleanIp, ignoreCase = true))) {
+                    return false
+                }
+            }
         }
-        if (matchesWhite) return false
 
-        return blackIps.any { block ->
-            val target = block.ipRegion!!.trim()
-            cleanIp.contains(target, ignoreCase = true) || target.contains(cleanIp, ignoreCase = true)
+        // Check blacklist
+        for (block in blockList) {
+            if (block.category == Block.CATEGORY_BLACK_LIST && block.type == Block.TYPE_IP_REGION) {
+                val target = block.ipRegion?.trim().orEmpty()
+                if (target.isNotEmpty() && (cleanIp.contains(target, ignoreCase = true) || target.contains(cleanIp, ignoreCase = true))) {
+                    return true
+                }
+            }
         }
+
+        return false
     }
 
     fun shouldBlockLevel(level: Int): Boolean {
-        val blackLevelRules = blackList.filter { it.type == Block.TYPE_USER_LEVEL && it.minLevel > 0 }
-        if (blackLevelRules.isEmpty()) return false
-
-        return blackLevelRules.any { block ->
-            level < block.minLevel
+        if (level <= 0) return false
+        for (block in blockList) {
+            if (block.category == Block.CATEGORY_BLACK_LIST && block.type == Block.TYPE_USER_LEVEL && block.minLevel > 0) {
+                if (level < block.minLevel) {
+                    return true
+                }
+            }
         }
+        return false
     }
 
     fun shouldBlock(content: String): Boolean = shouldBlockContent(content)

@@ -93,6 +93,7 @@ fun BlockListPage(
     val addDialogState = rememberDialogState()
     val importDialogState = rememberDialogState()
     val clearConfirmDialogState = rememberDialogState()
+    val simulatorDialogState = rememberDialogState()
 
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
@@ -113,10 +114,12 @@ fun BlockListPage(
         initial = false
     )
 
+    RuleSimulatorDialog(dialogState = simulatorDialogState)
+
     AddBlockRuleDialog(
         dialogState = addDialogState,
         category = addBlockCategory,
-        onConfirm = { type, keywords, username, uid, pattern, minLevel, ipRegion ->
+        onConfirm = { type, keywords, username, uid, pattern, minLevel, ipRegion, forum ->
             viewModel.send(
                 BlockListUiIntent.Add(
                     category = addBlockCategory,
@@ -127,6 +130,7 @@ fun BlockListPage(
                     pattern = pattern,
                     minLevel = minLevel,
                     ipRegion = ipRegion,
+                    forum = forum,
                 )
             )
         }
@@ -182,6 +186,12 @@ fun BlockListPage(
                         expanded = menuExpanded,
                         onDismissRequest = { menuExpanded = false }
                     ) {
+                        DropdownMenuItem(onClick = {
+                            menuExpanded = false
+                            simulatorDialogState.show()
+                        }) {
+                            Text(text = stringResource(id = R.string.btn_rule_simulator))
+                        }
                         DropdownMenuItem(onClick = {
                             menuExpanded = false
                             val json = BlockManager.exportRulesJson()
@@ -439,6 +449,24 @@ private fun BlockItem(
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colors.secondary
+                    )
+                }
+
+                val forumBadge = if (!item.forum.isNullOrBlank()) "${item.forum}吧" else stringResource(R.string.rule_scope_all)
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(
+                            if (!item.forum.isNullOrBlank()) MaterialTheme.colors.primary.copy(alpha = 0.12f)
+                            else ExtendedTheme.colors.text.copy(alpha = 0.08f)
+                        )
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = forumBadge,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = if (!item.forum.isNullOrBlank()) MaterialTheme.colors.primary else ExtendedTheme.colors.textSecondary
                     )
                 }
 

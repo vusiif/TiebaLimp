@@ -592,4 +592,23 @@
     <string name="toast_jump_to_floor">已定位至第 %d 楼</string>
     <string name="tip_confirm_clear_blacklist">确定清空全部黑名单规则吗？</string>
     <string name="tip_confirm_clear_whitelist">确定清空全部白名单规则吗？</string>
+    <string name="rule_scope_all">全吧</string>
+    <string name="rule_scope_forum">%s吧</string>
+    <string name="label_rule_forum">限定贴吧（选填，留空全吧生效）</string>
+    <string name="placeholder_rule_forum">如：孙笑川 或 显卡</string>
+    <string name="btn_rule_simulator">规则测试</string>
+    <string name="title_rule_simulator">过滤规则模拟测试</string>
+    <string name="sim_result_allowed">🟢 允许展示</string>
+    <string name="sim_result_whitelisted">🟡 白名单放行</string>
+    <string name="sim_result_blocked">🔴 已被拦截</string>
+    <string name="sim_input_content">测试发言内容</string>
+    <string name="sim_input_user">测试用户名（选填）</string>
+    <string name="sim_input_uid">测试 UID（选填）</string>
+    <string name="sim_input_level">测试用户等级 (Lv.%d)</string>
+    <string name="sim_input_ip">测试 IP 属地（选填）</string>
+    <string name="sim_input_forum">测试所在贴吧（选填）</string>
+    <string name="tip_blocked_reason_format">已屏蔽第 %1$d 楼内容 · %2$s</string>
+    <string name="tip_blocked_sub_reason_format">已屏蔽该回复 · %s</string>
+    <string name="tip_click_to_unhide">点击临时查看</string>
+    <string name="tip_click_to_hide">点击收起</string>
 </resources>

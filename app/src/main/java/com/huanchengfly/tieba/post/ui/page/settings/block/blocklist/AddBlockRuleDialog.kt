@@ -60,6 +60,7 @@ fun AddBlockRuleDialog(
         pattern: String?,
         minLevel: Int,
         ipRegion: String?,
+        forum: String?,
     ) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -70,6 +71,7 @@ fun AddBlockRuleDialog(
     var levelThreshold by remember { mutableFloatStateOf(4f) }
     var usernameText by remember { mutableStateOf("") }
     var uidText by remember { mutableStateOf("") }
+    var forumText by remember { mutableStateOf("") }
 
     val regexError = remember(regexText) {
         if (regexText.isBlank()) null
@@ -84,6 +86,7 @@ fun AddBlockRuleDialog(
             levelThreshold = 4f
             usernameText = ""
             uidText = ""
+            forumText = ""
             selectedType = Block.TYPE_KEYWORD
         }
     }
@@ -128,6 +131,7 @@ fun AddBlockRuleDialog(
                             if (selectedType == Block.TYPE_REGEX) regexText.trim() else null,
                             if (selectedType == Block.TYPE_USER_LEVEL) levelThreshold.roundToInt() else 0,
                             if (selectedType == Block.TYPE_IP_REGION) ipRegionText.trim() else null,
+                            forumText.trim().ifEmpty { null },
                         )
                     }
                 }
@@ -295,6 +299,15 @@ fun AddBlockRuleDialog(
                     )
                 }
             }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            OutlinedTextField(
+                value = forumText,
+                onValueChange = { forumText = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                placeholder = { Text(text = stringResource(id = R.string.label_rule_forum)) },
+            )
             Spacer(modifier = Modifier.height(16.dp))
         }
     }

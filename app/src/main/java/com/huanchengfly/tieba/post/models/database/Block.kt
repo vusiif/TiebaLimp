@@ -12,6 +12,7 @@ data class Block @JvmOverloads constructor(
     val pattern: String? = null,
     val minLevel: Int = 0,
     val ipRegion: String? = null,
+    val forum: String? = null,
 ) : LitePalSupport() {
     val id: Long = 0L
 

@@ -158,6 +158,7 @@ import com.huanchengfly.tieba.post.ui.widgets.compose.MyBackHandler
 import com.huanchengfly.tieba.post.ui.widgets.compose.MyLazyColumn
 import com.huanchengfly.tieba.post.ui.widgets.compose.MyScaffold
 import com.huanchengfly.tieba.post.ui.widgets.compose.OriginThreadCard
+import com.huanchengfly.tieba.post.utils.BlockManager.FilterResult
 import com.huanchengfly.tieba.post.ui.widgets.compose.PromptDialog
 import com.huanchengfly.tieba.post.ui.widgets.compose.Sizes
 import com.huanchengfly.tieba.post.ui.widgets.compose.TextWithMinWidth
@@ -1102,6 +1103,7 @@ fun ThreadPage(
         contentRenders: ImmutableList<PbContentRender>,
         subPosts: ImmutableList<SubPostItemData>,
         blocked: Boolean,
+        blockReason: String? = null,
     ) {
         PostCard(
             postHolder = item,
@@ -1109,6 +1111,7 @@ fun ThreadPage(
             subPosts = subPosts,
             threadAuthorId = author?.get { id } ?: 0L,
             blocked = blocked,
+            blockReason = blockReason,
             canDelete = { it.author_id == user.get { id } },
             immersiveMode = isImmersiveMode,
             isCollected = { it.id == thread?.get { collectMarkPid.toLongOrNull() } },
@@ -1239,13 +1242,16 @@ fun ThreadPage(
                     else if (item.get { is_fold == 1 || fold_comment_status != 0 }) "FoldedPost"
                     else "NormalPost"
                 }
-            ) { (item, blocked, renders, subPosts) ->
+            ) { postItem ->
+                val (item, blocked, renders, subPosts, blockResult) = postItem
+                val reason = (blockResult as? FilterResult.Blocked)?.reason
                 Container {
                     PostCard(
                         item,
                         renders,
                         subPosts,
-                        blocked
+                        blocked,
+                        reason
                     )
                 }
             }
@@ -1892,13 +1898,16 @@ fun ThreadPage(
                                             else if (item.get { is_fold == 1 || fold_comment_status != 0 }) "FoldedPost"
                                             else "NormalPost"
                                         }
-                                    ) { (item, blocked, renders, subPosts) ->
+                                    ) { postItem ->
+                                        val (item, blocked, renders, subPosts, blockResult) = postItem
+                                        val reason = (blockResult as? FilterResult.Blocked)?.reason
                                         Container {
                                             PostCard(
                                                 item,
                                                 renders,
                                                 subPosts,
-                                                blocked
+                                                blocked,
+                                                reason
                                             )
                                         }
                                     }
@@ -2088,6 +2097,7 @@ fun PostCard(
     subPosts: ImmutableList<SubPostItemData> = persistentListOf(),
     threadAuthorId: Long = 0L,
     blocked: Boolean = false,
+    blockReason: String? = null,
     canDelete: (Post) -> Boolean = { false },
     immersiveMode: Boolean = false,
     isCollected: (Post) -> Boolean = { false },
@@ -2112,6 +2122,9 @@ fun PostCard(
     var isFoldExpanded by rememberSaveable(post.id) {
         mutableStateOf(false)
     }
+    var isManuallyRevealed by rememberSaveable(post.id) {
+        mutableStateOf(false)
+    }
     val hasPadding = remember(key1 = postHolder, key2 = immersiveMode) {
         postHolder.get { floor > 1 } && !immersiveMode
     }
@@ -2128,11 +2141,18 @@ fun PostCard(
     }
     val menuState = rememberMenuState()
     BlockableContent(
-        blocked = blocked,
+        blocked = blocked && !isManuallyRevealed,
         blockedTip = {
-            BlockTip {
+            BlockTip(
+                onClick = { isManuallyRevealed = true }
+            ) {
+                val tip = if (!blockReason.isNullOrBlank()) {
+                    stringResource(id = R.string.tip_blocked_reason_format, postHolder.get { floor }, blockReason)
+                } else {
+                    stringResource(id = R.string.tip_blocked_post, postHolder.get { floor })
+                }
                 Text(
-                    text = stringResource(id = R.string.tip_blocked_post, postHolder.get { floor }),
+                    text = "$tip · ${stringResource(id = R.string.tip_click_to_unhide)}"
                 )
             }
         },
@@ -2332,16 +2352,27 @@ fun PostCard(
                             verticalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
                             subPosts.fastForEach { item ->
+                                var subPostRevealed by rememberSaveable(item.id) {
+                                    mutableStateOf(false)
+                                }
+                                val subReason = (item.blockResult as? FilterResult.Blocked)?.reason
                                 BlockableContent(
-                                    blocked = item.blocked,
+                                    blocked = item.blocked && !subPostRevealed,
                                     blockedTip = {
+                                        val subTip = if (!subReason.isNullOrBlank()) {
+                                            stringResource(id = R.string.tip_blocked_sub_reason_format, subReason)
+                                        } else {
+                                            stringResource(id = R.string.tip_blocked_sub_post)
+                                        }
                                         Text(
-                                            text = stringResource(id = R.string.tip_blocked_sub_post),
+                                            text = "$subTip · ${stringResource(id = R.string.tip_click_to_unhide)}",
                                             style = MaterialTheme.typography.body2.copy(
                                                 color = ExtendedTheme.colors.textDisabled,
                                                 fontSize = 13.sp
                                             ),
-                                            modifier = Modifier.padding(horizontal = 12.dp)
+                                            modifier = Modifier
+                                                .padding(horizontal = 12.dp)
+                                                .clickable { subPostRevealed = true }
                                         )
                                     },
                                 ) {

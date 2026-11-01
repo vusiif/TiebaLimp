@@ -28,13 +28,16 @@ import com.huanchengfly.tieba.post.utils.appPreferences
 
 @Composable
 fun BlockTip(
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
     text: @Composable () -> Unit = { Text(text = stringResource(id = R.string.tip_blocked_content)) },
 ) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(6.dp))
             .background(ExtendedTheme.colors.textSecondary.copy(alpha = 0.1f))
+            .let { if (onClick != null) it.clickable(onClick = onClick) else it }
             .padding(vertical = 8.dp, horizontal = 16.dp)
     ) {
         ProvideTextStyle(value = MaterialTheme.typography.caption) {

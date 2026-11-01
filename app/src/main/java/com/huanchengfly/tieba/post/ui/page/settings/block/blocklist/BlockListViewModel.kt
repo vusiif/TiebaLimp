@@ -66,6 +66,7 @@ class BlockListViewModel :
                     pattern = pattern,
                     minLevel = minLevel,
                     ipRegion = ipRegion,
+                    forum = forum,
                 )
                 BlockManager.addBlock(block)
                 emit(BlockListPartialChange.Add.Success(block))
@@ -103,6 +104,7 @@ sealed interface BlockListUiIntent : UiIntent {
         val pattern: String? = null,
         val minLevel: Int = 0,
         val ipRegion: String? = null,
+        val forum: String? = null,
     ) : BlockListUiIntent
 
     data class Delete(

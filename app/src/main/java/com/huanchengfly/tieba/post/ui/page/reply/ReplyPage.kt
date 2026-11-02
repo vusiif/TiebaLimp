@@ -125,13 +125,15 @@ import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.litepal.LitePal
 import org.litepal.extension.deleteAllAsync
 import org.litepal.extension.findFirstAsync
 import java.util.UUID
-import kotlin.concurrent.thread
 import kotlin.math.max
 
 data class ReplyArgs(
@@ -261,17 +263,27 @@ internal fun ReplyPageContent(
     var isDraftLoaded by remember { mutableStateOf(false) }
     val curTextFlow = remember { MutableStateFlow("") }
     val curText by curTextFlow.collectAsState()
-    LaunchedEffect(Unit) {
+    LaunchedEffect(isDraftLoaded) {
+        if (!isDraftLoaded) return@LaunchedEffect
         curTextFlow
-            .sample(500)
+            .debounce(500)
             .distinctUntilChanged()
-            .collect {
-                if (isDraftLoaded && !replySuccess) {
-                    thread {
-                        Draft(hash, it).saveOrUpdate("hash = ?", hash)
+            .collect { text ->
+                if (!replySuccess) {
+                    withContext(Dispatchers.IO) {
+                        Draft(hash, text).saveOrUpdate("hash = ?", hash)
                     }
                 }
             }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            if (isDraftLoaded && !replySuccess) {
+                val latestText = curTextFlow.value
+                Draft(hash, latestText).saveOrUpdate("hash = ?", hash)
+            }
+        }
     }
     LaunchedEffect(Unit) {
         LitePal.where("hash = ?", hash).findFirstAsync<Draft?>()

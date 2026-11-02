@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -114,11 +115,22 @@ fun BlockListPage(
         initial = false
     )
 
+    var selectedForumFilter by remember { mutableStateOf<String?>(null) }
+    val availableForums by remember(blackList, whiteList) {
+        derivedStateOf {
+            (blackList + whiteList)
+                .mapNotNull { it.forum?.trim()?.takeIf { f -> f.isNotEmpty() } }
+                .distinct()
+                .sorted()
+        }
+    }
+
     RuleSimulatorDialog(dialogState = simulatorDialogState)
 
     AddBlockRuleDialog(
         dialogState = addDialogState,
         category = addBlockCategory,
+        initialForum = selectedForumFilter?.takeIf { it.isNotBlank() },
         onConfirm = { type, keywords, username, uid, pattern, minLevel, ipRegion, forum ->
             viewModel.send(
                 BlockListUiIntent.Add(
@@ -321,18 +333,41 @@ fun BlockListPage(
             )
         }
 
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.fillMaxSize(),
-            key = { it },
-            contentPadding = paddingValues,
-            verticalAlignment = Alignment.Top
-        ) { position ->
-            val items by remember {
-                derivedStateOf {
-                    if (position == 0) blackList else whiteList
-                }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            if (availableForums.isNotEmpty()) {
+                ForumFilterBar(
+                    availableForums = availableForums,
+                    selectedForum = selectedForumFilter,
+                    onSelectForum = { selectedForumFilter = it }
+                )
             }
+
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                key = { it },
+                verticalAlignment = Alignment.Top
+            ) { position ->
+                val rawItems by remember {
+                    derivedStateOf {
+                        if (position == 0) blackList else whiteList
+                    }
+                }
+                val items by remember(rawItems, selectedForumFilter) {
+                    derivedStateOf {
+                        when (selectedForumFilter) {
+                            null -> rawItems
+                            "" -> rawItems.filter { it.forum.isNullOrBlank() }
+                            else -> rawItems.filter { it.forum?.equals(selectedForumFilter, ignoreCase = true) == true }
+                        }
+                    }
+                }
             StateScreen(
                 isEmpty = items.isEmpty(),
                 isError = false,
@@ -385,6 +420,71 @@ fun BlockListPage(
                 }
             }
         }
+        }
+    }
+}
+
+@Composable
+private fun ForumFilterBar(
+    availableForums: List<String>,
+    selectedForum: String?,
+    onSelectForum: (String?) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyRow(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        item {
+            ForumFilterChip(
+                label = stringResource(R.string.filter_all_rules),
+                selected = selectedForum == null,
+                onClick = { onSelectForum(null) }
+            )
+        }
+        item {
+            ForumFilterChip(
+                label = stringResource(R.string.filter_global_rules),
+                selected = selectedForum == "",
+                onClick = { onSelectForum("") }
+            )
+        }
+        items(availableForums, key = { it }) { forum ->
+            ForumFilterChip(
+                label = "${forum}吧",
+                selected = selectedForum.equals(forum, ignoreCase = true),
+                onClick = { onSelectForum(forum) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun ForumFilterChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val bgColor = if (selected) MaterialTheme.colors.primary else ExtendedTheme.colors.chip
+    val textColor = if (selected) Color.White else ExtendedTheme.colors.text
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(100))
+            .background(bgColor)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            color = textColor
+        )
     }
 }
 

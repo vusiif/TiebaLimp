@@ -53,6 +53,7 @@ import kotlin.math.roundToInt
 fun AddBlockRuleDialog(
     dialogState: DialogState,
     category: Int,
+    initialForum: String? = null,
     onConfirm: (
         type: Int,
         keywords: List<String>,
@@ -72,7 +73,7 @@ fun AddBlockRuleDialog(
     var levelThreshold by remember { mutableFloatStateOf(4f) }
     var usernameText by remember { mutableStateOf("") }
     var uidText by remember { mutableStateOf("") }
-    var forumText by remember { mutableStateOf("") }
+    var forumText by remember { mutableStateOf(initialForum.orEmpty()) }
 
     val regexError = remember(regexText) {
         if (regexText.isBlank()) null
@@ -88,7 +89,7 @@ fun AddBlockRuleDialog(
             levelThreshold = 4f
             usernameText = ""
             uidText = ""
-            forumText = ""
+            forumText = initialForum.orEmpty()
             selectedType = Block.TYPE_KEYWORD
         }
     }

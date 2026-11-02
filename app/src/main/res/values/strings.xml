@@ -628,4 +628,7 @@
     <string name="tip_search_highlight_badge">搜索命中</string>
     <string name="tip_active_search_bar">帖内检索: \"%1$s\" (%2$d/%3$d)</string>
     <string name="btn_exit_search">退出搜索</string>
+    <string name="filter_all_rules">全部规则</string>
+    <string name="filter_global_rules">全吧通用</string>
+    <string name="tip_empty_forum_rules">当前贴吧分类下暂无规则</string>
 </resources>

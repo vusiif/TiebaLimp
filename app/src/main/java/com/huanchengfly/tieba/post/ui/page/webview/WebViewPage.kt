@@ -435,6 +435,11 @@ open class MyWebViewClient(
     }
 
     open fun injectCookies(url: String) {
+        val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return
+        val host = uri.host?.lowercase() ?: return
+        val isTrustedBaiduHost = host == "baidu.com" || host.endsWith(".baidu.com") || host == "tieba.com" || host.endsWith(".tieba.com")
+        if (!isTrustedBaiduHost) return
+
         val cookieStr = CookieManager.getInstance().getCookie(url) ?: ""
         val cookies = AccountUtil.parseCookie(cookieStr)
         val BDUSS = cookies["BDUSS"]

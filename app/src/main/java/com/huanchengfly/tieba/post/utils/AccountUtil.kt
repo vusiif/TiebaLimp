@@ -266,6 +266,6 @@ object AccountUtil {
     }
 
     fun getBdussCookie(bduss: String): String {
-        return "BDUSS=$bduss; Path=/; Max-Age=315360000; Domain=.baidu.com; Httponly"
+        return "BDUSS=$bduss; Path=/; Max-Age=315360000; Domain=.baidu.com; Httponly; Secure"
     }
 }

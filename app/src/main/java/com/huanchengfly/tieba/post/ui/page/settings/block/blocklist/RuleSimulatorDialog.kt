@@ -57,8 +57,7 @@ fun RuleSimulatorDialog(
         ipInput,
         forumInput,
         levelThreshold,
-        BlockManager.blackList.size,
-        BlockManager.whiteList.size,
+        BlockManager.rulesVersion,
     ) {
         BlockManager.simulateCheck(
             content = contentInput,

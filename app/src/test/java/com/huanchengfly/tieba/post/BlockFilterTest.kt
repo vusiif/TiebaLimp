@@ -92,4 +92,19 @@ class BlockFilterTest {
         assertEquals("关键词: 刷单", blocked.reason)
         assertEquals("刷单", blocked.matchedTarget)
     }
+
+    @Test
+    fun rulesVersion_initialValueIsAccessible() {
+        assertTrue(BlockManager.rulesVersion >= 0)
+    }
+
+    @Test
+    fun importRulesFromJson_safeguardsAgainstInvalidInputs() {
+        assertEquals(0, BlockManager.importRulesFromJson(""))
+        assertEquals(0, BlockManager.importRulesFromJson("   "))
+        assertEquals(0, BlockManager.importRulesFromJson("[]"))
+        assertEquals(0, BlockManager.importRulesFromJson("not valid json"))
+        val giantJson = "[" + "{}".repeat(300_000) + "]"
+        assertEquals(0, BlockManager.importRulesFromJson(giantJson))
+    }
 }

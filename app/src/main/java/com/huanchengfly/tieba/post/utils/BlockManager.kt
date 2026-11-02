@@ -1,5 +1,8 @@
 package com.huanchengfly.tieba.post.utils
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import com.google.gson.reflect.TypeToken
 import com.huanchengfly.tieba.post.api.models.MessageListBean
 import com.huanchengfly.tieba.post.api.models.protos.Post
@@ -17,6 +20,9 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 
 object BlockManager {
+    var rulesVersion by mutableIntStateOf(0)
+        private set
+
     private val blockList: MutableList<Block> = CopyOnWriteArrayList()
     private val compiledRegexCache = ConcurrentHashMap<String, Regex?>()
     private val parsedKeywordsCache = ConcurrentHashMap<String, List<String>>()
@@ -85,6 +91,7 @@ object BlockManager {
         if (block.type == Block.TYPE_REGEX && !block.pattern.isNullOrBlank()) {
             compiledRegexCache.remove(block.pattern)
         }
+        rulesVersion++
     }
 
     fun addBlockAsync(
@@ -92,11 +99,14 @@ object BlockManager {
         callback: ((Boolean) -> Unit)? = null,
     ) {
         block.saveAsync()
-            .listen {
-                callback?.invoke(it)
-                blockList.add(block)
-                if (block.type == Block.TYPE_REGEX && !block.pattern.isNullOrBlank()) {
-                    compiledRegexCache.remove(block.pattern)
+            .listen { success ->
+                callback?.invoke(success)
+                if (success) {
+                    blockList.add(block)
+                    if (block.type == Block.TYPE_REGEX && !block.pattern.isNullOrBlank()) {
+                        compiledRegexCache.remove(block.pattern)
+                    }
+                    rulesVersion++
                 }
             }
     }
@@ -108,6 +118,7 @@ object BlockManager {
         if (removed?.type == Block.TYPE_REGEX && !removed.pattern.isNullOrBlank()) {
             compiledRegexCache.remove(removed.pattern)
         }
+        rulesVersion++
     }
 
     fun clearAll(category: Int? = null) {
@@ -120,6 +131,7 @@ object BlockManager {
         }
         compiledRegexCache.clear()
         parsedKeywordsCache.clear()
+        rulesVersion++
     }
 
     fun init() {
@@ -128,6 +140,7 @@ object BlockManager {
             blockList.addAll(blocks)
             compiledRegexCache.clear()
             parsedKeywordsCache.clear()
+            rulesVersion++
         }
     }
 
@@ -500,6 +513,19 @@ object BlockManager {
         }
     }
 
+    private fun isDuplicateBetween(a: Block, b: Block): Boolean {
+        if (a.category != b.category || a.type != b.type || a.forum != b.forum) return false
+        return when (a.type) {
+            Block.TYPE_KEYWORD -> a.keywords == b.keywords
+            Block.TYPE_USER -> (a.uid != null && a.uid == b.uid) ||
+                    (!a.username.isNullOrBlank() && a.username == b.username)
+            Block.TYPE_REGEX -> a.pattern == b.pattern
+            Block.TYPE_USER_LEVEL -> a.minLevel == b.minLevel
+            Block.TYPE_IP_REGION -> a.ipRegion?.trim().equals(b.ipRegion?.trim(), ignoreCase = true)
+            else -> false
+        }
+    }
+
     fun importRulesFromJson(json: String): Int {
         if (json.isBlank() || json.length > 500_000) return 0
         val gson = GsonUtil.getGson()
@@ -510,8 +536,8 @@ object BlockManager {
 
         if (importedList.isEmpty()) return 0
 
-        var count = 0
         val validList = importedList.take(500)
+        val blocksToSave = mutableListOf<Block>()
         for (dto in validList) {
             val category = dto.category.takeIf { it == Block.CATEGORY_BLACK_LIST || it == Block.CATEGORY_WHITE_LIST } ?: continue
             val ruleType = dto.type.takeIf { it in Block.TYPE_KEYWORD..Block.TYPE_IP_REGION } ?: continue
@@ -535,15 +561,19 @@ object BlockManager {
                 forum = dto.forum?.trim(),
             )
 
-            if (isDuplicateRule(block)) continue
+            if (isDuplicateRule(block) || blocksToSave.any { isDuplicateBetween(it, block) }) continue
 
-            block.save()
-            blockList.add(block)
-            count++
+            blocksToSave.add(block)
         }
-        compiledRegexCache.clear()
-        parsedKeywordsCache.clear()
-        return count
+
+        if (blocksToSave.isNotEmpty()) {
+            LitePal.saveAll(blocksToSave)
+            blockList.addAll(blocksToSave)
+            compiledRegexCache.clear()
+            parsedKeywordsCache.clear()
+            rulesVersion++
+        }
+        return blocksToSave.size
     }
 
     fun ThreadInfo.checkBlock(forumName: String? = null): FilterResult {

@@ -28,6 +28,7 @@ import com.huanchengfly.tieba.post.arch.emitGlobalEvent
 import com.huanchengfly.tieba.post.ui.common.theme.compose.ExtendedTheme
 import com.huanchengfly.tieba.post.ui.page.ProvideNavigator
 import com.huanchengfly.tieba.post.ui.page.history.list.HistoryListPage
+import com.huanchengfly.tieba.post.ui.page.history.snapshot.ThreadSnapshotListPage
 import com.huanchengfly.tieba.post.ui.page.history.list.HistoryListUiEvent
 import com.huanchengfly.tieba.post.ui.widgets.compose.BackNavigationIcon
 import com.huanchengfly.tieba.post.ui.widgets.compose.MyScaffold
@@ -50,7 +51,7 @@ import kotlinx.coroutines.launch
 fun HistoryPage(
     navigator: DestinationsNavigator
 ) {
-    val pagerState = rememberPagerState { 2 }
+    val pagerState = rememberPagerState { 3 }
     val coroutineScope = rememberCoroutineScope()
     val scaffoldState = rememberScaffoldState()
 
@@ -71,7 +72,8 @@ fun HistoryPage(
                     BackNavigationIcon(onBackPressed = { navigator.navigateUp() })
                 },
                 actions = {
-                    IconButton(onClick = {
+                    if (pagerState.currentPage != 2) {
+                        IconButton(onClick = {
                         coroutineScope.launch {
                             HistoryUtil.deleteAll()
                             emitGlobalEvent(HistoryListUiEvent.DeleteAll)
@@ -90,6 +92,7 @@ fun HistoryPage(
                             tint = ExtendedTheme.colors.onTopBar
                         )
                     }
+                    }
                 },
                 content = {
                     TabRow(
@@ -104,7 +107,7 @@ fun HistoryPage(
                         backgroundColor = Color.Transparent,
                         contentColor = ExtendedTheme.colors.primary,
                         modifier = Modifier
-                            .width(100.dp * 2)
+                            .width(80.dp * 3)
                             .align(Alignment.CenterHorizontally)
                     ) {
                         Tab(
@@ -139,6 +142,22 @@ fun HistoryPage(
                             selectedContentColor = ExtendedTheme.colors.onTopBar,
                             unselectedContentColor = ExtendedTheme.colors.onTopBarSecondary
                         )
+                        Tab(
+                            text = {
+                                Text(
+                                    text = stringResource(id = R.string.title_history_snapshot),
+                                    fontSize = 13.sp
+                                )
+                            },
+                            selected = pagerState.currentPage == 2,
+                            onClick = {
+                                coroutineScope.launch {
+                                    pagerState.animateScrollToPage(2)
+                                }
+                            },
+                            selectedContentColor = ExtendedTheme.colors.onTopBar,
+                            unselectedContentColor = ExtendedTheme.colors.onTopBarSecondary
+                        )
                     }
                 }
             )
@@ -152,10 +171,10 @@ fun HistoryPage(
                 verticalAlignment = Alignment.Top,
                 userScrollEnabled = true,
             ) {
-                if (it == 0) {
-                    HistoryListPage(type = HistoryUtil.TYPE_THREAD)
-                } else {
-                    HistoryListPage(type = HistoryUtil.TYPE_FORUM)
+                when (it) {
+                    0 -> HistoryListPage(type = HistoryUtil.TYPE_THREAD)
+                    1 -> HistoryListPage(type = HistoryUtil.TYPE_FORUM)
+                    else -> ThreadSnapshotListPage()
                 }
             }
         }

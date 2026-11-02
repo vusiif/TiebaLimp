@@ -177,6 +177,20 @@ import androidx.compose.material.icons.rounded.Bookmarks
 import com.huanchengfly.tieba.post.models.database.FloorBookmark
 import com.huanchengfly.tieba.post.utils.FloorBookmarkUtil
 import com.huanchengfly.tieba.post.ui.widgets.compose.FloorBookmarkEditDialog
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.border
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.ui.zIndex
+import com.huanchengfly.tieba.post.ui.widgets.compose.ThreadSearchHit
+import com.huanchengfly.tieba.post.ui.widgets.compose.ThreadSearchJumpDialog
 import com.huanchengfly.tieba.post.ui.widgets.compose.FloorBookmarksDialog
 import com.huanchengfly.tieba.post.ui.widgets.compose.PredictiveBackBox
 import com.huanchengfly.tieba.post.ui.widgets.compose.ResumeReadingPill
@@ -690,6 +704,11 @@ fun ThreadPage(
     var readingProgress by remember { mutableStateOf<ThreadHistoryInfoBean?>(null) }
     var showResumePill by remember { mutableStateOf(false) }
     var pendingScrollToPostId by remember { mutableStateOf<Long?>(null) }
+    var pendingScrollToFloor by remember { mutableStateOf<Int?>(null) }
+    var activeSearchKeyword by remember { mutableStateOf("") }
+    var activeSearchHits by remember { mutableStateOf<List<ThreadSearchHit>>(emptyList()) }
+    var currentHitIndex by remember { mutableIntStateOf(0) }
+    var highlightedFloor by remember { mutableIntStateOf(-1) }
     val galleryImages by remember(firstPost, firstPostContentRenders, data) {
         derivedStateOf {
             extractGalleryImages(
@@ -738,6 +757,86 @@ fun ThreadPage(
             pendingScrollToPostId = null
             val baseOffset = 2 + (if (hasPrevious) 1 else 0)
             lazyListState.animateScrollToItem(baseOffset + indexInData)
+        }
+    }
+
+    LaunchedEffect(data, pendingScrollToFloor) {
+        val targetFloor = pendingScrollToFloor ?: return@LaunchedEffect
+        if (targetFloor <= 1) {
+            pendingScrollToFloor = null
+            lazyListState.animateScrollToItem(0)
+        } else {
+            val indexInData = data.indexOfFirst { it.post.get { floor } == targetFloor }
+            if (indexInData != -1) {
+                pendingScrollToFloor = null
+                val baseOffset = 2 + (if (hasPrevious) 1 else 0)
+                lazyListState.animateScrollToItem(baseOffset + indexInData)
+            } else if (data.isNotEmpty()) {
+                val closestIndex = data.indices.minByOrNull { kotlin.math.abs(data[it].post.get { floor } - targetFloor) }
+                if (closestIndex != null) {
+                    pendingScrollToFloor = null
+                    val baseOffset = 2 + (if (hasPrevious) 1 else 0)
+                    lazyListState.animateScrollToItem(baseOffset + closestIndex)
+                }
+            }
+        }
+    }
+
+    val onJumpToFloor: (Int) -> Unit = { targetFloor ->
+        highlightedFloor = targetFloor
+        if (targetFloor <= 1) {
+            coroutineScope.launch {
+                lazyListState.animateScrollToItem(0)
+            }
+        } else {
+            val indexInData = data.indexOfFirst { it.post.get { floor } == targetFloor }
+            if (indexInData != -1) {
+                coroutineScope.launch {
+                    val baseOffset = 2 + (if (hasPrevious) 1 else 0)
+                    lazyListState.animateScrollToItem(baseOffset + indexInData)
+                }
+            } else {
+                pendingScrollToFloor = targetFloor
+                val targetPage = maxOf((targetFloor - 1) / 30 + 1, 1)
+                viewModel.send(
+                    ThreadUiIntent.Load(
+                        threadId = threadId,
+                        forumId = curForumId,
+                        page = targetPage,
+                        seeLz = isSeeLz,
+                        sortType = curSortType
+                    )
+                )
+            }
+        }
+    }
+
+    val onJumpToHit: (ThreadSearchHit) -> Unit = { hit ->
+        highlightedFloor = hit.floor
+        if (hit.floor <= 1) {
+            coroutineScope.launch {
+                lazyListState.animateScrollToItem(0)
+            }
+        } else {
+            val indexInData = data.indexOfFirst { it.post.get { floor } == hit.floor || it.post.get { id } == hit.postId }
+            if (indexInData != -1) {
+                coroutineScope.launch {
+                    val baseOffset = 2 + (if (hasPrevious) 1 else 0)
+                    lazyListState.animateScrollToItem(baseOffset + indexInData)
+                }
+            } else {
+                pendingScrollToPostId = hit.postId
+                viewModel.send(
+                    ThreadUiIntent.Load(
+                        threadId = threadId,
+                        page = 0,
+                        postId = hit.postId,
+                        forumId = curForumId,
+                        seeLz = isSeeLz,
+                        sortType = curSortType
+                    )
+                )
+            }
         }
     }
 
@@ -1002,30 +1101,32 @@ fun ThreadPage(
         }
     )
 
-    val jumpToPageDialogState = rememberDialogState()
-    PromptDialog(
-        onConfirm = {
+    val searchJumpDialogState = rememberDialogState()
+    val totalFloorCount = thread?.get { replyNum } ?: (data.lastOrNull()?.post?.get { floor } ?: 1)
+    ThreadSearchJumpDialog(
+        dialogState = searchJumpDialogState,
+        totalFloors = totalFloorCount,
+        currentPage = currentPageMax,
+        totalPage = totalPage,
+        firstPost = firstPost?.get(),
+        loadedPosts = data,
+        onJumpToFloor = onJumpToFloor,
+        onJumpToPage = { targetPage ->
             viewModel.send(
                 ThreadUiIntent.Load(
                     threadId = threadId,
                     forumId = forum?.get { id } ?: forumId,
-                    page = it.toInt(),
+                    page = targetPage,
                     seeLz = isSeeLz,
                     sortType = curSortType
                 )
             )
         },
-        dialogState = jumpToPageDialogState,
-        onValueChange = { newVal, _ -> "^[0-9]*$".toRegex().matches(newVal) },
-        title = { Text(text = stringResource(id = R.string.title_jump_page)) },
-        content = {
-            Text(
-                text = stringResource(
-                    id = R.string.tip_jump_page,
-                    currentPageMax,
-                    totalPage
-                )
-            )
+        onSelectSearchHit = { hit, query, hits ->
+            activeSearchKeyword = query
+            activeSearchHits = hits
+            currentHitIndex = hits.indexOf(hit).coerceAtLeast(0)
+            onJumpToHit(hit)
         }
     )
 
@@ -1104,6 +1205,7 @@ fun ThreadPage(
         subPosts: ImmutableList<SubPostItemData>,
         blocked: Boolean,
         blockReason: String? = null,
+        isSearchHighlighted: Boolean = false,
     ) {
         PostCard(
             postHolder = item,
@@ -1112,6 +1214,7 @@ fun ThreadPage(
             threadAuthorId = author?.get { id } ?: 0L,
             blocked = blocked,
             blockReason = blockReason,
+            isSearchHighlighted = isSearchHighlighted,
             canDelete = { it.author_id == user.get { id } },
             immersiveMode = isImmersiveMode,
             isCollected = { it.id == thread?.get { collectMarkPid.toLongOrNull() } },
@@ -1251,7 +1354,8 @@ fun ThreadPage(
                         renders,
                         subPosts,
                         blocked,
-                        reason
+                        reason,
+                        isSearchHighlighted = highlightedFloor == item.get { floor }
                     )
                 }
             }
@@ -1354,7 +1458,8 @@ fun ThreadPage(
                             )
                         },
                         isGalleryMode = isGalleryMode,
-                        onToggleGalleryMode = { isGalleryMode = !isGalleryMode }
+                        onToggleGalleryMode = { isGalleryMode = !isGalleryMode },
+                        onSearchClick = { searchJumpDialogState.show() }
                     )
                 },
                 bottomBar = {
@@ -1481,7 +1586,7 @@ fun ThreadPage(
                             },
                             onJumpPageClick = {
                                 closeBottomSheet()
-                                jumpToPageDialogState.show()
+                                searchJumpDialogState.show()
                             },
                             onBookmarksClick = {
                                 closeBottomSheet()
@@ -1649,6 +1754,7 @@ fun ThreadPage(
                                                     threadAuthorId = author?.get { id } ?: 0L,
                                                     canDelete = { it.author_id == user.get { id } },
                                                     immersiveMode = isImmersiveMode,
+                                                    isSearchHighlighted = highlightedFloor == 1,
                                                     isCollected = {
                                                         it.id == thread?.get { collectMarkPid }
                                                             ?.toLongOrNull()
@@ -1907,7 +2013,8 @@ fun ThreadPage(
                                                 renders,
                                                 subPosts,
                                                 blocked,
-                                                reason
+                                                reason,
+                                                isSearchHighlighted = highlightedFloor == item.get { floor }
                                             )
                                         }
                                     }
@@ -1936,6 +2043,100 @@ fun ThreadPage(
                                 .align(Alignment.BottomCenter)
                                 .padding(bottom = 16.dp)
                         )
+
+                        AnimatedVisibility(
+                            visible = activeSearchKeyword.isNotBlank() && activeSearchHits.isNotEmpty() && !isGalleryMode,
+                            enter = fadeIn() + slideInVertically { -it },
+                            exit = fadeOut() + slideOutVertically { -it },
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .padding(top = 8.dp)
+                                .zIndex(10f)
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(24.dp),
+                                color = ExtendedTheme.colors.card,
+                                elevation = 6.dp,
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(start = 14.dp, end = 6.dp, top = 4.dp, bottom = 4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Search,
+                                        contentDescription = null,
+                                        tint = ExtendedTheme.colors.accent,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = stringResource(
+                                            R.string.tip_active_search_bar,
+                                            activeSearchKeyword,
+                                            currentHitIndex + 1,
+                                            activeSearchHits.size
+                                        ),
+                                        style = MaterialTheme.typography.caption,
+                                        color = ExtendedTheme.colors.text,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    IconButton(
+                                        onClick = {
+                                            if (activeSearchHits.isNotEmpty()) {
+                                                val prevIndex = (currentHitIndex - 1 + activeSearchHits.size) % activeSearchHits.size
+                                                currentHitIndex = prevIndex
+                                                val hit = activeSearchHits[prevIndex]
+                                                onJumpToHit(hit)
+                                            }
+                                        },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.KeyboardArrowUp,
+                                            contentDescription = "Previous Hit",
+                                            modifier = Modifier.size(18.dp),
+                                            tint = ExtendedTheme.colors.text
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            if (activeSearchHits.isNotEmpty()) {
+                                                val nextIndex = (currentHitIndex + 1) % activeSearchHits.size
+                                                currentHitIndex = nextIndex
+                                                val hit = activeSearchHits[nextIndex]
+                                                onJumpToHit(hit)
+                                            }
+                                        },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.KeyboardArrowDown,
+                                            contentDescription = "Next Hit",
+                                            modifier = Modifier.size(18.dp),
+                                            tint = ExtendedTheme.colors.text
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            activeSearchKeyword = ""
+                                            activeSearchHits = emptyList()
+                                            highlightedFloor = -1
+                                        },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Close,
+                                            contentDescription = stringResource(R.string.btn_exit_search),
+                                            modifier = Modifier.size(18.dp),
+                                            tint = ExtendedTheme.colors.text
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -1951,6 +2152,7 @@ private fun TopBar(
     onForumClick: () -> Unit,
     isGalleryMode: Boolean = false,
     onToggleGalleryMode: () -> Unit = {},
+    onSearchClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     TitleCentredToolbar(
@@ -1991,6 +2193,13 @@ private fun TopBar(
             BackNavigationIcon(onBack)
         },
         actions = {
+            IconButton(onClick = onSearchClick) {
+                Icon(
+                    imageVector = Icons.Outlined.Search,
+                    contentDescription = stringResource(id = R.string.title_search_and_jump),
+                    tint = ExtendedTheme.colors.onTopBar
+                )
+            }
             IconButton(onClick = onToggleGalleryMode) {
                 Icon(
                     imageVector = if (isGalleryMode) Icons.Outlined.ViewAgenda else Icons.Outlined.BrowseGallery,
@@ -2098,6 +2307,7 @@ fun PostCard(
     threadAuthorId: Long = 0L,
     blocked: Boolean = false,
     blockReason: String? = null,
+    isSearchHighlighted: Boolean = false,
     canDelete: (Post) -> Boolean = { false },
     immersiveMode: Boolean = false,
     isCollected: (Post) -> Boolean = { false },
@@ -2258,6 +2468,11 @@ fun PostCard(
             }
         ) {
             Card(
+                modifier = if (isSearchHighlighted) {
+                    Modifier
+                        .border(2.dp, ExtendedTheme.colors.accent, RoundedCornerShape(8.dp))
+                        .padding(2.dp)
+                } else Modifier,
                 header = {
                     if (!immersiveMode) {
                         UserHeader(
@@ -2324,6 +2539,20 @@ fun PostCard(
                                 prefixIcon = {
                                     Icon(
                                         imageVector = Icons.Rounded.Star,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            )
+                        }
+
+                        if (isSearchHighlighted) {
+                            Chip(
+                                text = stringResource(id = R.string.tip_search_highlight_badge),
+                                invertColor = true,
+                                prefixIcon = {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Search,
                                         contentDescription = null,
                                         modifier = Modifier.size(16.dp)
                                     )
@@ -2671,8 +2900,8 @@ private fun ThreadMenu(
                 modifier = Modifier.fillMaxWidth(),
             )
             ListMenuItem(
-                icon = Icons.Rounded.RocketLaunch,
-                text = stringResource(id = R.string.title_jump_page),
+                icon = Icons.Rounded.Search,
+                text = stringResource(id = R.string.title_search_and_jump),
                 iconColor = ExtendedTheme.colors.text,
                 onClick = onJumpPageClick,
                 modifier = Modifier.fillMaxWidth(),

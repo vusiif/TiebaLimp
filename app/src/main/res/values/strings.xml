@@ -611,4 +611,21 @@
     <string name="tip_blocked_sub_reason_format">已屏蔽该回复 · %s</string>
     <string name="tip_click_to_unhide">点击临时查看</string>
     <string name="tip_click_to_hide">点击收起</string>
+    <string name="title_search_and_jump">帖内搜索与跳楼</string>
+    <string name="tab_jump_floor">跳楼/跳页</string>
+    <string name="tab_search_thread">帖内搜索</string>
+    <string name="hint_search_thread">搜索已加载正文、作者或楼中楼…</string>
+    <string name="label_jump_floor">输入目标楼层</string>
+    <string name="label_jump_page">输入目标页码</string>
+    <string name="btn_jump_to_floor">直达该楼</string>
+    <string name="btn_jump_to_page">跳转页码</string>
+    <string name="btn_jump_lz">回到 1 楼 (楼主)</string>
+    <string name="btn_jump_latest">直达最新楼层</string>
+    <string name="tip_total_thread_meta">共 %1$d 楼 · %2$d 页</string>
+    <string name="tip_search_matches_count">找到 %1$d 处相关发言</string>
+    <string name="tip_search_no_matches">未在当前已加载楼层中找到匹配内容</string>
+    <string name="tip_search_hint_load_more">若需搜索更深楼层，可先向下加载或跳页后检索</string>
+    <string name="tip_search_highlight_badge">搜索命中</string>
+    <string name="tip_active_search_bar">帖内检索: \"%1$s\" (%2$d/%3$d)</string>
+    <string name="btn_exit_search">退出搜索</string>
 </resources>

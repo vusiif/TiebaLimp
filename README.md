@@ -1,7 +1,7 @@
 # <p align="center">TiebaLimp</p>
 <p align="center">
     <a href="https://github.com/vusiif/TiebaLimp/actions/workflows/build.yml">
-        <img alt="Build Status" src="https://github.com/vusiif/TiebaLimp/actions/workflows/build.yml/badge.svg?branch=4.0-dev">
+        <img alt="Build Status" src="https://github.com/vusiif/TiebaLimp/actions/workflows/build.yml/badge.svg?branch=master">
     </a>
     <a href="https://github.com/vusiif/TiebaLimp">
         <img alt="License" src="https://img.shields.io/badge/license-GPLv3-blue.svg">

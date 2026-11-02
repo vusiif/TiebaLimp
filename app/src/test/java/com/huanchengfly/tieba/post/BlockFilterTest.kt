@@ -38,9 +38,27 @@ class BlockFilterTest {
         assertTrue(BlockManager.matchesForumScope("GPU", "gpu"))
         assertFalse(BlockManager.matchesForumScope("孙笑川", "显卡"))
 
-        // Unspecified current forum lets forum-specific rule pass through
-        assertTrue(BlockManager.matchesForumScope("孙笑川", null))
-        assertTrue(BlockManager.matchesForumScope("孙笑川", ""))
+        // Unspecified current forum must NOT match forum-specific rule
+        assertFalse(BlockManager.matchesForumScope("孙笑川", null))
+        assertFalse(BlockManager.matchesForumScope("孙笑川", ""))
+        assertFalse(BlockManager.matchesForumScope("孙笑川", "   "))
+    }
+
+    @Test
+    fun isDangerousRegexPattern_detectsCatastrophicBacktracking() {
+        // Catastrophic nested quantifiers
+        assertTrue(BlockManager.isDangerousRegexPattern("(a+)+"))
+        assertTrue(BlockManager.isDangerousRegexPattern("(.*)*"))
+        assertTrue(BlockManager.isDangerousRegexPattern("([a-z]+)+"))
+        assertTrue(BlockManager.isDangerousRegexPattern("(a|b+)+"))
+        assertTrue(BlockManager.isDangerousRegexPattern("a++"))
+
+        // Safe linear patterns
+        assertFalse(BlockManager.isDangerousRegexPattern(".*(广告|兼职|刷单).*"))
+        assertFalse(BlockManager.isDangerousRegexPattern("^[0-9]{3,8}$"))
+        assertFalse(BlockManager.isDangerousRegexPattern("hello\\s+world"))
+        assertFalse(BlockManager.isDangerousRegexPattern(null))
+        assertFalse(BlockManager.isDangerousRegexPattern(""))
     }
 
     @Test

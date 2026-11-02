@@ -15,6 +15,7 @@ import com.huanchengfly.tieba.post.api.models.protos.SubPostList
 import com.huanchengfly.tieba.post.api.models.protos.ThreadInfo
 import com.huanchengfly.tieba.post.api.models.protos.User
 import com.huanchengfly.tieba.post.api.models.protos.contentRenders
+import com.huanchengfly.tieba.post.api.models.protos.getContentText
 import com.huanchengfly.tieba.post.api.models.protos.pbPage.PbPageResponse
 import com.huanchengfly.tieba.post.api.models.protos.renders
 import com.huanchengfly.tieba.post.api.models.protos.subPosts
@@ -172,12 +173,13 @@ class ThreadViewModel @Inject constructor() :
                     val postList = response.data_.post_list
                     val firstPost = response.data_.first_floor_post
                     val notFirstPosts = postList.filterNot { it.floor == 1 }
+                    val forumName = response.data_.forum.name
                     ThreadPartialChange.Load.Success(
                         response.data_.thread.title,
                         response.data_.thread.author,
                         response.data_.user ?: User(),
                         firstPost,
-                        notFirstPosts.map { PostItemData(it.wrapImmutable()) },
+                        notFirstPosts.map { PostItemData(it.wrapImmutable(), forumName) },
                         response.data_.thread,
                         response.data_.forum,
                         response.data_.anti,
@@ -210,10 +212,11 @@ class ThreadViewModel @Inject constructor() :
                     val postList = response.data_.post_list
                     val firstPost = response.data_.first_floor_post
                     val notFirstPosts = postList.filterNot { it.floor == 1 }
+                    val forumName = response.data_.forum.name
                     ThreadPartialChange.LoadFirstPage.Success(
                         response.data_.thread.title,
                         response.data_.thread.author,
-                        notFirstPosts.map { PostItemData(it.wrapImmutable()) },
+                        notFirstPosts.map { PostItemData(it.wrapImmutable(), forumName) },
                         response.data_.thread,
                         response.data_.page.current_page,
                         response.data_.page.new_total_page,
@@ -243,9 +246,10 @@ class ThreadViewModel @Inject constructor() :
                     ) throw TiebaUnknownException
                     val postList = response.data_.post_list
                     val posts = postList.filterNot { it.floor == 1 || postIds.contains(it.id) }
+                    val forumName = response.data_.forum.name
                     ThreadPartialChange.LoadMore.Success(
                         response.data_.thread.author,
-                        posts.map { PostItemData(it.wrapImmutable()) },
+                        posts.map { PostItemData(it.wrapImmutable(), forumName) },
                         response.data_.thread,
                         response.data_.page.current_page,
                         response.data_.page.new_total_page,
@@ -277,9 +281,10 @@ class ThreadViewModel @Inject constructor() :
                     ) throw TiebaUnknownException
                     val postList = response.data_.post_list
                     val posts = postList.filterNot { it.floor == 1 || postIds.contains(it.id) }
+                    val forumName = response.data_.forum.name
                     ThreadPartialChange.LoadPrevious.Success(
                         response.data_.thread.author,
-                        posts.map { PostItemData(it.wrapImmutable()) },
+                        posts.map { PostItemData(it.wrapImmutable(), forumName) },
                         response.data_.thread,
                         response.data_.page.current_page,
                         response.data_.page.new_total_page,
@@ -313,12 +318,13 @@ class ThreadViewModel @Inject constructor() :
                     checkNotNull(response.data_.thread.author)
                     checkNotNull(response.data_.page)
                     val postList = response.data_.post_list.filterNot { it.floor == 1 }
+                    val forumName = response.data_.thread.forumName
                     if (postList.isEmpty()) {
                         ThreadPartialChange.LoadLatestPosts.SuccessWithNoNewPost
                     } else {
                         ThreadPartialChange.LoadLatestPosts.Success(
                             author = response.data_.thread.author,
-                            data = postList.map { PostItemData(it.wrapImmutable()) },
+                            data = postList.map { PostItemData(it.wrapImmutable(), forumName) },
                             threadInfo = response.data_.thread,
                             currentPage = response.data_.page.current_page,
                             totalPage = response.data_.page.new_total_page,
@@ -349,9 +355,10 @@ class ThreadViewModel @Inject constructor() :
                         || response.data_.anti == null
                     ) throw TiebaUnknownException
                     val firstLatestPost = response.data_.post_list.first()
+                    val forumName = response.data_.forum.name
                     ThreadPartialChange.LoadMyLatestReply.Success(
                         anti = response.data_.anti,
-                        posts = response.data_.post_list.map { PostItemData(it.wrapImmutable()) },
+                        posts = response.data_.post_list.map { PostItemData(it.wrapImmutable(), forumName) },
                         page = response.data_.page.current_page,
                         isContinuous = firstLatestPost.floor == curLatestPostFloor + 1,
                         isDesc = isDesc,
@@ -1229,19 +1236,71 @@ object ThreadSortType {
 @Immutable
 data class PostItemData(
     val post: ImmutableHolder<Post>,
-    val blocked: Boolean = post.get { shouldBlock() },
-    val contentRenders: ImmutableList<PbContentRender> = post.get { this.contentRenders },
-    val subPosts: ImmutableList<SubPostItemData> = post.get { this.subPosts },
-    val blockResult: FilterResult = post.get { checkBlock() },
-)
+    val blocked: Boolean,
+    val contentRenders: ImmutableList<PbContentRender>,
+    val subPosts: ImmutableList<SubPostItemData>,
+    val blockResult: FilterResult = FilterResult.Allowed,
+) {
+    constructor(
+        post: ImmutableHolder<Post>,
+        forumName: String? = null,
+    ) : this(
+        post = post,
+        renders = post.get { this.contentRenders },
+        subPosts = post.get {
+            sub_post_list?.sub_post_list?.map {
+                SubPostItemData(
+                    it.wrapImmutable(),
+                    it.getContentText(origin_thread_info?.author?.id),
+                    forumName
+                )
+            }?.toImmutableList() ?: persistentListOf()
+        },
+        result = post.get { checkBlock(forumName) }
+    )
+
+    private constructor(
+        post: ImmutableHolder<Post>,
+        renders: ImmutableList<PbContentRender>,
+        subPosts: ImmutableList<SubPostItemData>,
+        result: FilterResult,
+    ) : this(
+        post = post,
+        blocked = result is FilterResult.Blocked,
+        contentRenders = renders,
+        subPosts = subPosts,
+        blockResult = result,
+    )
+}
 
 @Immutable
 data class SubPostItemData(
     val subPost: ImmutableHolder<SubPostList>,
     val subPostContent: AnnotatedString,
-    val blocked: Boolean = subPost.get { shouldBlock() },
-    val blockResult: FilterResult = subPost.get { checkBlock() },
+    val blocked: Boolean,
+    val blockResult: FilterResult = FilterResult.Allowed,
 ) {
+    constructor(
+        subPost: ImmutableHolder<SubPostList>,
+        subPostContent: AnnotatedString,
+        forumName: String? = null,
+    ) : this(
+        subPost = subPost,
+        subPostContent = subPostContent,
+        result = subPost.get { checkBlock(forumName) }
+    )
+
+    private constructor(
+        subPost: ImmutableHolder<SubPostList>,
+        subPostContent: AnnotatedString,
+        result: FilterResult,
+    ) : this(
+        subPost = subPost,
+        subPostContent = subPostContent,
+        blocked = result is FilterResult.Blocked,
+        blockResult = result,
+    )
+
     val id: Long
         get() = subPost.get { id }
 

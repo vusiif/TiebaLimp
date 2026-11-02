@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.huanchengfly.tieba.post.R
 import com.huanchengfly.tieba.post.models.database.Block
+import com.huanchengfly.tieba.post.utils.BlockManager
 import com.huanchengfly.tieba.post.ui.common.theme.compose.ExtendedTheme
 import com.huanchengfly.tieba.post.ui.widgets.compose.Dialog
 import com.huanchengfly.tieba.post.ui.widgets.compose.DialogNegativeButton
@@ -75,6 +76,7 @@ fun AddBlockRuleDialog(
 
     val regexError = remember(regexText) {
         if (regexText.isBlank()) null
+        else if (BlockManager.isDangerousRegexPattern(regexText)) "存在高回溯风险（嵌套量词）或长度超限"
         else runCatching { Regex(regexText) }.exceptionOrNull()?.message
     }
 

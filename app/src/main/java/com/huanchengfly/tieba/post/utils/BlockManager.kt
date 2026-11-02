@@ -56,7 +56,15 @@ object BlockManager {
         val reason: String = "",
     )
 
+    fun isDangerousRegexPattern(pattern: String?): Boolean {
+        if (pattern.isNullOrBlank()) return false
+        if (pattern.length > 200) return true
+        val nestedQuantifiers = Regex("""(\+|\*|\{\d+,?\d*\})\s*(\+|\*|\{\d+,?\d*\})|\([^\)]*(\+|\*)[^\)]*\)\s*(\+|\*|\{\d+,?\d*\})""")
+        return nestedQuantifiers.containsMatchIn(pattern)
+    }
+
     private fun getOrCompileRegex(pattern: String): Regex? {
+        if (isDangerousRegexPattern(pattern)) return null
         return compiledRegexCache.computeIfAbsent(pattern) {
             runCatching {
                 Regex(pattern, setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE))
@@ -134,7 +142,7 @@ object BlockManager {
 
     fun matchesForumScope(ruleForum: String?, currentForum: String?): Boolean {
         if (ruleForum.isNullOrBlank()) return true
-        if (currentForum.isNullOrBlank()) return true
+        if (currentForum.isNullOrBlank()) return false
         return ruleForum.trim().equals(currentForum.trim(), ignoreCase = true)
     }
 
@@ -322,151 +330,133 @@ object BlockManager {
         val trimmedForum = forumName.trim().ifEmpty { null }
         val effectiveUserId = userId.takeIf { it > 0L } ?: 0L
         val effectiveUserName = userName.trim().ifEmpty { null }
+        val cleanIp = normalizeIpAddress(userIp)
+        val boundedContent = if (content.length > 4000) content.substring(0, 4000) else content
 
-        // 1. Check user whitelist
-        if (effectiveUserId > 0L || effectiveUserName != null) {
-            for (block in blockList) {
-                if (block.category == Block.CATEGORY_WHITE_LIST && block.type == Block.TYPE_USER) {
-                    if (!matchesForumScope(block.forum, trimmedForum)) continue
-                    if ((effectiveUserId > 0L && block.uid == effectiveUserId.toString()) ||
-                        (effectiveUserName != null && block.username == effectiveUserName)
-                    ) {
-                        return SimulationResult(
-                            isBlocked = false,
-                            isWhitelisted = true,
-                            hitRule = block,
-                            reason = "命中白名单用户: ${block.username ?: block.uid}"
-                        )
-                    }
-                }
+        var hitWhitelistRule: Block? = null
+        var hitWhitelistReason: String? = null
+
+        // 1. User dimension (whitelist strictly exempts user blacklist)
+        val isUserWhitelisted = isWhitelistedUser(effectiveUserId, effectiveUserName, trimmedForum)
+        if (isUserWhitelisted) {
+            val rule = blockList.firstOrNull {
+                it.category == Block.CATEGORY_WHITE_LIST && it.type == Block.TYPE_USER &&
+                        matchesForumScope(it.forum, trimmedForum) &&
+                        ((effectiveUserId > 0L && it.uid == effectiveUserId.toString()) ||
+                                (effectiveUserName != null && it.username == effectiveUserName))
+            }
+            if (rule != null) {
+                hitWhitelistRule = rule
+                hitWhitelistReason = "命中白名单用户: ${rule.username ?: rule.uid}"
+            }
+        } else {
+            val userResult = checkBlockUser(effectiveUserId, effectiveUserName, trimmedForum)
+            if (userResult is FilterResult.Blocked) {
+                val rule = blockList.firstOrNull { it.id == userResult.ruleId }
+                return SimulationResult(
+                    isBlocked = true,
+                    isWhitelisted = false,
+                    hitRule = rule,
+                    reason = userResult.reason
+                )
             }
         }
 
-        // 2. Check content/regex whitelist
+        // 2. Level dimension (level threshold has no whitelist, blocks immediately)
+        val levelResult = checkBlockLevel(userLevel, trimmedForum)
+        if (levelResult is FilterResult.Blocked) {
+            val rule = blockList.firstOrNull { it.id == levelResult.ruleId }
+            return SimulationResult(
+                isBlocked = true,
+                isWhitelisted = false,
+                hitRule = rule,
+                reason = levelResult.reason
+            )
+        }
+
+        // 3. IP dimension (IP whitelist strictly exempts IP blacklist)
+        var isIpWhitelisted = false
+        if (cleanIp.isNotEmpty()) {
+            val ipWhitelistRule = blockList.firstOrNull {
+                it.category == Block.CATEGORY_WHITE_LIST && it.type == Block.TYPE_IP_REGION &&
+                        matchesForumScope(it.forum, trimmedForum) &&
+                        !it.ipRegion.isNullOrBlank() &&
+                        (cleanIp.contains(it.ipRegion.trim(), ignoreCase = true) || it.ipRegion.trim().contains(cleanIp, ignoreCase = true))
+            }
+            if (ipWhitelistRule != null) {
+                isIpWhitelisted = true
+                if (hitWhitelistRule == null) {
+                    hitWhitelistRule = ipWhitelistRule
+                    hitWhitelistReason = "命中白名单 IP 属地: ${ipWhitelistRule.ipRegion}"
+                }
+            }
+        }
+        if (!isIpWhitelisted) {
+            val ipResult = checkBlockIp(cleanIp, trimmedForum)
+            if (ipResult is FilterResult.Blocked) {
+                val rule = blockList.firstOrNull { it.id == ipResult.ruleId }
+                return SimulationResult(
+                    isBlocked = true,
+                    isWhitelisted = false,
+                    hitRule = rule,
+                    reason = ipResult.reason
+                )
+            }
+        }
+
+        // 4. Content dimension (Content whitelist strictly exempts content blacklist)
+        var isContentWhitelisted = false
         if (content.isNotBlank()) {
-            for (block in blockList) {
-                if (block.category != Block.CATEGORY_WHITE_LIST) continue
-                if (!matchesForumScope(block.forum, trimmedForum)) continue
+            val contentWhitelistRule = blockList.firstOrNull { block ->
+                if (block.category != Block.CATEGORY_WHITE_LIST || !matchesForumScope(block.forum, trimmedForum)) return@firstOrNull false
                 when (block.type) {
                     Block.TYPE_KEYWORD -> {
                         val kws = getOrParseKeywords(block.keywords)
-                        if (kws.isNotEmpty() && kws.all { content.contains(it, ignoreCase = true) }) {
-                            return SimulationResult(
-                                isBlocked = false,
-                                isWhitelisted = true,
-                                hitRule = block,
-                                reason = "命中白名单关键词: ${kws.joinToString(" ")}"
-                            )
-                        }
+                        kws.isNotEmpty() && kws.all { content.contains(it, ignoreCase = true) }
                     }
                     Block.TYPE_REGEX -> {
-                        val p = block.pattern
-                        if (!p.isNullOrBlank()) {
-                            val regex = getOrCompileRegex(p)
-                            if (regex != null && regex.containsMatchIn(content)) {
-                                return SimulationResult(
-                                    isBlocked = false,
-                                    isWhitelisted = true,
-                                    hitRule = block,
-                                    reason = "命中白名单正则: $p"
-                                )
-                            }
-                        }
+                        val pattern = block.pattern
+                        if (!pattern.isNullOrBlank()) {
+                            val regex = getOrCompileRegex(pattern)
+                            regex != null && regex.containsMatchIn(boundedContent)
+                        } else false
+                    }
+                    else -> false
+                }
+            }
+            if (contentWhitelistRule != null) {
+                isContentWhitelisted = true
+                if (hitWhitelistRule == null) {
+                    hitWhitelistRule = contentWhitelistRule
+                    hitWhitelistReason = when (contentWhitelistRule.type) {
+                        Block.TYPE_KEYWORD -> "命中白名单关键词: ${contentWhitelistRule.keywords}"
+                        Block.TYPE_REGEX -> "命中白名单正则: ${contentWhitelistRule.pattern}"
+                        else -> "命中白名单内容"
                     }
                 }
             }
         }
-
-        // 3. Check IP whitelist
-        val cleanIp = normalizeIpAddress(userIp)
-        if (cleanIp.isNotEmpty()) {
-            for (block in blockList) {
-                if (block.category == Block.CATEGORY_WHITE_LIST && block.type == Block.TYPE_IP_REGION) {
-                    if (!matchesForumScope(block.forum, trimmedForum)) continue
-                    val target = block.ipRegion?.trim().orEmpty()
-                    if (target.isNotEmpty() && (cleanIp.contains(target, ignoreCase = true) || target.contains(cleanIp, ignoreCase = true))) {
-                        return SimulationResult(
-                            isBlocked = false,
-                            isWhitelisted = true,
-                            hitRule = block,
-                            reason = "命中白名单 IP 属地: $target"
-                        )
-                    }
-                }
+        if (!isContentWhitelisted && content.isNotBlank()) {
+            val contentResult = checkBlockContent(boundedContent, trimmedForum)
+            if (contentResult is FilterResult.Blocked) {
+                val rule = blockList.firstOrNull { it.id == contentResult.ruleId }
+                return SimulationResult(
+                    isBlocked = true,
+                    isWhitelisted = false,
+                    hitRule = rule,
+                    reason = contentResult.reason
+                )
             }
         }
 
-        // 4. Check user blacklist
-        if (effectiveUserId > 0L || effectiveUserName != null) {
-            for (block in blockList) {
-                if (block.category == Block.CATEGORY_BLACK_LIST && block.type == Block.TYPE_USER) {
-                    if (!matchesForumScope(block.forum, trimmedForum)) continue
-                    if ((effectiveUserId > 0L && block.uid == effectiveUserId.toString()) ||
-                        (effectiveUserName != null && block.username == effectiveUserName)
-                    ) {
-                        return SimulationResult(
-                            isBlocked = true,
-                            isWhitelisted = false,
-                            hitRule = block,
-                            reason = "命中黑名单用户: ${block.username ?: block.uid}"
-                        )
-                    }
-                }
-            }
-        }
-
-        // 5. Check content blacklist
-        for (block in blockList) {
-            if (block.category != Block.CATEGORY_BLACK_LIST) continue
-            if (!matchesForumScope(block.forum, trimmedForum)) continue
-            when (block.type) {
-                Block.TYPE_KEYWORD -> {
-                    val kws = getOrParseKeywords(block.keywords)
-                    if (kws.isNotEmpty() && content.isNotBlank() && kws.all { content.contains(it, ignoreCase = true) }) {
-                        return SimulationResult(
-                            isBlocked = true,
-                            isWhitelisted = false,
-                            hitRule = block,
-                            reason = "命中黑名单关键词: ${kws.joinToString(" ")}"
-                        )
-                    }
-                }
-                Block.TYPE_REGEX -> {
-                    val p = block.pattern
-                    if (!p.isNullOrBlank() && content.isNotBlank()) {
-                        val regex = getOrCompileRegex(p)
-                        if (regex != null && regex.containsMatchIn(content)) {
-                            return SimulationResult(
-                                isBlocked = true,
-                                isWhitelisted = false,
-                                hitRule = block,
-                                reason = "命中黑名单正则: $p"
-                            )
-                        }
-                    }
-                }
-                Block.TYPE_USER_LEVEL -> {
-                    if (userLevel in 1 until block.minLevel) {
-                        return SimulationResult(
-                            isBlocked = true,
-                            isWhitelisted = false,
-                            hitRule = block,
-                            reason = "等级 Lv.$userLevel 低于门限 Lv.${block.minLevel}"
-                        )
-                    }
-                }
-                Block.TYPE_IP_REGION -> {
-                    val target = block.ipRegion?.trim().orEmpty()
-                    if (cleanIp.isNotEmpty() && target.isNotEmpty() && (cleanIp.contains(target, ignoreCase = true) || target.contains(cleanIp, ignoreCase = true))) {
-                        return SimulationResult(
-                            isBlocked = true,
-                            isWhitelisted = false,
-                            hitRule = block,
-                            reason = "命中黑名单 IP 属地: $target"
-                        )
-                    }
-                }
-            }
+        // No dimension was blocked
+        if (hitWhitelistRule != null) {
+            return SimulationResult(
+                isBlocked = false,
+                isWhitelisted = true,
+                hitRule = hitWhitelistRule,
+                reason = hitWhitelistReason ?: "命中白名单放行"
+            )
         }
 
         return SimulationResult(
@@ -511,7 +501,7 @@ object BlockManager {
     }
 
     fun importRulesFromJson(json: String): Int {
-        if (json.isBlank()) return 0
+        if (json.isBlank() || json.length > 500_000) return 0
         val gson = GsonUtil.getGson()
         val type = object : TypeToken<List<BlockRuleDto>>() {}.type
         val importedList: List<BlockRuleDto> = runCatching {
@@ -528,7 +518,7 @@ object BlockManager {
 
             if (ruleType == Block.TYPE_REGEX) {
                 val p = dto.pattern?.trim()
-                if (p.isNullOrBlank() || p.length > 200 || runCatching { Regex(p) }.isFailure) {
+                if (p.isNullOrBlank() || p.length > 200 || isDangerousRegexPattern(p) || runCatching { Regex(p) }.isFailure) {
                     continue
                 }
             }

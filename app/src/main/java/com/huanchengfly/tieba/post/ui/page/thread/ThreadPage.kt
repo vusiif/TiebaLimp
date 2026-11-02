@@ -1051,7 +1051,7 @@ fun ThreadPage(
         }
     }
 
-    var savedHistory by remember { mutableStateOf(false) }
+    var savedHistory by remember(threadId) { mutableStateOf(false) }
     LaunchedEffect(threadId, threadTitle, author, lastVisibilityPostId) {
         if (threadTitle.isBlank()) return@LaunchedEffect
 

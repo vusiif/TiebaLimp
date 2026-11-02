@@ -4,7 +4,11 @@ import com.huanchengfly.tieba.post.fromJson
 import com.huanchengfly.tieba.post.models.ThreadHistoryInfoBean
 import com.huanchengfly.tieba.post.models.database.History
 import com.huanchengfly.tieba.post.utils.extension.findFlow
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.launch
 import org.litepal.LitePal
 import org.litepal.crud.async.FindMultiExecutor
 import org.litepal.extension.deleteAll
@@ -77,12 +81,14 @@ object HistoryUtil {
         }
     }
 
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
     private fun update(history: History, incrementCount: Boolean = true): Boolean {
         val historyBean = LitePal.where("data = ? and type = ?", history.data, history.type.toString()).findFirst(
             History::class.java
         )
         if (historyBean != null) {
-            historyBean.copy(
+            val rows = historyBean.copy(
                 timestamp = System.currentTimeMillis(),
                 title = history.title.ifBlank { historyBean.title },
                 extras = history.extras ?: historyBean.extras,
@@ -90,7 +96,7 @@ object HistoryUtil {
                 username = history.username ?: historyBean.username,
                 count = if (incrementCount) historyBean.count + 1 else historyBean.count
             ).update(historyBean.id)
-            return true
+            return rows > 0
         }
         return false
     }
@@ -109,7 +115,7 @@ object HistoryUtil {
         incrementCount: Boolean = true,
         callback: ((Boolean) -> Unit)? = null
     ) {
-        kotlin.concurrent.thread {
+        scope.launch {
             val success = synchronized(HistoryUtil) {
                 if (update(history, incrementCount)) {
                     true

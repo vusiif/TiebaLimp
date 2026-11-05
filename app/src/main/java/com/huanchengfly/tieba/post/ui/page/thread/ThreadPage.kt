@@ -125,11 +125,8 @@ import com.huanchengfly.tieba.post.toastShort
 import com.huanchengfly.tieba.post.ui.common.PbContentRender
 import com.huanchengfly.tieba.post.ui.common.PbContentText
 import com.huanchengfly.tieba.post.ui.common.theme.compose.ExtendedTheme
-import com.huanchengfly.tieba.post.ui.common.theme.compose.invertChipBackground
-import com.huanchengfly.tieba.post.ui.common.theme.compose.invertChipContent
 import com.huanchengfly.tieba.post.ui.common.theme.compose.loadMoreIndicator
 import com.huanchengfly.tieba.post.ui.common.theme.compose.pullRefreshIndicator
-import com.huanchengfly.tieba.post.ui.common.theme.compose.threadBottomBar
 import com.huanchengfly.tieba.post.ui.page.LocalNavigator
 import com.huanchengfly.tieba.post.ui.page.ProvideNavigator
 import com.huanchengfly.tieba.post.ui.page.destinations.CopyTextDialogPageDestination
@@ -139,7 +136,6 @@ import com.huanchengfly.tieba.post.ui.page.destinations.SubPostsSheetPageDestina
 import com.huanchengfly.tieba.post.ui.page.destinations.ThreadPageDestination
 import com.huanchengfly.tieba.post.ui.page.destinations.UserProfilePageDestination
 import com.huanchengfly.tieba.post.ui.widgets.compose.Avatar
-import com.huanchengfly.tieba.post.ui.widgets.compose.BackNavigationIcon
 import com.huanchengfly.tieba.post.ui.widgets.compose.BlockTip
 import com.huanchengfly.tieba.post.ui.widgets.compose.BlockableContent
 import com.huanchengfly.tieba.post.ui.widgets.compose.FoldedTip
@@ -161,12 +157,9 @@ import com.huanchengfly.tieba.post.ui.widgets.compose.OriginThreadCard
 import com.huanchengfly.tieba.post.utils.BlockManager.FilterResult
 import com.huanchengfly.tieba.post.ui.widgets.compose.PromptDialog
 import com.huanchengfly.tieba.post.ui.widgets.compose.Sizes
-import com.huanchengfly.tieba.post.ui.widgets.compose.TextWithMinWidth
 import com.huanchengfly.tieba.post.ui.widgets.compose.TipScreen
-import com.huanchengfly.tieba.post.ui.widgets.compose.TitleCentredToolbar
 import com.huanchengfly.tieba.post.ui.widgets.compose.UserHeader
 import com.huanchengfly.tieba.post.ui.widgets.compose.VerticalDivider
-import com.huanchengfly.tieba.post.ui.widgets.compose.VerticalGrid
 import com.huanchengfly.tieba.post.ui.widgets.compose.VoteCard
 import com.huanchengfly.tieba.post.utils.PollVoteStore
 import com.huanchengfly.tieba.post.ui.widgets.compose.buildChipInlineContent
@@ -277,149 +270,6 @@ fun PostAgreeBtn(
                     style = MaterialTheme.typography.caption,
                     textAlign = TextAlign.Center
                 )
-            }
-        }
-    }
-}
-
-@Composable
-private fun BottomBarAgreeBtn(
-    hasAgreed: Boolean,
-    agreeNum: Long,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val color = if (hasAgreed) ExtendedTheme.colors.accent else ExtendedTheme.colors.textSecondary
-    val animatedColor by animateColorAsState(color, label = "agreeBtnColor")
-
-    Button(
-        onClick = onClick,
-        shape = RoundedCornerShape(0),
-        contentPadding = PaddingValues(horizontal = 4.dp),
-        colors = ButtonDefaults.buttonColors(
-            backgroundColor = ExtendedTheme.colors.bottomBar,
-            contentColor = animatedColor
-        ),
-        modifier = modifier
-    ) {
-        Row(
-            modifier = Modifier.align(Alignment.CenterVertically),
-            verticalAlignment = Alignment.Top
-        ) {
-            Icon(
-                imageVector = if (hasAgreed) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                contentDescription = stringResource(id = R.string.title_agree),
-                tint = animatedColor
-            )
-            if (agreeNum > 0) {
-                Text(
-                    text = agreeNum.getShortNumString(),
-                    style = MaterialTheme.typography.caption,
-                    color = animatedColor,
-                    fontSize = 12.sp
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun BottomBarPlaceholder() {
-    Row(
-        modifier = Modifier
-            .height(IntrinsicSize.Min)
-            .background(ExtendedTheme.colors.bottomBar)
-            // 拦截点击事件
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = {}
-            )
-            .padding(horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .padding(vertical = 8.dp)
-                .weight(1f)
-                .clip(RoundedCornerShape(6.dp))
-                .background(ExtendedTheme.colors.bottomBarSurface)
-                .padding(8.dp),
-        ) {
-            Text(
-                text = stringResource(id = R.string.tip_reply_thread),
-                style = MaterialTheme.typography.caption,
-                color = ExtendedTheme.colors.onBottomBarSurface,
-            )
-        }
-
-        BottomBarAgreeBtn(
-            hasAgreed = false,
-            agreeNum = 1,
-            onClick = {},
-            modifier = Modifier.fillMaxHeight()
-        )
-
-        Box(
-            modifier = Modifier.fillMaxHeight(),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.MoreVert,
-                contentDescription = stringResource(id = R.string.btn_more),
-                tint = ExtendedTheme.colors.textSecondary,
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterialApi::class)
-@Composable
-private fun ToggleButton(
-    text: @Composable (() -> Unit),
-    checked: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    icon: @Composable (() -> Unit)? = null,
-    backgroundColor: Color = ExtendedTheme.colors.chip,
-    contentColor: Color = ExtendedTheme.colors.text,
-    selectedBackgroundColor: Color = ExtendedTheme.colors.invertChipBackground,
-    selectedContentColor: Color = ExtendedTheme.colors.invertChipContent,
-) {
-    val animatedColor by animateColorAsState(
-        if (checked) selectedContentColor else contentColor,
-        label = "toggleBtnColor"
-    )
-    val animatedBackgroundColor by animateColorAsState(
-        if (checked) selectedBackgroundColor else backgroundColor,
-        label = "toggleBtnBackgroundColor"
-    )
-
-    Surface(
-        onClick = onClick,
-        modifier = modifier,
-        enabled = true,
-        shape = RoundedCornerShape(6.dp),
-        color = animatedBackgroundColor,
-        contentColor = animatedColor,
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                if (icon != null) {
-                    icon()
-                }
-                ProvideTextStyle(
-                    value = MaterialTheme.typography.subtitle1.copy(
-                        fontSize = 14.sp,
-                        textAlign = TextAlign.Center,
-                    )
-                ) {
-                    text()
-                }
             }
         }
     }
@@ -1449,7 +1299,7 @@ fun ThreadPage(
             MyScaffold(
                 scaffoldState = scaffoldState,
                 topBar = {
-                    TopBar(
+                    ThreadTopBar(
                         forum = forum,
                         onBack = handleBack,
                         onForumClick = {
@@ -1466,7 +1316,7 @@ fun ThreadPage(
                     )
                 },
                 bottomBar = {
-                    BottomBar(
+                    ThreadBottomBar(
                         user = user,
                         onClickReply = {
                             navigator.navigate(
@@ -2240,160 +2090,6 @@ fun ThreadPage(
 }
 
 @Composable
-private fun TopBar(
-    forum: ImmutableHolder<SimpleForum>?,
-    onBack: () -> Unit,
-    onForumClick: () -> Unit,
-    isGalleryMode: Boolean = false,
-    onToggleGalleryMode: () -> Unit = {},
-    onSearchClick: () -> Unit = {},
-    modifier: Modifier = Modifier
-) {
-    TitleCentredToolbar(
-        title = {
-            forum?.let {
-                if (forum.get { name }.isNotBlank()) {
-                    Row(
-                        modifier = Modifier
-                            .padding(horizontal = 48.dp)
-                            .height(IntrinsicSize.Min)
-                            .clip(RoundedCornerShape(100))
-                            .background(ExtendedTheme.colors.chip)
-                            .clickable(onClick = onForumClick)
-                            .padding(4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Avatar(
-                            data = forum.get { avatar },
-                            contentDescription = it.get { name },
-                            modifier = Modifier
-                                .fillMaxHeight()
-                                .aspectRatio(1f)
-                        )
-
-                        Text(
-                            text = stringResource(id = R.string.title_forum, it.get { name }),
-                            fontSize = 14.sp,
-                            color = ExtendedTheme.colors.text,
-                            modifier = Modifier.padding(horizontal = 8.dp),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-            }
-        },
-        navigationIcon = {
-            BackNavigationIcon(onBack)
-        },
-        actions = {
-            IconButton(onClick = onSearchClick) {
-                Icon(
-                    imageVector = Icons.Outlined.Search,
-                    contentDescription = stringResource(id = R.string.title_search_and_jump),
-                    tint = ExtendedTheme.colors.onTopBar
-                )
-            }
-            IconButton(onClick = onToggleGalleryMode) {
-                Icon(
-                    imageVector = if (isGalleryMode) Icons.Outlined.ViewAgenda else Icons.Outlined.BrowseGallery,
-                    contentDescription = stringResource(
-                        id = if (isGalleryMode) R.string.title_thread_mode else R.string.title_gallery_mode
-                    ),
-                    tint = ExtendedTheme.colors.onTopBar
-                )
-            }
-        },
-        modifier = modifier
-    )
-}
-
-@Composable
-private fun BottomBar(
-    user: ImmutableHolder<User>,
-    onClickReply: () -> Unit,
-    onAgree: () -> Unit,
-    onClickMore: () -> Unit,
-    modifier: Modifier = Modifier,
-    hasAgreed: Boolean = false,
-    agreeNum: Long = 0,
-) {
-    Column(
-        modifier = Modifier.background(ExtendedTheme.colors.threadBottomBar)
-    ) {
-        Row(
-            modifier = Modifier
-                .height(IntrinsicSize.Min)
-                .then(modifier)
-                .padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            if (user.get { is_login } == 1 && !LocalContext.current.appPreferences.hideReply) {
-                Avatar(
-                    data = StringUtil.getAvatarUrl(user.get { portrait }),
-                    size = Sizes.Tiny,
-                    contentDescription = user.get { name },
-                    modifier = Modifier
-                        .padding(vertical = 8.dp)
-                )
-
-                Row(
-                    modifier = Modifier
-                        .padding(vertical = 8.dp)
-                        .weight(1f)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(ExtendedTheme.colors.bottomBarSurface)
-                        .clickable(onClick = onClickReply)
-                        .padding(8.dp),
-                ) {
-                    Text(
-                        text = stringResource(id = R.string.tip_reply_thread),
-                        style = MaterialTheme.typography.caption,
-                        color = ExtendedTheme.colors.onBottomBarSurface,
-                    )
-                }
-            } else {
-                Spacer(modifier = Modifier
-                    .weight(1f)
-                    .height(40.dp))
-            }
-
-            BottomBarAgreeBtn(
-                hasAgreed = hasAgreed,
-                agreeNum = agreeNum,
-                onClick = onAgree,
-                modifier = Modifier.fillMaxHeight()
-            )
-
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .clickable(onClick = onClickMore)
-                    .padding(horizontal = 4.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.MoreVert,
-                    contentDescription = stringResource(id = R.string.btn_more),
-                    tint = ExtendedTheme.colors.textSecondary,
-                )
-            }
-        }
-
-        Box(
-            modifier = Modifier
-                .requiredHeightIn(min = if (LocalContext.current.appPreferences.liftUpBottomBar) 16.dp else 0.dp)
-        ) {
-            Spacer(
-                modifier = Modifier
-                    .windowInsetsBottomHeight(WindowInsets.navigationBars)
-            )
-        }
-    }
-}
-
-@Composable
 fun PostCard(
     postHolder: ImmutableHolder<Post>,
     contentRenders: ImmutableList<PbContentRender>,
@@ -2861,190 +2557,3 @@ fun UserNameText(
     )
 }
 
-@Composable
-private fun ThreadMenu(
-    isSeeLz: Boolean,
-    isCollected: Boolean,
-    isImmersiveMode: Boolean,
-    isDesc: Boolean,
-    isGalleryMode: Boolean = false,
-    canDelete: () -> Boolean,
-    onSeeLzClick: () -> Unit,
-    onCollectClick: () -> Unit,
-    onImmersiveModeClick: () -> Unit,
-    onDescClick: () -> Unit,
-    onGalleryModeClick: () -> Unit = {},
-    onJumpPageClick: () -> Unit,
-    onBookmarksClick: () -> Unit = {},
-    onSaveSnapshotClick: () -> Unit = {},
-    onShareClick: () -> Unit,
-    onCopyLinkClick: () -> Unit,
-    onReportClick: () -> Unit,
-    onDeleteClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Spacer(
-            modifier = Modifier
-                .padding(horizontal = 16.dp)
-                .height(4.dp)
-                .fillMaxWidth(0.25f)
-                .clip(RoundedCornerShape(100))
-                .background(ExtendedTheme.colors.chip)
-        )
-        VerticalGrid(
-            column = 2,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            rowModifier = Modifier.height(IntrinsicSize.Min),
-            modifier = Modifier.padding(horizontal = 16.dp),
-        ) {
-            item {
-                ToggleButton(
-                    text = {
-                        TextWithMinWidth(
-                            text = stringResource(id = R.string.title_see_lz),
-                            minLength = 4
-                        )
-                    },
-                    checked = isSeeLz,
-                    onClick = onSeeLzClick,
-                    icon = {
-                        Icon(
-                            imageVector = if (isSeeLz) Icons.Rounded.Face6 else Icons.Rounded.FaceRetouchingOff,
-                            contentDescription = null
-                        )
-                    },
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-            item {
-                ToggleButton(
-                    text = {
-                        TextWithMinWidth(
-                            text = stringResource(
-                                id = if (isCollected) R.string.title_collected else R.string.title_uncollected
-                            ),
-                            minLength = 4
-                        )
-                    },
-                    checked = isCollected,
-                    onClick = onCollectClick,
-                    icon = {
-                        Icon(
-                            imageVector = if (isCollected) Icons.Rounded.Star else Icons.Rounded.StarBorder,
-                            contentDescription = null
-                        )
-                    },
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-            item {
-                ToggleButton(
-                    text = {
-                        TextWithMinWidth(
-                            text = stringResource(
-                                id = R.string.title_pure_read
-                            ),
-                            minLength = 4
-                        )
-                    },
-                    checked = isImmersiveMode,
-                    onClick = onImmersiveModeClick,
-                    icon = {
-                        Icon(
-                            imageVector = if (isImmersiveMode) Icons.AutoMirrored.Rounded.ChromeReaderMode else Icons.AutoMirrored.Outlined.ChromeReaderMode,
-                            contentDescription = null
-                        )
-                    },
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-            item {
-                ToggleButton(
-                    text = {
-                        TextWithMinWidth(
-                            text = stringResource(
-                                id = R.string.title_sort
-                            ),
-                            minLength = 4
-                        )
-                    },
-                    checked = isDesc,
-                    onClick = onDescClick,
-                    icon = {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.Sort,
-                            contentDescription = null
-                        )
-                    },
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-        }
-        Column {
-            ListMenuItem(
-                icon = if (isGalleryMode) Icons.Outlined.ViewAgenda else Icons.Outlined.BrowseGallery,
-                text = if (isGalleryMode) stringResource(id = R.string.title_thread_mode) else stringResource(id = R.string.title_gallery_mode),
-                iconColor = if (isGalleryMode) MaterialTheme.colors.secondary else ExtendedTheme.colors.text,
-                onClick = onGalleryModeClick,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            ListMenuItem(
-                icon = Icons.Rounded.Search,
-                text = stringResource(id = R.string.title_search_and_jump),
-                iconColor = ExtendedTheme.colors.text,
-                onClick = onJumpPageClick,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            ListMenuItem(
-                icon = Icons.Rounded.Bookmarks,
-                text = stringResource(id = R.string.title_thread_bookmarks),
-                iconColor = ExtendedTheme.colors.text,
-                onClick = onBookmarksClick,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            ListMenuItem(
-                icon = Icons.Outlined.Archive,
-                text = stringResource(id = R.string.title_save_offline_snapshot),
-                iconColor = ExtendedTheme.colors.text,
-                onClick = onSaveSnapshotClick,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            ListMenuItem(
-                icon = Icons.Rounded.Share,
-                text = stringResource(id = R.string.title_share),
-                iconColor = ExtendedTheme.colors.text,
-                onClick = onShareClick,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            ListMenuItem(
-                icon = Icons.Rounded.ContentCopy,
-                text = stringResource(id = R.string.title_copy_link),
-                iconColor = ExtendedTheme.colors.text,
-                onClick = onCopyLinkClick,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            ListMenuItem(
-                icon = Icons.Rounded.Report,
-                text = stringResource(id = R.string.title_report),
-                iconColor = ExtendedTheme.colors.text,
-                onClick = onReportClick,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            if (canDelete()) {
-                ListMenuItem(
-                    icon = Icons.Rounded.Delete,
-                    text = stringResource(id = R.string.title_delete),
-                    iconColor = ExtendedTheme.colors.text,
-                    onClick = onDeleteClick,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        }
-    }
-}

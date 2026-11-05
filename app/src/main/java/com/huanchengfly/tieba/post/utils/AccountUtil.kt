@@ -67,15 +67,28 @@ object AccountUtil {
         get() = mutableAllAccountsState.value
 
     fun init(context: Context) {
+        val rawAccounts = findAll(Account::class.java)
+        var migrated = false
+        for (acc in rawAccounts) {
+            if (AccountSecurityUtil.isPlaintext(acc.bduss) || AccountSecurityUtil.isPlaintext(acc.sToken)) {
+                acc.toEncryptedCopy().update(acc.id.toLong())
+                migrated = true
+            }
+        }
+        val finalAccounts = if (migrated) findAll(Account::class.java) else rawAccounts
+        val decryptedAccounts = finalAccounts.map { it.decryptSensitiveFields() }
+        mutableAllAccountsState.value = decryptedAccounts
+
         val account = runCatching {
             val loginUser =
                 context.getSharedPreferences("accountData", Context.MODE_PRIVATE).getInt("now", -1)
             if (loginUser == -1) {
                 null
-            } else getAccountInfo(loginUser)
+            } else {
+                decryptedAccounts.firstOrNull { it.id == loginUser } ?: getAccountInfo(loginUser)
+            }
         }.getOrNull()
         mutableCurrentAccountState.value = account
-        mutableAllAccountsState.value = findAll(Account::class.java)
     }
 
     @JvmStatic
@@ -89,24 +102,33 @@ object AccountUtil {
     }
 
     fun newAccount(uid: String, account: Account, callback: (Boolean) -> Unit) {
-        account.saveOrUpdateAsync("uid = ?", uid).listen {
-            mutableAllAccountsState.value = findAll(Account::class.java)
-            callback(it)
+        val encrypted = account.toEncryptedCopy()
+        encrypted.saveOrUpdateAsync("uid = ?", uid).listen { success ->
+            mutableAllAccountsState.value = findAll(Account::class.java).map { it.decryptSensitiveFields() }
+            callback(success)
         }
     }
 
     private fun getAccountInfo(accountId: Int): Account {
-        return where("id = ?", accountId.toString()).findFirst(Account::class.java)
+        return allAccounts.firstOrNull { it.id == accountId }
+            ?: where("id = ?", accountId.toString()).findFirst(Account::class.java)?.decryptSensitiveFields()
+            ?: Account()
     }
 
     @JvmStatic
     fun getAccountInfoByUid(uid: String): Account? {
-        return where("uid = ?", uid).findFirst<Account>()
+        return allAccounts.firstOrNull { it.uid == uid }
+            ?: where("uid = ?", uid).findFirst<Account>()?.decryptSensitiveFields()
     }
 
     @JvmStatic
     fun getAccountInfoByBduss(bduss: String): Account {
-        return where("bduss = ?", bduss).findFirst(Account::class.java)
+        return allAccounts.firstOrNull { it.bduss == bduss }
+            ?: run {
+                val encBduss = AccountSecurityUtil.encrypt(bduss)
+                where("bduss = ? or bduss = ?", encBduss, bduss).findFirst(Account::class.java)?.decryptSensitiveFields()
+                    ?: Account()
+            }
     }
 
     @JvmStatic
@@ -185,11 +207,11 @@ object AccountUtil {
                     }
             }
             .onEach { account ->
-                account.saveOrUpdateAsync("uid = ?", account.uid)
+                account.toEncryptedCopy().saveOrUpdateAsync("uid = ?", account.uid)
                     .listen {
                         LitePal.findAllAsync<Account>()
-                            .listen {
-                                mutableAllAccountsState.value = it
+                            .listen { list ->
+                                mutableAllAccountsState.value = list.map { it.decryptSensitiveFields() }
                             }
                     }
             }
@@ -214,7 +236,9 @@ object AccountUtil {
             account.apply {
                 this.sToken = sToken
                 this.cookie = cookie
-            }.update(account.id.toLong())
+            }
+            account.toEncryptedCopy().update(account.id.toLong())
+            mutableAllAccountsState.value = allAccounts.map { if (it.id == account.id) account else it }
             return true
         }
         return false
@@ -268,4 +292,39 @@ object AccountUtil {
     fun getBdussCookie(bduss: String): String {
         return "BDUSS=$bduss; Path=/; Max-Age=315360000; Domain=.baidu.com; Httponly; Secure"
     }
+}
+
+fun Account.toEncryptedCopy(): Account {
+    return Account(
+        uid = this.uid,
+        name = this.name,
+        bduss = AccountSecurityUtil.encrypt(this.bduss),
+        tbs = this.tbs,
+        portrait = this.portrait,
+        sToken = AccountSecurityUtil.encrypt(this.sToken),
+        cookie = AccountSecurityUtil.encrypt(this.cookie),
+        nameShow = this.nameShow,
+        intro = this.intro,
+        sex = this.sex,
+        fansNum = this.fansNum,
+        postNum = this.postNum,
+        threadNum = this.threadNum,
+        concernNum = this.concernNum,
+        tbAge = this.tbAge,
+        age = this.age,
+        birthdayShowStatus = this.birthdayShowStatus,
+        birthdayTime = this.birthdayTime,
+        constellation = this.constellation,
+        tiebaUid = this.tiebaUid,
+        loadSuccess = this.loadSuccess,
+        uuid = this.uuid,
+        zid = this.zid,
+    )
+}
+
+fun Account.decryptSensitiveFields(): Account {
+    this.bduss = AccountSecurityUtil.decrypt(this.bduss)
+    this.sToken = AccountSecurityUtil.decrypt(this.sToken)
+    this.cookie = AccountSecurityUtil.decrypt(this.cookie)
+    return this
 }

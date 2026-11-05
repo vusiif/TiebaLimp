@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- By default, enforce strict HTTPS across the entire application -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Specific legacy Tieba & Baidu media CDN endpoints where some older assets/voice notes may still use HTTP -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">tieba.baidu.com</domain>
+        <domain includeSubdomains="true">tiebac.baidu.com</domain>
+        <domain includeSubdomains="true">tb.himg.baidu.com</domain>
+        <domain includeSubdomains="true">c.hiphotos.baidu.com</domain>
+        <domain includeSubdomains="true">imgsa.baidu.com</domain>
+        <domain includeSubdomains="true">bdimg.com</domain>
+        <domain includeSubdomains="true">tieba.com</domain>
+    </domain-config>
+</network-security-config>

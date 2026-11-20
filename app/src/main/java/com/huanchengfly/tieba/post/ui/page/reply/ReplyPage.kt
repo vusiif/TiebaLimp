@@ -31,17 +31,11 @@ import androidx.compose.foundation.layout.requiredHeightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.Badge
 import androidx.compose.material.BadgedBox
-import androidx.compose.material.Checkbox
 import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
@@ -53,8 +47,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.outlined.EmojiEmotions
 import androidx.compose.material.icons.outlined.InsertPhoto
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Close
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -80,14 +72,9 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.widget.addTextChangedListener
-import com.github.panpf.sketch.compose.AsyncImage
-import com.google.accompanist.drawablepainter.rememberDrawablePainter
 import com.huanchengfly.tieba.post.R
-import com.huanchengfly.tieba.post.arch.GlobalEvent
 import com.huanchengfly.tieba.post.arch.collectPartialAsState
-import com.huanchengfly.tieba.post.arch.emitGlobalEvent
 import com.huanchengfly.tieba.post.arch.onEvent
-import com.huanchengfly.tieba.post.arch.onGlobalEvent
 import com.huanchengfly.tieba.post.arch.pageViewModel
 import com.huanchengfly.tieba.post.models.database.Draft
 import com.huanchengfly.tieba.post.pxToDpFloat
@@ -110,8 +97,6 @@ import com.huanchengfly.tieba.post.ui.widgets.compose.rememberDialogState
 import com.huanchengfly.tieba.post.ui.widgets.edittext.widget.UndoableEditText
 import com.huanchengfly.tieba.post.utils.AccountUtil
 import com.huanchengfly.tieba.post.utils.Emoticon
-import com.huanchengfly.tieba.post.utils.EmoticonManager
-import com.huanchengfly.tieba.post.utils.PickMediasRequest
 import com.huanchengfly.tieba.post.utils.StringUtil
 import com.huanchengfly.tieba.post.utils.appPreferences
 import com.huanchengfly.tieba.post.utils.hideKeyboard
@@ -133,7 +118,6 @@ import kotlinx.coroutines.withContext
 import org.litepal.LitePal
 import org.litepal.extension.deleteAllAsync
 import org.litepal.extension.findFirstAsync
-import java.util.UUID
 import kotlin.math.max
 
 data class ReplyArgs(
@@ -778,143 +762,4 @@ fun ReplyPage(
         replyUserPortrait = replyUserPortrait,
         tbs = tbs
     )
-}
-
-@Composable
-private fun EmoticonPanel(
-    modifier: Modifier = Modifier,
-    onEmoticonClick: (Emoticon) -> Unit,
-) {
-    val emoticons = remember {
-        EmoticonManager.getAllEmoticon()
-            .filter { it.name.isNotEmpty() }
-    }
-
-    Column(
-        modifier = modifier
-    ) {
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(48.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 16.dp)
-        ) {
-            items(emoticons) { emoticon ->
-                Image(
-                    painter = rememberDrawablePainter(
-                        drawable = EmoticonManager.getEmoticonDrawable(
-                            LocalContext.current,
-                            emoticon.id
-                        )
-                    ),
-                    contentDescription = stringResource(
-                        id = R.string.emoticon,
-                        emoticon.name
-                    ),
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .padding(8.dp)
-                        .clickable { onEmoticonClick(emoticon) },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ImagePanel(
-    selectedImages: ImmutableList<String>,
-    onNewImageSelected: (List<Uri>) -> Unit,
-    onRemoveImage: (Int) -> Unit,
-    isOriginImage: Boolean,
-    onIsOriginImageChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val id = remember { UUID.randomUUID().toString() }
-    val coroutineScope = rememberCoroutineScope()
-    onGlobalEvent<GlobalEvent.SelectedImages>(
-        coroutineScope,
-        filter = { it.id == id }
-    ) {
-        onNewImageSelected(it.images)
-    }
-
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.Center
-    ) {
-        LazyRow(
-            modifier = Modifier
-                .fillMaxHeight(0.5f),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-//            item {
-//                Spacer(modifier = Modifier.width(16.dp))
-//            }
-            itemsIndexed(selectedImages) { index, imageUri ->
-                Box {
-                    AsyncImage(
-                        imageUri = imageUri,
-                        contentDescription = stringResource(id = R.string.desc_image),
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .aspectRatio(1f)
-                    )
-                    IconButton(
-                        onClick = { onRemoveImage(index) },
-                        modifier = Modifier.align(Alignment.TopEnd)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Close,
-                            contentDescription = stringResource(id = R.string.desc_remove_image)
-                        )
-                    }
-                }
-            }
-            if (selectedImages.size < 9) {
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .aspectRatio(1f)
-                            .background(ExtendedTheme.colors.chip)
-                            .clickable {
-                                coroutineScope.emitGlobalEvent(
-                                    GlobalEvent.StartSelectImages(
-                                        id,
-                                        9 - selectedImages.size,
-                                        PickMediasRequest.ImageOnly
-                                    )
-                                )
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Add,
-                            contentDescription = stringResource(id = R.string.desc_add_image),
-                            modifier = Modifier.size(48.dp)
-                        )
-                    }
-                }
-            }
-        }
-        Row(
-            modifier = Modifier
-                .padding(vertical = 16.dp)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) {
-                    onIsOriginImageChange(!isOriginImage)
-                },
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Checkbox(checked = isOriginImage, onCheckedChange = onIsOriginImageChange)
-            Text(text = stringResource(id = R.string.origin_image))
-        }
-    }
 }

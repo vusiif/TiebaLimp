@@ -1,15 +1,6 @@
 package com.huanchengfly.tieba.post.ui.page.reply
 
-import android.content.ActivityNotFoundException
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.net.Uri
-import android.util.Log
 import android.view.View
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,9 +8,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.consumeWindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -28,25 +17,13 @@ import androidx.compose.foundation.layout.imeAnimationTarget
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeightIn
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.Badge
-import androidx.compose.material.BadgedBox
-import androidx.compose.material.CircularProgressIndicator
-import androidx.compose.material.Icon
-import androidx.compose.material.IconButton
 import androidx.compose.material.LocalTextStyle
 import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Surface
 import androidx.compose.material.Text
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.Send
-import androidx.compose.material.icons.outlined.EmojiEmotions
-import androidx.compose.material.icons.outlined.InsertPhoto
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -61,7 +38,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -86,14 +62,8 @@ import com.huanchengfly.tieba.post.ui.page.reply.ReplyPanelType.EMOJI
 import com.huanchengfly.tieba.post.ui.page.reply.ReplyPanelType.IMAGE
 import com.huanchengfly.tieba.post.ui.page.reply.ReplyPanelType.NONE
 import com.huanchengfly.tieba.post.ui.utils.imeNestedScroll
-import com.huanchengfly.tieba.post.ui.widgets.compose.BaseDialog
-import com.huanchengfly.tieba.post.ui.widgets.compose.Dialog
-import com.huanchengfly.tieba.post.ui.widgets.compose.DialogNegativeButton
-import com.huanchengfly.tieba.post.ui.widgets.compose.DialogPositiveButton
-import com.huanchengfly.tieba.post.ui.widgets.compose.DialogState
 import com.huanchengfly.tieba.post.ui.widgets.compose.MyBackHandler
 import com.huanchengfly.tieba.post.ui.widgets.compose.VerticalDivider
-import com.huanchengfly.tieba.post.ui.widgets.compose.rememberDialogState
 import com.huanchengfly.tieba.post.ui.widgets.edittext.widget.UndoableEditText
 import com.huanchengfly.tieba.post.utils.AccountUtil
 import com.huanchengfly.tieba.post.utils.Emoticon
@@ -119,51 +89,6 @@ import org.litepal.LitePal
 import org.litepal.extension.deleteAllAsync
 import org.litepal.extension.findFirstAsync
 import kotlin.math.max
-
-data class ReplyArgs(
-    val forumId: Long,
-    val forumName: String,
-    val threadId: Long,
-    val postId: Long? = null,
-    val subPostId: Long? = null,
-    val replyUserId: Long? = null,
-    val replyUserName: String? = null,
-    val replyUserPortrait: String? = null,
-    val tbs: String? = null,
-)
-
-@Composable
-fun ReplyDialog(
-    args: ReplyArgs,
-    state: DialogState = rememberDialogState(),
-) {
-    BaseDialog(
-        dialogState = state,
-        imePadding = false,
-    ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp),
-            color = ExtendedTheme.colors.windowBackground,
-            elevation = 0.dp,
-        ) {
-            ReplyPageContent(
-                viewModel = pageViewModel(),
-                onBack = { dismiss() },
-                forumId = args.forumId,
-                forumName = args.forumName,
-                threadId = args.threadId,
-                postId = args.postId,
-                subPostId = args.subPostId,
-                replyUserId = args.replyUserId,
-                replyUserName = args.replyUserName,
-                replyUserPortrait = args.replyUserPortrait,
-                tbs = args.tbs,
-                isDialog = true
-            )
-        }
-    }
-}
 
 @OptIn(
     ExperimentalLayoutApi::class,
@@ -514,108 +439,44 @@ internal fun ReplyPageContent(
 //                placeholder = { Text(text = stringResource(id = R.string.tip_reply)) },
 //            )
         }
-        Row(
-            modifier = Modifier.padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(24.dp)
-        ) {
-            IconButton(
-                onClick = { switchToPanel(EMOJI) },
-                modifier = Modifier.size(24.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.EmojiEmotions,
-                    contentDescription = stringResource(id = R.string.insert_emotions),
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-            if (postId == null || postId == 0L) {
-                IconButton(
-                    onClick = { switchToPanel(IMAGE) },
-                    modifier = Modifier.size(24.dp)
-                ) {
-                    BadgedBox(
-                        badge = {
-                            if (selectedImageList.isNotEmpty()) {
-                                Badge(
-                                    backgroundColor = ExtendedTheme.colors.accent,
-                                    contentColor = ExtendedTheme.colors.background,
-                                ) {
-                                    Text(
-                                        text = "${selectedImageList.size}",
-                                        style = MaterialTheme.typography.caption
-                                    )
-                                }
-                            }
-                        }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.InsertPhoto,
-                            contentDescription = stringResource(id = R.string.insert_photo),
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
+        ReplyActionToolbar(
+            onEmojiClick = { switchToPanel(EMOJI) },
+            canChooseImage = (postId == null || postId == 0L),
+            selectedImageCount = selectedImageList.size,
+            onImageClick = { switchToPanel(IMAGE) },
+            isReplying = isReplying,
+            canSend = canSend,
+            onSendClick = {
+                val replyContent = if (subPostId == null || subPostId == 0L) {
+                    getText()
+                } else {
+                    "回复 #(reply, ${replyUserPortrait}, ${replyUserName}) :${getText()}"
                 }
-            }
-//            IconButton(
-//                onClick = { switchToPanel(VOICE) },
-//                modifier = Modifier.size(24.dp)
-//            ) {
-//                Icon(
-//                    imageVector = Icons.Outlined.KeyboardVoice,
-//                    contentDescription = stringResource(id = R.string.insert_voice),
-//                    modifier = Modifier.size(24.dp)
-//                )
-//            }
-            Spacer(modifier = Modifier.weight(1f))
-            if (isReplying) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(24.dp),
-                    strokeWidth = 2.dp,
-                    color = ExtendedTheme.colors.primary
-                )
-            } else {
-                IconButton(
-                    onClick = {
-                        val replyContent = if (subPostId == null || subPostId == 0L) {
-                            getText()
-                        } else {
-                            "回复 #(reply, ${replyUserPortrait}, ${replyUserName}) :${getText()}"
-                        }
-                        if (selectedImageList.isEmpty()) {
-                            viewModel.send(
-                                ReplyUiIntent.Send(
-                                    content = replyContent,
-                                    forumId = forumId,
-                                    forumName = forumName,
-                                    threadId = threadId,
-                                    tbs = curTbs,
-                                    postId = postId,
-                                    subPostId = subPostId,
-                                    replyUserId = replyUserId
-                                )
-                            )
-                        } else {
-                            waitUploadSuccessToSend = true
-                            viewModel.send(
-                                ReplyUiIntent.UploadImages(
-                                    forumName,
-                                    selectedImageList,
-                                    isOriginImage
-                                )
-                            )
-                        }
-                    },
-                    enabled = canSend,
-                    modifier = Modifier.size(24.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Rounded.Send,
-                        contentDescription = stringResource(id = R.string.send_reply),
-                        modifier = Modifier.size(24.dp)
+                if (selectedImageList.isEmpty()) {
+                    viewModel.send(
+                        ReplyUiIntent.Send(
+                            content = replyContent,
+                            forumId = forumId,
+                            forumName = forumName,
+                            threadId = threadId,
+                            tbs = curTbs,
+                            postId = postId,
+                            subPostId = subPostId,
+                            replyUserId = replyUserId
+                        )
+                    )
+                } else {
+                    waitUploadSuccessToSend = true
+                    viewModel.send(
+                        ReplyUiIntent.UploadImages(
+                            forumName,
+                            selectedImageList,
+                            isOriginImage
+                        )
                     )
                 }
             }
-        }
+        )
         Spacer(
             modifier = Modifier
                 .fillMaxWidth()
@@ -678,59 +539,11 @@ internal fun ReplyPageContent(
         }
     }
 
-    fun getDispatchUri(): Uri {
-        return if (postId != null) {
-            Uri.parse("com.baidu.tieba://unidispatch/pb?obj_locate=comment_lzl_cut_guide&obj_source=wise&obj_name=index&obj_param2=chrome&has_token=0&qd=scheme&refer=tieba.baidu.com&wise_sample_id=3000232_2&hightlight_anchor_pid=${postId}&is_anchor_to_comment=1&comment_sort_type=0&fr=bpush&tid=${threadId}")
-        } else {
-            Uri.parse("com.baidu.tieba://unidispatch/pb?obj_locate=pb_reply&obj_source=wise&obj_name=index&obj_param2=chrome&has_token=0&qd=scheme&refer=tieba.baidu.com&wise_sample_id=3000232_2-99999_9&fr=bpush&tid=${threadId}")
-        }
-    }
-
-    fun launchOfficialApp() {
-        val intent = Intent(Intent.ACTION_VIEW).setData(getDispatchUri())
-        val resolveInfos =
-            context.packageManager.queryIntentActivities(
-                intent,
-                PackageManager.MATCH_DEFAULT_ONLY
-            ).filter { it.activityInfo.packageName != context.packageName }
-        try {
-            if (resolveInfos.isNotEmpty()) {
-                context.startActivity(intent)
-            } else {
-                context.toastShort(R.string.toast_official_client_not_install)
-            }
-        } catch (e: ActivityNotFoundException) {
-            context.toastShort(R.string.toast_official_client_not_install)
-        }
-    }
-
-    val warningDialogState = rememberDialogState()
-    Dialog(
-        dialogState = warningDialogState,
-        title = { Text(text = stringResource(id = R.string.title_dialog_reply_warning)) },
-        buttons = {
-            DialogPositiveButton(
-                text = stringResource(id = R.string.button_official_client_reply),
-                onClick = { launchOfficialApp() }
-            )
-            DialogNegativeButton(text = stringResource(id = R.string.btn_continue_reply))
-            DialogNegativeButton(
-                text = stringResource(id = R.string.btn_cancel_reply),
-                onClick = { onBack() }
-            )
-        },
-    ) {
-        Text(
-            text = stringResource(id = R.string.message_dialog_reply_warning),
-            modifier = Modifier.padding(horizontal = 24.dp)
-        )
-    }
-
-    LaunchedEffect(Unit) {
-        if (context.appPreferences.postOrReplyWarning) {
-            warningDialogState.show()
-        }
-    }
+    ReplyWarningDialog(
+        threadId = threadId,
+        postId = postId,
+        onBack = onBack,
+    )
 }
 
 // TODO: 将软键盘状态相关逻辑抽离出来

@@ -1,8 +1,6 @@
 package com.huanchengfly.tieba.post.ui.page.thread
 
-import android.util.Log
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -10,60 +8,36 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.defaultMinSize
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.requiredHeightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsBottomHeight
-import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.CircularProgressIndicator
-import androidx.compose.material.DropdownMenuItem
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.Icon
-import androidx.compose.material.IconButton
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.ModalBottomSheetLayout
 import androidx.compose.material.ModalBottomSheetValue
-import androidx.compose.material.ProvideTextStyle
 import androidx.compose.material.SnackbarDuration
 import androidx.compose.material.SnackbarResult
-import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ChromeReaderMode
-import androidx.compose.material.icons.automirrored.rounded.ChromeReaderMode
 import androidx.compose.material.icons.automirrored.rounded.Sort
-import androidx.compose.material.icons.outlined.BrowseGallery
-import androidx.compose.material.icons.outlined.ViewAgenda
 import androidx.compose.material.icons.rounded.AlignVerticalTop
-import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.Face6
-import androidx.compose.material.icons.rounded.FaceRetouchingOff
 import androidx.compose.material.icons.rounded.Favorite
-import androidx.compose.material.icons.rounded.FavoriteBorder
-import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Report
-import androidx.compose.material.icons.rounded.RocketLaunch
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Star
-import androidx.compose.material.icons.rounded.StarBorder
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
@@ -81,33 +55,21 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.util.fastForEach
 import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.LottieConstants
 import com.airbnb.lottie.compose.rememberLottieComposition
-import com.huanchengfly.tieba.post.App
 import com.huanchengfly.tieba.post.R
-import com.huanchengfly.tieba.post.api.TiebaApi
 import com.huanchengfly.tieba.post.api.booleanToString
 import com.huanchengfly.tieba.post.api.models.protos.Post
 import com.huanchengfly.tieba.post.api.models.protos.SimpleForum
-import com.huanchengfly.tieba.post.api.models.protos.SubPostList
 import com.huanchengfly.tieba.post.api.models.protos.ThreadInfo
 import com.huanchengfly.tieba.post.api.models.protos.User
-import com.huanchengfly.tieba.post.api.models.protos.plainText
-import com.huanchengfly.tieba.post.api.retrofit.exception.getErrorMessage
 import com.huanchengfly.tieba.post.arch.GlobalEvent
 import com.huanchengfly.tieba.post.arch.ImmutableHolder
 import com.huanchengfly.tieba.post.arch.collectPartialAsState
@@ -117,13 +79,12 @@ import com.huanchengfly.tieba.post.arch.pageViewModel
 import com.huanchengfly.tieba.post.arch.wrapImmutable
 import com.huanchengfly.tieba.post.models.ThreadHistoryInfoBean
 import com.huanchengfly.tieba.post.models.database.History
+import com.huanchengfly.tieba.post.models.database.FloorBookmark
 import com.huanchengfly.tieba.post.toJson
 import com.huanchengfly.tieba.post.toastShort
 import com.huanchengfly.tieba.post.ui.common.PbContentRender
-import com.huanchengfly.tieba.post.ui.common.PbContentText
 import com.huanchengfly.tieba.post.ui.common.theme.compose.ExtendedTheme
 import com.huanchengfly.tieba.post.ui.common.theme.compose.pullRefreshIndicator
-import com.huanchengfly.tieba.post.ui.page.LocalNavigator
 import com.huanchengfly.tieba.post.ui.page.ProvideNavigator
 import com.huanchengfly.tieba.post.ui.page.destinations.CopyTextDialogPageDestination
 import com.huanchengfly.tieba.post.ui.page.destinations.ForumPageDestination
@@ -131,57 +92,22 @@ import com.huanchengfly.tieba.post.ui.page.destinations.ReplyPageDestination
 import com.huanchengfly.tieba.post.ui.page.destinations.SubPostsSheetPageDestination
 import com.huanchengfly.tieba.post.ui.page.destinations.ThreadPageDestination
 import com.huanchengfly.tieba.post.ui.page.destinations.UserProfilePageDestination
-import com.huanchengfly.tieba.post.ui.widgets.compose.Avatar
-import com.huanchengfly.tieba.post.ui.widgets.compose.BlockTip
-import com.huanchengfly.tieba.post.ui.widgets.compose.BlockableContent
 import com.huanchengfly.tieba.post.ui.widgets.compose.Button
-import com.huanchengfly.tieba.post.ui.widgets.compose.Card
-import com.huanchengfly.tieba.post.ui.widgets.compose.Chip
-import com.huanchengfly.tieba.post.ui.widgets.compose.ConfirmDialog
 import com.huanchengfly.tieba.post.ui.widgets.compose.Container
 import com.huanchengfly.tieba.post.ui.widgets.compose.ErrorScreen
-import com.huanchengfly.tieba.post.ui.widgets.compose.HorizontalDivider
 import com.huanchengfly.tieba.post.ui.widgets.compose.LazyLoad
-import com.huanchengfly.tieba.post.ui.widgets.compose.ListMenuItem
 import com.huanchengfly.tieba.post.ui.widgets.compose.LoadMoreLayout
-import com.huanchengfly.tieba.post.ui.widgets.compose.LongClickMenu
 import com.huanchengfly.tieba.post.ui.widgets.compose.MyBackHandler
 import com.huanchengfly.tieba.post.ui.widgets.compose.MyLazyColumn
 import com.huanchengfly.tieba.post.ui.widgets.compose.MyScaffold
-import com.huanchengfly.tieba.post.ui.widgets.compose.OriginThreadCard
 import com.huanchengfly.tieba.post.utils.BlockManager.FilterResult
-import com.huanchengfly.tieba.post.ui.widgets.compose.PromptDialog
-import com.huanchengfly.tieba.post.ui.widgets.compose.Sizes
 import com.huanchengfly.tieba.post.ui.widgets.compose.TipScreen
-import com.huanchengfly.tieba.post.ui.widgets.compose.UserHeader
 import com.huanchengfly.tieba.post.ui.widgets.compose.VerticalDivider
-import com.huanchengfly.tieba.post.ui.widgets.compose.VoteCard
-import com.huanchengfly.tieba.post.utils.PollVoteStore
 import com.huanchengfly.tieba.post.ui.widgets.compose.rememberDialogState
-import com.huanchengfly.tieba.post.ui.widgets.compose.rememberMenuState
 import com.huanchengfly.tieba.post.ui.widgets.compose.states.StateScreen
-import androidx.compose.material.icons.rounded.Bookmarks
-import com.huanchengfly.tieba.post.models.database.FloorBookmark
 import com.huanchengfly.tieba.post.utils.FloorBookmarkUtil
-import com.huanchengfly.tieba.post.utils.ThreadSnapshotUtil
-import com.huanchengfly.tieba.post.ui.common.PicContentRender
-import androidx.compose.material.icons.outlined.Archive
-import com.huanchengfly.tieba.post.ui.widgets.compose.FloorBookmarkEditDialog
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.border
-import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
-import androidx.compose.material.icons.rounded.KeyboardArrowUp
-import androidx.compose.material.icons.rounded.Search
-import androidx.compose.ui.zIndex
 import com.huanchengfly.tieba.post.ui.widgets.compose.ThreadSearchHit
 import com.huanchengfly.tieba.post.ui.widgets.compose.ThreadSearchJumpDialog
-import com.huanchengfly.tieba.post.ui.widgets.compose.FloorBookmarksDialog
 import com.huanchengfly.tieba.post.ui.widgets.compose.PredictiveBackBox
 import com.huanchengfly.tieba.post.ui.widgets.compose.ResumeReadingPill
 import com.huanchengfly.tieba.post.ui.widgets.compose.ThreadGalleryView
@@ -189,19 +115,16 @@ import com.huanchengfly.tieba.post.ui.widgets.compose.extractGalleryImages
 import com.huanchengfly.tieba.post.utils.HistoryUtil
 import com.huanchengfly.tieba.post.utils.StringUtil
 import com.huanchengfly.tieba.post.utils.TiebaUtil
-import com.huanchengfly.tieba.post.utils.appPreferences
 import com.ramcosta.composedestinations.annotation.DeepLink
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
-import kotlin.concurrent.thread
 import kotlin.math.max
 
 object ThreadPageFrom {
@@ -655,74 +578,46 @@ fun ThreadPage(
     var readFloorBeforeBack by remember {
         mutableIntStateOf(1)
     }
-    ConfirmDialog(
+    UpdateCollectMarkDialog(
         dialogState = updateCollectMarkDialogState,
-        onConfirm = {
-            coroutineScope.launch {
-                navigator.navigateUp()
-                if (lastVisibilityPostId != 0L) {
-                    TiebaApi.getInstance()
-                        .addStoreFlow(threadId, lastVisibilityPostId)
-                        .catch {
-                            context.toastShort(
-                                R.string.message_update_collect_mark_failed,
-                                it.getErrorMessage()
-                            )
-                        }
-                        .collect {
-                            context.toastShort(R.string.message_update_collect_mark_success)
-                        }
-                }
-            }
-        },
-        onCancel = {
-            navigator.navigateUp()
-        }
-    ) {
-        Text(text = stringResource(R.string.message_update_collect_mark, readFloorBeforeBack))
-    }
-
+        floor = readFloorBeforeBack,
+        threadId = threadId,
+        lastVisibilityPostId = lastVisibilityPostId,
+        onNavUp = { navigator.navigateUp() }
+    )
 
     val confirmDeleteDialogState = rememberDialogState()
     var deletePost by remember { mutableStateOf<ImmutableHolder<Post>?>(null) }
-    ConfirmDialog(
+    ConfirmDeletePostDialog(
         dialogState = confirmDeleteDialogState,
-        onConfirm = {
-            curForumId ?: return@ConfirmDialog
-            if (deletePost == null) {
-                val isSelfThread = author?.get { id } == user.get { id }
-                viewModel.send(
-                    ThreadUiIntent.DeleteThread(
-                        forumId = curForumId,
-                        forumName = curForumName.orEmpty(),
-                        threadId = threadId,
-                        deleteMyThread = isSelfThread,
-                        tbs = curTbs
-                    )
+        deletePost = deletePost,
+        curForumId = curForumId,
+        onDeleteThread = {
+            val isSelfThread = author?.get { id } == user.get { id }
+            viewModel.send(
+                ThreadUiIntent.DeleteThread(
+                    forumId = curForumId!!,
+                    forumName = curForumName.orEmpty(),
+                    threadId = threadId,
+                    deleteMyThread = isSelfThread,
+                    tbs = curTbs
                 )
-            } else {
-                val isSelfPost = deletePost!!.get { author_id } == user.get { id }
-                viewModel.send(
-                    ThreadUiIntent.DeletePost(
-                        forumId = curForumId,
-                        forumName = curForumName.orEmpty(),
-                        threadId = threadId,
-                        postId = deletePost!!.get { id },
-                        deleteMyPost = isSelfPost,
-                        tbs = curTbs
-                    )
-                )
-            }
-        }
-    ) {
-        Text(
-            text = stringResource(
-                id = R.string.message_confirm_delete,
-                if (deletePost == null) stringResource(id = R.string.this_thread)
-                else stringResource(id = R.string.tip_post_floor, deletePost!!.get { floor })
             )
-        )
-    }
+        },
+        onDeletePost = { postId ->
+            val isSelfPost = deletePost!!.get { author_id } == user.get { id }
+            viewModel.send(
+                ThreadUiIntent.DeletePost(
+                    forumId = curForumId!!,
+                    forumName = curForumName.orEmpty(),
+                    threadId = threadId,
+                    postId = postId,
+                    deleteMyPost = isSelfPost,
+                    tbs = curTbs
+                )
+            )
+        }
+    )
 
     var bookmarkTargetPost by remember { mutableStateOf<Post?>(null) }
     var bookmarkInitialNote by remember { mutableStateOf("") }
@@ -742,42 +637,20 @@ fun ThreadPage(
         }
     }
 
-    FloorBookmarkEditDialog(
-        dialogState = bookmarkEditDialogState,
-        floor = bookmarkTargetPost?.floor ?: 0,
-        authorName = bookmarkTargetPost?.author?.nameShow.takeIf { !it.isNullOrEmpty() }
-            ?: bookmarkTargetPost?.author?.name.orEmpty(),
-        contentSnippet = bookmarkTargetPost?.content?.plainText.orEmpty(),
+    ThreadBookmarkDialogs(
+        editDialogState = bookmarkEditDialogState,
+        bookmarksDialogState = bookmarksDialogState,
+        targetPost = bookmarkTargetPost,
         initialNote = bookmarkInitialNote,
         isExisting = bookmarkIsExisting,
-        onSave = { note ->
-            val target = bookmarkTargetPost ?: return@FloorBookmarkEditDialog
+        threadBookmarks = threadBookmarks,
+        threadId = threadId,
+        threadTitle = threadTitle,
+        onBookmarksChanged = {
             coroutineScope.launch {
-                FloorBookmarkUtil.addOrUpdateBookmark(
-                    threadId = threadId,
-                    threadTitle = threadTitle,
-                    postId = target.id,
-                    floor = target.floor,
-                    authorName = target.author?.nameShow.takeIf { !it.isNullOrEmpty() }
-                        ?: target.author?.name.orEmpty(),
-                    contentSnippet = target.content.plainText,
-                    note = note
-                )
-                context.toastShort(R.string.toast_bookmark_saved)
+                threadBookmarks = FloorBookmarkUtil.getBookmarks(threadId)
             }
         },
-        onDelete = {
-            val target = bookmarkTargetPost ?: return@FloorBookmarkEditDialog
-            coroutineScope.launch {
-                FloorBookmarkUtil.deleteBookmark(threadId, target.id)
-                context.toastShort(R.string.toast_bookmark_deleted)
-            }
-        }
-    )
-
-    FloorBookmarksDialog(
-        dialogState = bookmarksDialogState,
-        bookmarks = threadBookmarks,
         onSelectBookmark = { bookmark ->
             val targetPid = bookmark.postId.toLongOrNull() ?: 0L
             val targetFloor = bookmark.floor
@@ -807,13 +680,6 @@ fun ThreadPage(
                     )
                 }
                 context.toastShort(context.getString(R.string.toast_jump_to_reading_history, targetFloor.toString()))
-            }
-        },
-        onDeleteBookmark = { bookmark ->
-            coroutineScope.launch {
-                FloorBookmarkUtil.deleteBookmarkById(bookmark.id)
-                threadBookmarks = FloorBookmarkUtil.getBookmarks(threadId)
-                context.toastShort(R.string.toast_bookmark_deleted)
             }
         }
     )
@@ -1031,75 +897,6 @@ fun ThreadPage(
         )
     }
 
-    fun LazyListScope.latestPosts(desc: Boolean) {
-        if (latestPosts.isNotEmpty()) {
-            if (!desc) {
-                item("LatestPostsTip") {
-                    Container {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            VerticalDivider(modifier = Modifier.weight(1f))
-                            Text(
-                                text = stringResource(id = R.string.below_is_latest_post),
-                                color = ExtendedTheme.colors.textSecondary,
-                                style = MaterialTheme.typography.caption,
-                            )
-                            VerticalDivider(modifier = Modifier.weight(1f))
-                        }
-                    }
-                }
-            }
-            items(
-                items = latestPosts,
-                key = { (item) -> "LatestPost_${item.get { id }}" },
-                contentType = { (item, blocked) ->
-                    if (blocked) "BlockedPost"
-                    else if (item.get { is_fold == 1 || fold_comment_status != 0 }) "FoldedPost"
-                    else "NormalPost"
-                }
-            ) { postItem ->
-                val (item, blocked, renders, subPosts, blockResult) = postItem
-                val reason = (blockResult as? FilterResult.Blocked)?.reason
-                Container {
-                    PostCard(
-                        item,
-                        renders,
-                        subPosts,
-                        blocked,
-                        reason,
-                        isSearchHighlighted = highlightedFloor == item.get { floor }
-                    )
-                }
-            }
-            if (desc) {
-                item("LatestPostsTip") {
-                    Container {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            VerticalDivider(modifier = Modifier.weight(1f))
-                            Text(
-                                text = stringResource(id = R.string.above_is_latest_post),
-                                color = ExtendedTheme.colors.textSecondary,
-                                style = MaterialTheme.typography.caption,
-                            )
-                            VerticalDivider(modifier = Modifier.weight(1f))
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     val handleBack: () -> Unit = {
         if (isGalleryMode) {
             isGalleryMode = false
@@ -1315,92 +1112,16 @@ fun ThreadPage(
                             onSaveSnapshotClick = {
                                 closeBottomSheet()
                                 coroutineScope.launch {
-                                    val firstPostData = firstPost?.get()
-                                    val authorName = firstPostData?.author?.nameShow?.ifBlank { firstPostData.author?.name }
-                                        ?: firstPostData?.author?.name
-                                        ?: author?.get { nameShow.ifBlank { name } }
-                                        ?: ""
-                                    val authorAvatar = firstPostData?.author?.portrait ?: author?.get { portrait } ?: ""
-                                    val forumTitle = forum?.get { name } ?: ""
-                                    val targetTitle = threadTitle.ifBlank { firstPostData?.title ?: "" }
-
-                                    val postsList = mutableListOf<ThreadSnapshotUtil.SnapshotPost>()
-                                    if (firstPostData != null) {
-                                        val firstPostImages = firstPostContentRenders.filterIsInstance<PicContentRender>().map {
-                                            ThreadSnapshotUtil.SnapshotImage(
-                                                picUrl = it.picUrl,
-                                                originUrl = it.originUrl,
-                                                width = it.width,
-                                                height = it.height,
-                                            )
-                                        }
-                                        postsList.add(
-                                            ThreadSnapshotUtil.SnapshotPost(
-                                                floor = 1L,
-                                                postId = firstPostData.id,
-                                                authorName = authorName,
-                                                authorAvatar = authorAvatar,
-                                                time = firstPostData.time.toLong(),
-                                                contentText = firstPostData.content.plainText,
-                                                images = firstPostImages,
-                                            )
-                                        )
-                                    }
-
-                                    for (item in data) {
-                                        if (item.blocked) continue
-                                        val post = item.post.get()
-                                        if (post.floor == 1) continue
-                                        val postAuthor = post.author?.nameShow?.ifBlank { post.author?.name } ?: post.author?.name ?: ""
-                                        val postAvatar = post.author?.portrait
-                                        val postImages = item.contentRenders.filterIsInstance<PicContentRender>().map {
-                                            ThreadSnapshotUtil.SnapshotImage(
-                                                picUrl = it.picUrl,
-                                                originUrl = it.originUrl,
-                                                width = it.width,
-                                                height = it.height,
-                                            )
-                                        }
-                                        val subPosts = item.subPosts.map { sp ->
-                                            val subPost = sp.subPost.get()
-                                            val spAuthor = subPost.author?.nameShow?.ifBlank { subPost.author?.name } ?: subPost.author?.name ?: ""
-                                            ThreadSnapshotUtil.SnapshotSubPost(
-                                                authorName = spAuthor,
-                                                contentText = sp.subPostContent.text,
-                                                time = subPost.time.toLong(),
-                                            )
-                                        }
-                                        postsList.add(
-                                            ThreadSnapshotUtil.SnapshotPost(
-                                                floor = post.floor.toLong(),
-                                                postId = post.id,
-                                                authorName = postAuthor,
-                                                authorAvatar = postAvatar,
-                                                time = post.time.toLong(),
-                                                contentText = post.content.plainText,
-                                                images = postImages,
-                                                subPosts = subPosts,
-                                            )
-                                        )
-                                    }
-
-                                    val snapshotData = ThreadSnapshotUtil.SnapshotData(
+                                    saveThreadSnapshot(
+                                        context = context,
                                         threadId = threadId,
-                                        title = targetTitle,
-                                        forumName = forumTitle,
-                                        authorName = authorName,
-                                        authorAvatar = authorAvatar,
-                                        postTime = firstPostData?.time?.toLong() ?: System.currentTimeMillis(),
-                                        snapshotTime = System.currentTimeMillis(),
-                                        posts = postsList,
+                                        threadTitle = threadTitle,
+                                        firstPost = firstPost,
+                                        author = author,
+                                        forum = forum,
+                                        firstPostContentRenders = firstPostContentRenders,
+                                        data = data,
                                     )
-
-                                    val success = ThreadSnapshotUtil.saveSnapshot(context, snapshotData)
-                                    if (success) {
-                                        context.toastShort(context.getString(R.string.toast_save_snapshot_success, postsList.size))
-                                    } else {
-                                        context.toastShort(context.getString(R.string.toast_save_snapshot_failed))
-                                    }
                                 }
                             },
                             onShareClick = {
@@ -1554,184 +1275,68 @@ fun ThreadPage(
                             ) {
                                 item(key = "FirstPost") {
                                     if (firstPost != null) {
-                                        Container {
-                                            Column {
-                                                PostCard(
-                                                    postHolder = firstPost!!,
-                                                    contentRenders = firstPostContentRenders,
-                                                    threadAuthorId = author?.get { id } ?: 0L,
-                                                    canDelete = { it.author_id == user.get { id } },
-                                                    immersiveMode = isImmersiveMode,
-                                                    isSearchHighlighted = highlightedFloor == 1,
-                                                    isCollected = {
-                                                        it.id == thread?.get { collectMarkPid }
-                                                            ?.toLongOrNull()
-                                                    },
-                                                    showSubPosts = false,
-                                                    onUserClick = {
-                                                        navigator.navigate(
-                                                            UserProfilePageDestination(
-                                                                it.id
-                                                            )
-                                                        )
-                                                    },
-                                                    onReplyClick = {
-                                                        navigator.navigate(
-                                                            ReplyPageDestination(
-                                                                forumId = curForumId ?: 0,
-                                                                forumName = forum?.get { name }
-                                                                    .orEmpty(),
-                                                                threadId = threadId,
-                                                            )
-                                                        )
-                                                    },
-                                                    onMenuCopyClick = {
-                                                        navigator.navigate(
-                                                            CopyTextDialogPageDestination(it)
-                                                        )
-                                                    },
-                                                    onMenuFavoriteClick = {
-                                                        viewModel.send(
-                                                            ThreadUiIntent.AddFavorite(
-                                                                threadId,
-                                                                it.id,
-                                                                it.floor
-                                                            )
-                                                        )
-                                                    },
-                                                    onMenuBookmarkClick = {
-                                                        openBookmarkEdit(it)
-                                                    },
-                                                ) {
-                                                    deletePost = null
-                                                    confirmDeleteDialogState.show()
-                                                }
-
-                                                thread?.getNullableImmutable { origin_thread_info }
-                                                    .takeIf { thread?.get { is_share_thread } == 1 }
-                                                    ?.let {
-                                                        OriginThreadCard(
-                                                            originThreadInfo = it,
-                                                            modifier = Modifier
-                                                                .padding(horizontal = 16.dp)
-                                                                .padding(bottom = 16.dp)
-                                                                .clip(RoundedCornerShape(6.dp))
-                                                                .background(ExtendedTheme.colors.floorCard)
-                                                                .clickable {
-                                                                    navigator.navigate(
-                                                                        ThreadPageDestination(
-                                                                            threadId = it.get { tid.toLong() },
-                                                                            forumId = it.get { fid },
-                                                                        )
-                                                                    )
-                                                                }
-                                                                .padding(16.dp)
-                                                        )
-                                                    }
-
-                                                val effectiveForumId = (curForumId?.takeIf { it > 0 } ?: thread?.get { forumId }) ?: 0L
-                                                var localPollInfo by remember(thread, threadId) {
-                                                    mutableStateOf(PollVoteStore.get(threadId, thread?.get { poll_info }))
-                                                }
-                                                localPollInfo?.takeIf { it.options.isNotEmpty() }?.let { poll ->
-                                                    VoteCard(
-                                                        pollInfo = poll,
-                                                        threadId = threadId,
-                                                        forumId = effectiveForumId,
-                                                        onVoteSuccess = { newPoll -> localPollInfo = newPoll },
-                                                        modifier = Modifier
-                                                            .padding(horizontal = 16.dp)
-                                                            .padding(bottom = 16.dp)
+                                        ThreadFirstPostCard(
+                                            threadId = threadId,
+                                            thread = thread,
+                                            firstPost = firstPost!!,
+                                            firstPostContentRenders = firstPostContentRenders,
+                                            author = author,
+                                            user = user,
+                                            forum = forum,
+                                            curForumId = curForumId,
+                                            isImmersiveMode = isImmersiveMode,
+                                            isSearchHighlighted = highlightedFloor == 1,
+                                            navigator = navigator,
+                                            onAddFavorite = {
+                                                viewModel.send(
+                                                    ThreadUiIntent.AddFavorite(
+                                                        threadId,
+                                                        it.id,
+                                                        it.floor
                                                     )
-                                                }
-
-                                                VerticalDivider(
-                                                    modifier = Modifier
-                                                        .padding(horizontal = 16.dp)
-                                                        .padding(bottom = 8.dp),
-                                                    thickness = 2.dp
                                                 )
+                                            },
+                                            onOpenBookmarkEdit = { openBookmarkEdit(it) },
+                                            onDeleteClick = {
+                                                deletePost = null
+                                                confirmDeleteDialogState.show()
                                             }
-                                        }
+                                        )
                                     }
                                 }
                                 stickyHeader(key = "ThreadHeader") {
-                                    Container {
-                                        Row(
-                                            modifier = Modifier
-                                                .background(MaterialTheme.colors.background)
-                                                .padding(8.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                text = stringResource(
-                                                    R.string.title_thread_header,
-                                                    "${thread?.get { replyNum - 1 } ?: 0}"),
-                                                fontSize = 13.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = ExtendedTheme.colors.text,
-                                                modifier = Modifier.padding(horizontal = 8.dp),
+                                    ThreadStickyHeader(
+                                        replyCount = thread?.get { replyNum } ?: 0,
+                                        isSeeLz = isSeeLz,
+                                        onToggleSeeLz = { seeLz ->
+                                            viewModel.send(
+                                                ThreadUiIntent.LoadFirstPage(
+                                                    threadId = threadId,
+                                                    forumId = forumId,
+                                                    seeLz = seeLz,
+                                                    sortType = curSortType
+                                                )
                                             )
-                                            Spacer(modifier = Modifier.weight(1f))
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                modifier = Modifier.height(IntrinsicSize.Min)
-                                            ) {
-                                                Text(
-                                                    text = stringResource(R.string.text_all),
-                                                    modifier = Modifier
-                                                        .padding(horizontal = 8.dp)
-                                                        .clickable(
-                                                            interactionSource = remember { MutableInteractionSource() },
-                                                            indication = null,
-                                                            enabled = isSeeLz
-                                                        ) {
-                                                            if (isSeeLz) {
-                                                                viewModel.send(
-                                                                    ThreadUiIntent.LoadFirstPage(
-                                                                        threadId = threadId,
-                                                                        forumId = forumId,
-                                                                        seeLz = false,
-                                                                        sortType = curSortType
-                                                                    )
-                                                                )
-                                                            }
-                                                        },
-                                                    fontSize = 13.sp,
-                                                    fontWeight = if (!isSeeLz) FontWeight.SemiBold else FontWeight.Normal,
-                                                    color = if (!isSeeLz) ExtendedTheme.colors.text else ExtendedTheme.colors.textSecondary,
-                                                )
-                                                HorizontalDivider()
-                                                Text(
-                                                    text = stringResource(R.string.title_see_lz),
-                                                    modifier = Modifier
-                                                        .padding(horizontal = 8.dp)
-                                                        .clickable(
-                                                            interactionSource = remember { MutableInteractionSource() },
-                                                            indication = null,
-                                                            enabled = !isSeeLz
-                                                        ) {
-                                                            if (!isSeeLz) {
-                                                                viewModel.send(
-                                                                    ThreadUiIntent.LoadFirstPage(
-                                                                        threadId = threadId,
-                                                                        forumId = forumId,
-                                                                        seeLz = true,
-                                                                        sortType = curSortType
-                                                                    )
-                                                                )
-                                                            }
-                                                        },
-                                                    fontSize = 13.sp,
-                                                    fontWeight = if (isSeeLz) FontWeight.SemiBold else FontWeight.Normal,
-                                                    color = if (isSeeLz) ExtendedTheme.colors.text else ExtendedTheme.colors.textSecondary,
-                                                )
-                                            }
                                         }
-                                    }
+                                    )
                                 }
                                 if (curSortType == ThreadSortType.SORT_TYPE_DESC) {
-                                    latestPosts(true)
+                                    threadLatestPosts(
+                                        latestPosts = latestPosts,
+                                        desc = true,
+                                        highlightedFloor = highlightedFloor,
+                                    ) { postItem, isHighlighted ->
+                                        val (item, blocked, renders, subPosts, blockResult) = postItem
+                                        val reason = (blockResult as? FilterResult.Blocked)?.reason
+                                        PostCard(
+                                            item,
+                                            renders,
+                                            subPosts,
+                                            blocked,
+                                            reason,
+                                            isSearchHighlighted = isHighlighted
+                                        )
+                                    }
                                 }
                                 if (hasPrevious) {
                                     item(key = "LoadPreviousBtn") {
@@ -1828,7 +1433,22 @@ fun ThreadPage(
                                     }
                                 }
                                 if (curSortType != ThreadSortType.SORT_TYPE_DESC) {
-                                    latestPosts(false)
+                                    threadLatestPosts(
+                                        latestPosts = latestPosts,
+                                        desc = false,
+                                        highlightedFloor = highlightedFloor,
+                                    ) { postItem, isHighlighted ->
+                                        val (item, blocked, renders, subPosts, blockResult) = postItem
+                                        val reason = (blockResult as? FilterResult.Blocked)?.reason
+                                        PostCard(
+                                            item,
+                                            renders,
+                                            subPosts,
+                                            blocked,
+                                            reason,
+                                            isSearchHighlighted = isHighlighted
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1852,99 +1472,34 @@ fun ThreadPage(
                                 .padding(bottom = 16.dp)
                         )
 
-                        AnimatedVisibility(
+                        ThreadSearchFloatingBar(
                             visible = activeSearchKeyword.isNotBlank() && activeSearchHits.isNotEmpty() && !isGalleryMode,
-                            enter = fadeIn() + slideInVertically { -it },
-                            exit = fadeOut() + slideOutVertically { -it },
+                            keyword = activeSearchKeyword,
+                            currentIndex = currentHitIndex,
+                            totalHits = activeSearchHits.size,
+                            onPreviousHit = {
+                                if (activeSearchHits.isNotEmpty()) {
+                                    val prevIndex = (currentHitIndex - 1 + activeSearchHits.size) % activeSearchHits.size
+                                    currentHitIndex = prevIndex
+                                    onJumpToHit(activeSearchHits[prevIndex])
+                                }
+                            },
+                            onNextHit = {
+                                if (activeSearchHits.isNotEmpty()) {
+                                    val nextIndex = (currentHitIndex + 1) % activeSearchHits.size
+                                    currentHitIndex = nextIndex
+                                    onJumpToHit(activeSearchHits[nextIndex])
+                                }
+                            },
+                            onClose = {
+                                activeSearchKeyword = ""
+                                activeSearchHits = emptyList()
+                                highlightedFloor = -1
+                            },
                             modifier = Modifier
                                 .align(Alignment.TopCenter)
                                 .padding(top = 8.dp)
-                                .zIndex(10f)
-                        ) {
-                            Surface(
-                                shape = RoundedCornerShape(24.dp),
-                                color = ExtendedTheme.colors.card,
-                                elevation = 6.dp,
-                                modifier = Modifier.padding(horizontal = 16.dp)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(start = 14.dp, end = 6.dp, top = 4.dp, bottom = 4.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Search,
-                                        contentDescription = null,
-                                        tint = ExtendedTheme.colors.accent,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = stringResource(
-                                            R.string.tip_active_search_bar,
-                                            activeSearchKeyword,
-                                            currentHitIndex + 1,
-                                            activeSearchHits.size
-                                        ),
-                                        style = MaterialTheme.typography.caption,
-                                        color = ExtendedTheme.colors.text,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    IconButton(
-                                        onClick = {
-                                            if (activeSearchHits.isNotEmpty()) {
-                                                val prevIndex = (currentHitIndex - 1 + activeSearchHits.size) % activeSearchHits.size
-                                                currentHitIndex = prevIndex
-                                                val hit = activeSearchHits[prevIndex]
-                                                onJumpToHit(hit)
-                                            }
-                                        },
-                                        modifier = Modifier.size(32.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.KeyboardArrowUp,
-                                            contentDescription = "Previous Hit",
-                                            modifier = Modifier.size(18.dp),
-                                            tint = ExtendedTheme.colors.text
-                                        )
-                                    }
-                                    IconButton(
-                                        onClick = {
-                                            if (activeSearchHits.isNotEmpty()) {
-                                                val nextIndex = (currentHitIndex + 1) % activeSearchHits.size
-                                                currentHitIndex = nextIndex
-                                                val hit = activeSearchHits[nextIndex]
-                                                onJumpToHit(hit)
-                                            }
-                                        },
-                                        modifier = Modifier.size(32.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.KeyboardArrowDown,
-                                            contentDescription = "Next Hit",
-                                            modifier = Modifier.size(18.dp),
-                                            tint = ExtendedTheme.colors.text
-                                        )
-                                    }
-                                    IconButton(
-                                        onClick = {
-                                            activeSearchKeyword = ""
-                                            activeSearchHits = emptyList()
-                                            highlightedFloor = -1
-                                        },
-                                        modifier = Modifier.size(32.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Close,
-                                            contentDescription = stringResource(R.string.btn_exit_search),
-                                            modifier = Modifier.size(18.dp),
-                                            tint = ExtendedTheme.colors.text
-                                        )
-                                    }
-                                }
-                            }
-                        }
+                        )
                     }
                 }
             }

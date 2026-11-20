@@ -1,43 +1,21 @@
 package com.huanchengfly.tieba.post.ui.page.thread
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.ExperimentalMaterialApi
-import androidx.compose.material.Icon
-import androidx.compose.material.MaterialTheme
 import androidx.compose.material.ModalBottomSheetLayout
 import androidx.compose.material.ModalBottomSheetValue
 import androidx.compose.material.SnackbarDuration
 import androidx.compose.material.SnackbarResult
-import androidx.compose.material.Text
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.Sort
-import androidx.compose.material.icons.rounded.AlignVerticalTop
-import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.Favorite
-import androidx.compose.material.icons.rounded.Report
-import androidx.compose.material.icons.rounded.Share
-import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
@@ -59,11 +37,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.airbnb.lottie.compose.LottieAnimation
-import com.airbnb.lottie.compose.LottieCompositionSpec
-import com.airbnb.lottie.compose.LottieConstants
-import com.airbnb.lottie.compose.rememberLottieComposition
 import com.huanchengfly.tieba.post.R
 import com.huanchengfly.tieba.post.api.booleanToString
 import com.huanchengfly.tieba.post.api.models.protos.Post
@@ -77,10 +50,7 @@ import com.huanchengfly.tieba.post.arch.onEvent
 import com.huanchengfly.tieba.post.arch.onGlobalEvent
 import com.huanchengfly.tieba.post.arch.pageViewModel
 import com.huanchengfly.tieba.post.arch.wrapImmutable
-import com.huanchengfly.tieba.post.models.ThreadHistoryInfoBean
-import com.huanchengfly.tieba.post.models.database.History
 import com.huanchengfly.tieba.post.models.database.FloorBookmark
-import com.huanchengfly.tieba.post.toJson
 import com.huanchengfly.tieba.post.toastShort
 import com.huanchengfly.tieba.post.ui.common.PbContentRender
 import com.huanchengfly.tieba.post.ui.common.theme.compose.ExtendedTheme
@@ -92,40 +62,29 @@ import com.huanchengfly.tieba.post.ui.page.destinations.ReplyPageDestination
 import com.huanchengfly.tieba.post.ui.page.destinations.SubPostsSheetPageDestination
 import com.huanchengfly.tieba.post.ui.page.destinations.ThreadPageDestination
 import com.huanchengfly.tieba.post.ui.page.destinations.UserProfilePageDestination
-import com.huanchengfly.tieba.post.ui.widgets.compose.Button
-import com.huanchengfly.tieba.post.ui.widgets.compose.Container
 import com.huanchengfly.tieba.post.ui.widgets.compose.ErrorScreen
 import com.huanchengfly.tieba.post.ui.widgets.compose.LazyLoad
 import com.huanchengfly.tieba.post.ui.widgets.compose.LoadMoreLayout
 import com.huanchengfly.tieba.post.ui.widgets.compose.MyBackHandler
-import com.huanchengfly.tieba.post.ui.widgets.compose.MyLazyColumn
 import com.huanchengfly.tieba.post.ui.widgets.compose.MyScaffold
-import com.huanchengfly.tieba.post.utils.BlockManager.FilterResult
-import com.huanchengfly.tieba.post.ui.widgets.compose.TipScreen
-import com.huanchengfly.tieba.post.ui.widgets.compose.VerticalDivider
-import com.huanchengfly.tieba.post.ui.widgets.compose.rememberDialogState
-import com.huanchengfly.tieba.post.ui.widgets.compose.states.StateScreen
-import com.huanchengfly.tieba.post.utils.FloorBookmarkUtil
-import com.huanchengfly.tieba.post.ui.widgets.compose.ThreadSearchHit
-import com.huanchengfly.tieba.post.ui.widgets.compose.ThreadSearchJumpDialog
 import com.huanchengfly.tieba.post.ui.widgets.compose.PredictiveBackBox
 import com.huanchengfly.tieba.post.ui.widgets.compose.ResumeReadingPill
 import com.huanchengfly.tieba.post.ui.widgets.compose.ThreadGalleryView
+import com.huanchengfly.tieba.post.ui.widgets.compose.ThreadSearchHit
+import com.huanchengfly.tieba.post.ui.widgets.compose.ThreadSearchJumpDialog
 import com.huanchengfly.tieba.post.ui.widgets.compose.extractGalleryImages
-import com.huanchengfly.tieba.post.utils.HistoryUtil
-import com.huanchengfly.tieba.post.utils.StringUtil
+import com.huanchengfly.tieba.post.ui.widgets.compose.rememberDialogState
+import com.huanchengfly.tieba.post.ui.widgets.compose.states.StateScreen
+import com.huanchengfly.tieba.post.utils.FloorBookmarkUtil
 import com.huanchengfly.tieba.post.utils.TiebaUtil
 import com.ramcosta.composedestinations.annotation.DeepLink
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
-import kotlin.math.max
 
 object ThreadPageFrom {
     const val FROM_FORUM = "forum"
@@ -341,8 +300,14 @@ fun ThreadPage(
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
 
-    var readingProgress by remember { mutableStateOf<ThreadHistoryInfoBean?>(null) }
-    var showResumePill by remember { mutableStateOf(false) }
+    val lastVisibilityFloor by remember {
+        derivedStateOf { lastVisibilityPost?.get { floor } ?: 0 }
+    }
+    val readingProgressState = rememberThreadReadingProgress(
+        threadId = threadId,
+        postId = postId,
+        currentFloor = lastVisibilityFloor
+    )
     var pendingScrollToPostId by remember { mutableStateOf<Long?>(null) }
     var pendingScrollToFloor by remember { mutableStateOf<Int?>(null) }
     var activeSearchKeyword by remember { mutableStateOf("") }
@@ -356,37 +321,6 @@ fun ThreadPage(
                 firstPostContentRenders = firstPostContentRenders,
                 posts = data
             )
-        }
-    }
-
-    LaunchedEffect(threadId) {
-        if (postId == 0L) {
-            val progress = withContext(Dispatchers.IO) {
-                runCatching { HistoryUtil.getThreadProgress(threadId) }.getOrNull()
-            }
-            val floor = progress?.floor?.toIntOrNull() ?: 0
-            val pid = progress?.pid?.toLongOrNull() ?: 0L
-            if (floor > 1 && pid > 0L) {
-                readingProgress = progress
-                showResumePill = true
-            }
-        }
-    }
-
-    LaunchedEffect(showResumePill) {
-        if (showResumePill) {
-            delay(8000)
-            showResumePill = false
-        }
-    }
-
-    LaunchedEffect(lastVisibilityPostId) {
-        if (showResumePill) {
-            val currentFloor = lastVisibilityPost?.get { floor } ?: 0
-            val targetFloor = readingProgress?.floor?.toIntOrNull() ?: 0
-            if (currentFloor > 5 || (targetFloor > 0 && currentFloor >= targetFloor)) {
-                showResumePill = false
-            }
         }
     }
 
@@ -481,10 +415,10 @@ fun ThreadPage(
     }
 
     val onJumpToResume: () -> Unit = {
-        readingProgress?.let { progress ->
+        readingProgressState.readingProgress?.let { progress ->
             val targetPid = progress.pid?.toLongOrNull() ?: 0L
             val targetFloor = progress.floor.orEmpty()
-            showResumePill = false
+            readingProgressState.dismiss()
             if (targetPid > 0L) {
                 val indexInData = data.indexOfFirst { it.post.get { id } == targetPid }
                 if (indexInData != -1) {
@@ -735,37 +669,15 @@ fun ThreadPage(
         }
     }
 
-    var savedHistory by remember(threadId) { mutableStateOf(false) }
-    LaunchedEffect(threadId, threadTitle, author, lastVisibilityPostId) {
-        if (threadTitle.isBlank()) return@LaunchedEffect
-
-        if (savedHistory && lastVisibilityPostId != 0L) {
-            delay(600)
-        }
-
-        withContext(Dispatchers.IO) {
-            runCatching {
-                HistoryUtil.saveHistory(
-                    History(
-                        title = threadTitle,
-                        data = threadId.toString(),
-                        type = HistoryUtil.TYPE_THREAD,
-                        extras = ThreadHistoryInfoBean(
-                            isSeeLz = isSeeLz,
-                            pid = lastVisibilityPostId.toString(),
-                            forumName = forum?.get { name },
-                            floor = lastVisibilityPost?.get { floor }?.toString()
-                        ).toJson(),
-                        avatar = StringUtil.getAvatarUrl(author?.get { portrait }),
-                        username = author?.get { nameShow }
-                    ),
-                    async = false,
-                    incrementCount = !savedHistory
-                )
-                savedHistory = true
-            }
-        }
-    }
+    ThreadReadingHistoryTracker(
+        threadId = threadId,
+        threadTitle = threadTitle,
+        author = author,
+        forumName = forum?.get { name },
+        currentFloor = lastVisibilityFloor,
+        lastVisibilityPostId = lastVisibilityPostId,
+        isSeeLz = isSeeLz,
+    )
 
     val pullRefreshState = rememberPullRefreshState(
         refreshing = isRefreshing,
@@ -780,122 +692,6 @@ fun ThreadPage(
             )
         }
     )
-
-    @Composable
-    fun PostCard(
-        item: ImmutableHolder<Post>,
-        contentRenders: ImmutableList<PbContentRender>,
-        subPosts: ImmutableList<SubPostItemData>,
-        blocked: Boolean,
-        blockReason: String? = null,
-        isSearchHighlighted: Boolean = false,
-    ) {
-        PostCard(
-            postHolder = item,
-            contentRenders = contentRenders,
-            subPosts = subPosts,
-            threadAuthorId = author?.get { id } ?: 0L,
-            blocked = blocked,
-            blockReason = blockReason,
-            isSearchHighlighted = isSearchHighlighted,
-            canDelete = { it.author_id == user.get { id } },
-            immersiveMode = isImmersiveMode,
-            isCollected = { it.id == thread?.get { collectMarkPid.toLongOrNull() } },
-            onUserClick = {
-                navigator.navigate(UserProfilePageDestination(it.id))
-            },
-            onAgree = {
-                val postHasAgreed =
-                    item.get { agree?.hasAgree == 1 }
-                viewModel.send(
-                    ThreadUiIntent.AgreePost(
-                        threadId = threadId,
-                        postId = item.get { id },
-                        agree = !postHasAgreed
-                    )
-                )
-            },
-            onReplyClick = {
-                navigator.navigate(
-                    ReplyPageDestination(
-                        forumId = curForumId ?: 0,
-                        forumName = forum?.get { name } ?: "",
-                        threadId = threadId,
-                        postId = it.id,
-                        replyUserId = it.author?.id ?: it.author_id,
-                        replyUserName = it.author?.nameShow.takeIf { name -> !name.isNullOrEmpty() }
-                            ?: it.author?.name,
-                        replyUserPortrait = it.author?.portrait,
-                    )
-                )
-            },
-            onSubPostReplyClick = { post, subPost ->
-                navigator.navigate(
-                    ReplyPageDestination(
-                        forumId = curForumId ?: 0,
-                        forumName = forum?.get { name } ?: "",
-                        threadId = threadId,
-                        postId = post.id,
-                        subPostId = subPost.id,
-                        replyUserId = subPost.author?.id ?: subPost.author_id,
-                        replyUserName = subPost.author?.nameShow.takeIf { name -> !name.isNullOrEmpty() }
-                            ?: subPost.author?.name,
-                        replyUserPortrait = subPost.author?.portrait,
-                    )
-                )
-            },
-            onOpenSubPosts = {
-                if (curForumId != null) {
-                    navigator.navigate(
-                        SubPostsSheetPageDestination(
-                            forumId = curForumId,
-                            threadId = threadId,
-                            postId = item.get { id },
-                            subPostId = it,
-                            loadFromSubPost = false
-                        )
-                    )
-                }
-            },
-            onMenuCopyClick = {
-                navigator.navigate(
-                    CopyTextDialogPageDestination(it)
-                )
-            },
-            onMenuFavoriteClick = {
-                val isPostCollected =
-                    it.id == thread?.get { collectMarkPid.toLongOrNull() }
-                val fid = forum?.get { id } ?: forumId
-                val tbs = anti?.get { tbs }
-                if (fid != null) {
-                    if (isPostCollected) {
-                        viewModel.send(
-                            ThreadUiIntent.RemoveFavorite(
-                                threadId = threadId,
-                                forumId = fid,
-                                tbs = tbs
-                            )
-                        )
-                    } else {
-                        viewModel.send(
-                            ThreadUiIntent.AddFavorite(
-                                threadId = threadId,
-                                postId = it.id,
-                                floor = it.floor
-                            )
-                        )
-                    }
-                }
-            },
-            onMenuBookmarkClick = {
-                openBookmarkEdit(it)
-            },
-            onMenuDeleteClick = {
-                deletePost = it.wrapImmutable()
-                confirmDeleteDialogState.show()
-            },
-        )
-    }
 
     val handleBack: () -> Unit = {
         if (isGalleryMode) {
@@ -1024,13 +820,13 @@ fun ThreadPage(
                     sheetShape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp),
                     sheetBackgroundColor = ExtendedTheme.colors.windowBackground,
                     sheetContent = {
-                        ThreadMenu(
+                        ThreadPageMenuSheet(
                             isSeeLz = isSeeLz,
                             isCollected = isCollected,
                             isImmersiveMode = isImmersiveMode,
                             isDesc = curSortType == ThreadSortType.SORT_TYPE_DESC,
                             isGalleryMode = isGalleryMode,
-                            canDelete = { author?.get { id } == user.get { id } },
+                            canDelete = author?.get { id } == user.get { id },
                             onSeeLzClick = {
                                 viewModel.send(
                                     ThreadUiIntent.LoadFirstPage(
@@ -1153,12 +949,7 @@ fun ThreadPage(
                             onDeleteClick = {
                                 deletePost = null
                                 confirmDeleteDialogState.show()
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .navigationBarsPadding()
-                                .padding(vertical = 16.dp)
-                                .defaultMinSize(minHeight = 1.dp)
+                            }
                         )
                     },
                     scrimColor = Color.Transparent,
@@ -1269,188 +1060,153 @@ fun ThreadPage(
                             isEmpty = data.isEmpty(),
                             preloadCount = loadMorePreloadCount,
                         ) {
-                            MyLazyColumn(
-                                state = lazyListState,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                item(key = "FirstPost") {
-                                    if (firstPost != null) {
-                                        ThreadFirstPostCard(
+                            ThreadPostList(
+                                lazyListState = lazyListState,
+                                threadId = threadId,
+                                thread = thread,
+                                firstPost = firstPost,
+                                firstPostContentRenders = firstPostContentRenders,
+                                author = author,
+                                user = user,
+                                forum = forum,
+                                curForumId = curForumId,
+                                isImmersiveMode = isImmersiveMode,
+                                highlightedFloor = highlightedFloor,
+                                isSeeLz = isSeeLz,
+                                curSortType = curSortType,
+                                currentPageMax = currentPageMax,
+                                latestPosts = latestPosts,
+                                hasPrevious = hasPrevious,
+                                isRefreshing = isRefreshing,
+                                data = data,
+                                navigator = navigator,
+                                onToggleSeeLz = { seeLz ->
+                                    viewModel.send(
+                                        ThreadUiIntent.LoadFirstPage(
                                             threadId = threadId,
-                                            thread = thread,
-                                            firstPost = firstPost!!,
-                                            firstPostContentRenders = firstPostContentRenders,
-                                            author = author,
-                                            user = user,
-                                            forum = forum,
-                                            curForumId = curForumId,
-                                            isImmersiveMode = isImmersiveMode,
-                                            isSearchHighlighted = highlightedFloor == 1,
-                                            navigator = navigator,
-                                            onAddFavorite = {
-                                                viewModel.send(
-                                                    ThreadUiIntent.AddFavorite(
-                                                        threadId,
-                                                        it.id,
-                                                        it.floor
-                                                    )
-                                                )
-                                            },
-                                            onOpenBookmarkEdit = { openBookmarkEdit(it) },
-                                            onDeleteClick = {
-                                                deletePost = null
-                                                confirmDeleteDialogState.show()
-                                            }
+                                            forumId = forumId,
+                                            seeLz = seeLz,
+                                            sortType = curSortType
                                         )
-                                    }
-                                }
-                                stickyHeader(key = "ThreadHeader") {
-                                    ThreadStickyHeader(
-                                        replyCount = thread?.get { replyNum } ?: 0,
-                                        isSeeLz = isSeeLz,
-                                        onToggleSeeLz = { seeLz ->
-                                            viewModel.send(
-                                                ThreadUiIntent.LoadFirstPage(
-                                                    threadId = threadId,
-                                                    forumId = forumId,
-                                                    seeLz = seeLz,
-                                                    sortType = curSortType
-                                                )
-                                            )
-                                        }
                                     )
-                                }
-                                if (curSortType == ThreadSortType.SORT_TYPE_DESC) {
-                                    threadLatestPosts(
-                                        latestPosts = latestPosts,
-                                        desc = true,
-                                        highlightedFloor = highlightedFloor,
-                                    ) { postItem, isHighlighted ->
-                                        val (item, blocked, renders, subPosts, blockResult) = postItem
-                                        val reason = (blockResult as? FilterResult.Blocked)?.reason
-                                        PostCard(
-                                            item,
-                                            renders,
-                                            subPosts,
-                                            blocked,
-                                            reason,
-                                            isSearchHighlighted = isHighlighted
+                                },
+                                onLoadPrevious = { page, firstPostId, postIds ->
+                                    viewModel.send(
+                                        ThreadUiIntent.LoadPrevious(
+                                            threadId,
+                                            page,
+                                            forumId,
+                                            postId = firstPostId,
+                                            seeLz = isSeeLz,
+                                            sortType = curSortType,
+                                            postIds = postIds
+                                        )
+                                    )
+                                },
+                                onReload = if (canReload) { { reload() } } else null,
+                                onAddFavorite = {
+                                    viewModel.send(
+                                        ThreadUiIntent.AddFavorite(
+                                            threadId,
+                                            it.id,
+                                            it.floor
+                                        )
+                                    )
+                                },
+                                onOpenBookmarkEdit = { openBookmarkEdit(it) },
+                                onDeleteFirstPost = {
+                                    deletePost = null
+                                    confirmDeleteDialogState.show()
+                                },
+                                onUserClick = {
+                                    navigator.navigate(UserProfilePageDestination(it))
+                                },
+                                onAgreePost = { post, agree ->
+                                    viewModel.send(
+                                        ThreadUiIntent.AgreePost(
+                                            threadId = threadId,
+                                            postId = post.get { id },
+                                            agree = agree
+                                        )
+                                    )
+                                },
+                                onReplyClick = {
+                                    navigator.navigate(
+                                        ReplyPageDestination(
+                                            forumId = curForumId ?: 0,
+                                            forumName = forum?.get { name } ?: "",
+                                            threadId = threadId,
+                                            postId = it.id,
+                                            replyUserId = it.author?.id ?: it.author_id,
+                                            replyUserName = it.author?.nameShow.takeIf { name -> !name.isNullOrEmpty() }
+                                                ?: it.author?.name,
+                                            replyUserPortrait = it.author?.portrait,
+                                        )
+                                    )
+                                },
+                                onSubPostReplyClick = { post, subPost ->
+                                    navigator.navigate(
+                                        ReplyPageDestination(
+                                            forumId = curForumId ?: 0,
+                                            forumName = forum?.get { name } ?: "",
+                                            threadId = threadId,
+                                            postId = post.id,
+                                            subPostId = subPost.id,
+                                            replyUserId = subPost.author?.id ?: subPost.author_id,
+                                            replyUserName = subPost.author?.nameShow.takeIf { name -> !name.isNullOrEmpty() }
+                                                ?: subPost.author?.name,
+                                            replyUserPortrait = subPost.author?.portrait,
+                                        )
+                                    )
+                                },
+                                onOpenSubPosts = { postId, subPostId ->
+                                    if (curForumId != null) {
+                                        navigator.navigate(
+                                            SubPostsSheetPageDestination(
+                                                forumId = curForumId,
+                                                threadId = threadId,
+                                                postId = postId,
+                                                subPostId = subPostId,
+                                                loadFromSubPost = false
+                                            )
                                         )
                                     }
-                                }
-                                if (hasPrevious) {
-                                    item(key = "LoadPreviousBtn") {
-                                        Container {
-                                            Row(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .clickable {
-                                                        viewModel.send(
-                                                            ThreadUiIntent.LoadPrevious(
-                                                                threadId,
-                                                                max(currentPageMax - 1, 1),
-                                                                forumId,
-                                                                postId = data
-                                                                    .first()
-                                                                    .post
-                                                                    .get { id },
-                                                                seeLz = isSeeLz,
-                                                                sortType = curSortType,
-                                                                postIds = data.map { it.post.get { id } }
-                                                            )
-                                                        )
-                                                    }
-                                                    .padding(8.dp),
-                                                horizontalArrangement = Arrangement.Center,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Rounded.AlignVerticalTop,
-                                                    contentDescription = null,
-                                                    modifier = Modifier.size(16.dp)
+                                },
+                                onMenuCopyClick = {
+                                    navigator.navigate(
+                                        CopyTextDialogPageDestination(it)
+                                    )
+                                },
+                                onMenuFavoriteClick = {
+                                    val isPostCollected =
+                                        it.id == thread?.get { collectMarkPid.toLongOrNull() }
+                                    val fid = forum?.get { id } ?: forumId
+                                    val tbs = anti?.get { tbs }
+                                    if (fid != null) {
+                                        if (isPostCollected) {
+                                            viewModel.send(
+                                                ThreadUiIntent.RemoveFavorite(
+                                                    threadId = threadId,
+                                                    forumId = fid,
+                                                    tbs = tbs
                                                 )
-                                                Spacer(modifier = Modifier.width(16.dp))
-                                                Text(
-                                                    text = stringResource(id = R.string.btn_load_previous),
-                                                    color = ExtendedTheme.colors.text,
-                                                    fontSize = 14.sp
+                                            )
+                                        } else {
+                                            viewModel.send(
+                                                ThreadUiIntent.AddFavorite(
+                                                    threadId = threadId,
+                                                    postId = it.id,
+                                                    floor = it.floor
                                                 )
-                                            }
-                                        }
-                                    }
-                                }
-                                if (!isRefreshing && data.isEmpty()) {
-                                    item(key = "EmptyTip") {
-                                        Container {
-                                            TipScreen(
-                                                title = { Text(text = stringResource(id = R.string.title_empty)) },
-                                                image = {
-                                                    val composition by rememberLottieComposition(
-                                                        LottieCompositionSpec.RawRes(R.raw.lottie_empty_box)
-                                                    )
-                                                    LottieAnimation(
-                                                        composition = composition,
-                                                        iterations = LottieConstants.IterateForever,
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .aspectRatio(2f)
-                                                    )
-                                                },
-                                                actions = {
-                                                    if (canReload) {
-                                                        Button(onClick = { reload() }) {
-                                                            Text(text = stringResource(id = R.string.btn_refresh))
-                                                        }
-                                                    }
-                                                },
-                                                modifier = Modifier.fillMaxSize(),
-                                                scrollable = false
                                             )
                                         }
                                     }
-                                } else {
-                                    items(
-                                        items = data,
-                                        key = { (item) -> "Post_${item.get { id }}" },
-                                        contentType = { (item, blocked) ->
-                                            if (blocked) "BlockedPost"
-                                            else if (item.get { is_fold == 1 || fold_comment_status != 0 }) "FoldedPost"
-                                            else "NormalPost"
-                                        }
-                                    ) { postItem ->
-                                        val (item, blocked, renders, subPosts, blockResult) = postItem
-                                        val reason = (blockResult as? FilterResult.Blocked)?.reason
-                                        Container {
-                                            PostCard(
-                                                item,
-                                                renders,
-                                                subPosts,
-                                                blocked,
-                                                reason,
-                                                isSearchHighlighted = highlightedFloor == item.get { floor }
-                                            )
-                                        }
-                                    }
+                                },
+                                onMenuDeleteClick = {
+                                    deletePost = it.wrapImmutable()
+                                    confirmDeleteDialogState.show()
                                 }
-                                if (curSortType != ThreadSortType.SORT_TYPE_DESC) {
-                                    threadLatestPosts(
-                                        latestPosts = latestPosts,
-                                        desc = false,
-                                        highlightedFloor = highlightedFloor,
-                                    ) { postItem, isHighlighted ->
-                                        val (item, blocked, renders, subPosts, blockResult) = postItem
-                                        val reason = (blockResult as? FilterResult.Blocked)?.reason
-                                        PostCard(
-                                            item,
-                                            renders,
-                                            subPosts,
-                                            blocked,
-                                            reason,
-                                            isSearchHighlighted = isHighlighted
-                                        )
-                                    }
-                                }
-                            }
+                            )
                         }
                         }
 
@@ -1463,10 +1219,10 @@ fun ThreadPage(
                         )
 
                         ResumeReadingPill(
-                            visible = showResumePill && !isGalleryMode,
-                            floor = readingProgress?.floor.orEmpty(),
+                            visible = readingProgressState.showResumePill && !isGalleryMode,
+                            floor = readingProgressState.readingProgress?.floor.orEmpty(),
                             onJump = onJumpToResume,
-                            onDismiss = { showResumePill = false },
+                            onDismiss = { readingProgressState.dismiss() },
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
                                 .padding(bottom = 16.dp)

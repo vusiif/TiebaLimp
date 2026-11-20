@@ -2,57 +2,33 @@ package com.huanchengfly.tieba.post.ui.page.subposts
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.requiredHeightIn
-import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.DropdownMenuItem
-import androidx.compose.material.Icon
-import androidx.compose.material.IconButton
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.OpenInBrowser
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.util.fastForEach
-import com.huanchengfly.tieba.post.App
 import com.huanchengfly.tieba.post.R
 import com.huanchengfly.tieba.post.api.models.protos.SubPostList
-import com.huanchengfly.tieba.post.api.models.protos.User
-import com.huanchengfly.tieba.post.api.models.protos.bawuType
 import com.huanchengfly.tieba.post.arch.ImmutableHolder
 import com.huanchengfly.tieba.post.arch.collectPartialAsState
 import com.huanchengfly.tieba.post.arch.onEvent
 import com.huanchengfly.tieba.post.arch.pageViewModel
 import com.huanchengfly.tieba.post.arch.wrapImmutable
 import com.huanchengfly.tieba.post.ui.common.theme.compose.ExtendedTheme
-import com.huanchengfly.tieba.post.ui.common.theme.compose.threadBottomBar
 import com.huanchengfly.tieba.post.ui.page.LocalNavigator
 import com.huanchengfly.tieba.post.ui.page.ProvideNavigator
 import com.huanchengfly.tieba.post.ui.page.destinations.CopyTextDialogPageDestination
@@ -60,31 +36,16 @@ import com.huanchengfly.tieba.post.ui.page.destinations.ThreadPageDestination
 import com.huanchengfly.tieba.post.ui.page.destinations.UserProfilePageDestination
 import com.huanchengfly.tieba.post.ui.page.reply.ReplyArgs
 import com.huanchengfly.tieba.post.ui.page.reply.ReplyDialog
-import com.huanchengfly.tieba.post.ui.page.thread.PostAgreeBtn
 import com.huanchengfly.tieba.post.ui.page.thread.PostCard
-import com.huanchengfly.tieba.post.ui.page.thread.UserNameText
-import com.huanchengfly.tieba.post.ui.widgets.compose.Avatar
-import com.huanchengfly.tieba.post.ui.widgets.compose.BlockTip
-import com.huanchengfly.tieba.post.ui.widgets.compose.BlockableContent
-import com.huanchengfly.tieba.post.ui.widgets.compose.Card
 import com.huanchengfly.tieba.post.ui.widgets.compose.ConfirmDialog
 import com.huanchengfly.tieba.post.ui.widgets.compose.LazyLoad
 import com.huanchengfly.tieba.post.ui.widgets.compose.LoadMoreLayout
-import com.huanchengfly.tieba.post.ui.widgets.compose.LongClickMenu
 import com.huanchengfly.tieba.post.ui.widgets.compose.MyLazyColumn
 import com.huanchengfly.tieba.post.ui.widgets.compose.MyScaffold
-import com.huanchengfly.tieba.post.ui.widgets.compose.Sizes
-import com.huanchengfly.tieba.post.ui.widgets.compose.TitleCentredToolbar
-import com.huanchengfly.tieba.post.ui.widgets.compose.UserHeader
 import com.huanchengfly.tieba.post.ui.widgets.compose.VerticalDivider
 import com.huanchengfly.tieba.post.ui.widgets.compose.rememberDialogState
-import com.huanchengfly.tieba.post.ui.widgets.compose.rememberMenuState
 import com.huanchengfly.tieba.post.ui.widgets.compose.states.StateScreen
 import com.huanchengfly.tieba.post.utils.AccountUtil.LocalAccount
-import com.huanchengfly.tieba.post.utils.DateTimeUtils
-import com.huanchengfly.tieba.post.utils.StringUtil
-import com.huanchengfly.tieba.post.utils.TiebaUtil
-import com.huanchengfly.tieba.post.utils.appPreferences
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import com.ramcosta.composedestinations.spec.DestinationStyleBottomSheet
@@ -299,101 +260,39 @@ internal fun SubPostsContent(
         MyScaffold(
             modifier = Modifier.fillMaxSize(),
             topBar = {
-                TitleCentredToolbar(
-                    title = {
-                        Text(text = post?.let {
-                            stringResource(
-                                id = R.string.title_sub_posts,
-                                it.get { floor })
-                        } ?: stringResource(id = R.string.title_sub_posts_default),
-                            fontWeight = FontWeight.Bold, style = MaterialTheme.typography.h6)
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = onNavigateUp) {
-                            Icon(
-                                imageVector = if (isSheet) Icons.Rounded.Close else Icons.AutoMirrored.Rounded.ArrowBack,
-                                contentDescription = stringResource(id = R.string.btn_close)
+                SubPostsToolbar(
+                    postFloor = post?.get { floor },
+                    isSheet = isSheet,
+                    onNavigateUp = onNavigateUp,
+                    onOpenOriginThread = {
+                        navigator.navigate(
+                            ThreadPageDestination(
+                                forumId = forumId,
+                                threadId = threadId,
+                                postId = postId
                             )
-                        }
-                    },
-                    actions = {
-                        if (!isSheet) {
-                            IconButton(onClick = {
-                                navigator.navigate(
-                                    ThreadPageDestination(
-                                        forumId = forumId,
-                                        threadId = threadId,
-                                        postId = postId
-                                    )
-                                )
-                            }) {
-                                Icon(
-                                    imageVector = Icons.Rounded.OpenInBrowser,
-                                    contentDescription = stringResource(id = R.string.btn_open_origin_thread)
-                                )
-                            }
-                        }
+                        )
                     }
                 )
             },
             bottomBar = {
-                if (account != null && !LocalContext.current.appPreferences.hideReply) {
-                    Column(
-                        modifier = Modifier.background(ExtendedTheme.colors.threadBottomBar)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Avatar(
-                                data = StringUtil.getAvatarUrl(account.portrait),
-                                size = Sizes.Tiny,
-                                contentDescription = account.name,
-                            )
-                            Row(
-                                modifier = Modifier
-                                    .padding(vertical = 8.dp)
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(ExtendedTheme.colors.bottomBarSurface)
-                                    .clickable {
-                                        val fid = forum?.get { id } ?: forumId
-                                        val forumName = forum?.get { name }
-                                        if (!forumName.isNullOrEmpty()) {
-                                            showReplyDialog(
-                                                ReplyArgs(
-                                                    forumId = fid,
-                                                    forumName = forumName,
-                                                    threadId = threadId,
-                                                    postId = postId,
-                                                )
-                                            )
-                                        }
-                                    }
-                                    .padding(8.dp),
-                            ) {
-                                Text(
-                                    text = stringResource(id = R.string.tip_reply_thread),
-                                    style = MaterialTheme.typography.caption,
-                                    color = ExtendedTheme.colors.onBottomBarSurface,
+                SubPostsBottomBar(
+                    account = account,
+                    onReplyClick = {
+                        val fid = forum?.get { id } ?: forumId
+                        val forumName = forum?.get { name }
+                        if (!forumName.isNullOrEmpty()) {
+                            showReplyDialog(
+                                ReplyArgs(
+                                    forumId = fid,
+                                    forumName = forumName,
+                                    threadId = threadId,
+                                    postId = postId,
                                 )
-                            }
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .requiredHeightIn(min = if (LocalContext.current.appPreferences.liftUpBottomBar) 16.dp else 0.dp)
-                        ) {
-                            Spacer(
-                                modifier = Modifier
-                                    .windowInsetsBottomHeight(WindowInsets.navigationBars)
                             )
                         }
                     }
-                }
+                )
             }
         ) { paddingValues ->
             LoadMoreLayout(
@@ -532,152 +431,6 @@ internal fun SubPostsContent(
                     }
                 }
             }
-        }
-    }
-}
-
-private fun getDescText(
-    time: Long?,
-    ipAddress: String?
-): String {
-    val texts = listOfNotNull(
-        time?.let { DateTimeUtils.getRelativeTimeString(App.INSTANCE, it) },
-        ipAddress?.let { App.INSTANCE.getString(R.string.text_ip_location, it) }
-    )
-    if (texts.isEmpty()) return ""
-    return texts.joinToString(" ")
-}
-
-@Composable
-private fun SubPostItem(
-    item: SubPostItemData,
-    threadAuthorId: Long? = null,
-    canDelete: (SubPostList) -> Boolean = { false },
-    onUserClick: (User) -> Unit = {},
-    onAgree: (SubPostList) -> Unit = {},
-    onReplyClick: (SubPostList) -> Unit = {},
-    onMenuCopyClick: ((String) -> Unit)? = null,
-    onMenuDeleteClick: ((SubPostList) -> Unit)? = null,
-) {
-    val (subPost, contentRenders, blocked) = item
-    val context = LocalContext.current
-    val navigator = LocalNavigator.current
-    val coroutineScope = rememberCoroutineScope()
-    val author = remember(subPost) { subPost.get { author }?.wrapImmutable() }
-    val hasAgreed = remember(subPost) {
-        subPost.get { agree?.hasAgree == 1 }
-    }
-    val agreeNum = remember(subPost) {
-        subPost.get { agree?.diffAgreeNum ?: 0L }
-    }
-    val menuState = rememberMenuState()
-    BlockableContent(
-        blocked = blocked,
-        blockedTip = { BlockTip(text = { Text(text = stringResource(id = R.string.tip_blocked_sub_post)) }) },
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-    ) {
-        LongClickMenu(
-            menuState = menuState,
-            indication = null,
-            menuContent = {
-                if (!context.appPreferences.hideReply) {
-                    DropdownMenuItem(
-                        onClick = {
-                            onReplyClick(subPost.get())
-                            menuState.expanded = false
-                        }
-                    ) {
-                        Text(text = stringResource(id = R.string.btn_reply))
-                    }
-                }
-                if (onMenuCopyClick != null) {
-                    DropdownMenuItem(
-                        onClick = {
-                            onMenuCopyClick(contentRenders.joinToString("\n") { it.toString() })
-                            menuState.expanded = false
-                        }
-                    ) {
-                        Text(text = stringResource(id = R.string.menu_copy))
-                    }
-                }
-                DropdownMenuItem(
-                    onClick = {
-                        coroutineScope.launch {
-                            TiebaUtil.reportPost(context, navigator, subPost.get { id }.toString())
-                        }
-                        menuState.expanded = false
-                    }
-                ) {
-                    Text(text = stringResource(id = R.string.title_report))
-                }
-                if (canDelete(subPost.get()) && onMenuDeleteClick != null) {
-                    DropdownMenuItem(
-                        onClick = {
-                            onMenuDeleteClick(subPost.get())
-                            menuState.expanded = false
-                        }
-                    ) {
-                        Text(text = stringResource(id = R.string.title_delete))
-                    }
-                }
-            },
-            onClick = { onReplyClick(subPost.get()) }.takeUnless { context.appPreferences.hideReply }
-        ) {
-            Card(
-                header = {
-                    if (author != null) {
-                        UserHeader(
-                            avatar = {
-                                Avatar(
-                                    data = StringUtil.getAvatarUrl(author.get { portrait }),
-                                    size = Sizes.Small,
-                                    contentDescription = null
-                                )
-                            },
-                            name = {
-                                UserNameText(
-                                    userName = StringUtil.getUsernameAnnotatedString(
-                                        LocalContext.current,
-                                        author.get { name },
-                                        author.get { nameShow }
-                                    ),
-                                    userLevel = author.get { level_id },
-                                    isLz = author.get { id } == threadAuthorId,
-                                    bawuType = author.get { bawuType },
-                                )
-                            },
-                            desc = {
-                                Text(
-                                    text = getDescText(
-                                        subPost.get { time }.toLong(),
-                                        author.get { ip_address })
-                                )
-                            },
-                            onClick = {
-                                onUserClick(author.get())
-                            }
-                        ) {
-                            PostAgreeBtn(
-                                hasAgreed = hasAgreed,
-                                agreeNum = agreeNum,
-                                onClick = { onAgree(subPost.get()) }
-                            )
-                        }
-                    }
-                },
-                content = {
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier
-                            .padding(start = Sizes.Small + 8.dp)
-                            .fillMaxWidth()
-                    ) {
-                        contentRenders.fastForEach { it.Render() }
-                    }
-                }
-            )
         }
     }
 }

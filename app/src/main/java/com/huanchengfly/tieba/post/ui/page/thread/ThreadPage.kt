@@ -262,12 +262,6 @@ fun ThreadPage(
         postId = postId,
         currentFloor = lastVisibilityFloor
     )
-    var pendingScrollToPostId by remember { mutableStateOf<Long?>(null) }
-    var pendingScrollToFloor by remember { mutableStateOf<Int?>(null) }
-    var activeSearchKeyword by remember { mutableStateOf("") }
-    var activeSearchHits by remember { mutableStateOf<List<ThreadSearchHit>>(emptyList()) }
-    var currentHitIndex by remember { mutableIntStateOf(0) }
-    var highlightedFloor by remember { mutableIntStateOf(-1) }
     val galleryImages by remember(firstPost, firstPostContentRenders, data) {
         derivedStateOf {
             extractGalleryImages(
@@ -278,132 +272,24 @@ fun ThreadPage(
         }
     }
 
-    LaunchedEffect(data, pendingScrollToPostId) {
-        val targetId = pendingScrollToPostId ?: return@LaunchedEffect
-        val indexInData = data.indexOfFirst { it.post.get { id } == targetId }
-        if (indexInData != -1) {
-            pendingScrollToPostId = null
-            val baseOffset = 2 + (if (hasPrevious) 1 else 0)
-            lazyListState.animateScrollToItem(baseOffset + indexInData)
-        }
-    }
+    val jumpController = rememberThreadJumpController(
+        lazyListState = lazyListState,
+        data = data,
+        hasPrevious = hasPrevious,
+        threadId = threadId,
+        curForumId = curForumId,
+        isSeeLz = isSeeLz,
+        curSortType = curSortType,
+        viewModel = viewModel,
+        readingProgressState = readingProgressState,
+    )
 
-    LaunchedEffect(data, pendingScrollToFloor) {
-        val targetFloor = pendingScrollToFloor ?: return@LaunchedEffect
-        if (targetFloor <= 1) {
-            pendingScrollToFloor = null
-            lazyListState.animateScrollToItem(0)
-        } else {
-            val indexInData = data.indexOfFirst { it.post.get { floor } == targetFloor }
-            if (indexInData != -1) {
-                pendingScrollToFloor = null
-                val baseOffset = 2 + (if (hasPrevious) 1 else 0)
-                lazyListState.animateScrollToItem(baseOffset + indexInData)
-            } else if (data.isNotEmpty()) {
-                val closestIndex = data.indices.minByOrNull { kotlin.math.abs(data[it].post.get { floor } - targetFloor) }
-                if (closestIndex != null) {
-                    pendingScrollToFloor = null
-                    val baseOffset = 2 + (if (hasPrevious) 1 else 0)
-                    lazyListState.animateScrollToItem(baseOffset + closestIndex)
-                }
-            }
-        }
-    }
-
-    val onJumpToFloor: (Int) -> Unit = { targetFloor ->
-        highlightedFloor = targetFloor
-        if (targetFloor <= 1) {
-            coroutineScope.launch {
-                lazyListState.animateScrollToItem(0)
-            }
-        } else {
-            val indexInData = data.indexOfFirst { it.post.get { floor } == targetFloor }
-            if (indexInData != -1) {
-                coroutineScope.launch {
-                    val baseOffset = 2 + (if (hasPrevious) 1 else 0)
-                    lazyListState.animateScrollToItem(baseOffset + indexInData)
-                }
-            } else {
-                pendingScrollToFloor = targetFloor
-                val targetPage = maxOf((targetFloor - 1) / 30 + 1, 1)
-                viewModel.send(
-                    ThreadUiIntent.Load(
-                        threadId = threadId,
-                        forumId = curForumId,
-                        page = targetPage,
-                        seeLz = isSeeLz,
-                        sortType = curSortType
-                    )
-                )
-            }
-        }
-    }
-
-    val onJumpToHit: (ThreadSearchHit) -> Unit = { hit ->
-        highlightedFloor = hit.floor
-        if (hit.floor <= 1) {
-            coroutineScope.launch {
-                lazyListState.animateScrollToItem(0)
-            }
-        } else {
-            val indexInData = data.indexOfFirst { it.post.get { floor } == hit.floor || it.post.get { id } == hit.postId }
-            if (indexInData != -1) {
-                coroutineScope.launch {
-                    val baseOffset = 2 + (if (hasPrevious) 1 else 0)
-                    lazyListState.animateScrollToItem(baseOffset + indexInData)
-                }
-            } else {
-                pendingScrollToPostId = hit.postId
-                viewModel.send(
-                    ThreadUiIntent.Load(
-                        threadId = threadId,
-                        page = 0,
-                        postId = hit.postId,
-                        forumId = curForumId,
-                        seeLz = isSeeLz,
-                        sortType = curSortType
-                    )
-                )
-            }
-        }
-    }
-
-    val onJumpToResume: () -> Unit = {
-        readingProgressState.readingProgress?.let { progress ->
-            val targetPid = progress.pid?.toLongOrNull() ?: 0L
-            val targetFloor = progress.floor.orEmpty()
-            readingProgressState.dismiss()
-            if (targetPid > 0L) {
-                val indexInData = data.indexOfFirst { it.post.get { id } == targetPid }
-                if (indexInData != -1) {
-                    coroutineScope.launch {
-                        val baseOffset = 2 + (if (hasPrevious) 1 else 0)
-                        lazyListState.animateScrollToItem(baseOffset + indexInData)
-                    }
-                } else {
-                    pendingScrollToPostId = targetPid
-                    viewModel.send(
-                        ThreadUiIntent.Load(
-                            threadId = threadId,
-                            page = 0,
-                            postId = targetPid,
-                            forumId = curForumId,
-                            seeLz = isSeeLz,
-                            sortType = curSortType
-                        )
-                    )
-                }
-                context.toastShort(context.getString(R.string.toast_jump_to_reading_history, targetFloor))
-            }
-        }
-    }
-
-    val openBottomSheet = {
+    val openBottomSheet: () -> Unit = {
         coroutineScope.launch {
             bottomSheetState.show()
         }
     }
-    val closeBottomSheet = {
+    val closeBottomSheet: () -> Unit = {
         coroutineScope.launch {
             bottomSheetState.hide()
         }
@@ -416,51 +302,17 @@ fun ThreadPage(
         closeBottomSheet()
     }
 
-    viewModel.onEvent<ThreadUiEvent.ScrollToFirstReply> {
-        lazyListState.animateScrollToItem(1)
-    }
-    viewModel.onEvent<ThreadUiEvent.ScrollToLatestReply> {
-        if (curSortType != ThreadSortType.SORT_TYPE_DESC) {
-            lazyListState.animateScrollToItem(2 + data.size)
-        } else {
-            lazyListState.animateScrollToItem(1)
-        }
-    }
-    viewModel.onEvent<ThreadUiEvent.LoadSuccess> {
-        if (it.page > 1 || waitLoadSuccessAndScrollToFirstReply) {
-            waitLoadSuccessAndScrollToFirstReply = false
-            lazyListState.animateScrollToItem(1)
-        }
-    }
-    viewModel.onEvent<ThreadUiEvent.AddFavoriteSuccess> {
-        scaffoldState.snackbarHostState.showSnackbar(
-            context.getString(R.string.message_add_favorite_success, it.floor)
-        )
-    }
-    viewModel.onEvent<ThreadUiEvent.RemoveFavoriteSuccess> {
-        scaffoldState.snackbarHostState.showSnackbar(
-            context.getString(R.string.message_remove_favorite_success)
-        )
-    }
-
-    onGlobalEvent<GlobalEvent.ReplySuccess>(
-        filter = { it.threadId == threadId }
-    ) { event ->
-        viewModel.send(
-            ThreadUiIntent.LoadMyLatestReply(
-                threadId = threadId,
-                postId = event.newPostId,
-                forumId = curForumId,
-                isDesc = curSortType == ThreadSortType.SORT_TYPE_DESC,
-                curLatestPostFloor = if (curSortType == ThreadSortType.SORT_TYPE_DESC) {
-                    data.firstOrNull()?.post?.get { floor } ?: 1
-                } else {
-                    data.lastOrNull()?.post?.get { floor } ?: 1
-                },
-                curPostIds = data.map { it.post.get { id } },
-            )
-        )
-    }
+    ThreadPageEventHandler(
+        viewModel = viewModel,
+        lazyListState = lazyListState,
+        scaffoldState = scaffoldState,
+        threadId = threadId,
+        curForumId = curForumId,
+        curSortType = curSortType,
+        data = data,
+        waitLoadSuccessAndScrollToFirstReply = waitLoadSuccessAndScrollToFirstReply,
+        onClearWaitLoadSuccess = { waitLoadSuccessAndScrollToFirstReply = false }
+    )
 
     val updateCollectMarkDialogState = rememberDialogState()
     var readFloorBeforeBack by remember {
@@ -538,35 +390,7 @@ fun ThreadPage(
             }
         },
         onSelectBookmark = { bookmark ->
-            val targetPid = bookmark.postId.toLongOrNull() ?: 0L
-            val targetFloor = bookmark.floor
-            if (targetFloor == 1 || (targetPid > 0L && firstPost?.get { id } == targetPid)) {
-                coroutineScope.launch {
-                    lazyListState.animateScrollToItem(0)
-                }
-                context.toastShort(context.getString(R.string.toast_jump_to_reading_history, "1"))
-            } else if (targetPid > 0L) {
-                val indexInData = data.indexOfFirst { it.post.get { id } == targetPid }
-                if (indexInData != -1) {
-                    coroutineScope.launch {
-                        val baseOffset = 2 + (if (hasPrevious) 1 else 0)
-                        lazyListState.animateScrollToItem(baseOffset + indexInData)
-                    }
-                } else {
-                    pendingScrollToPostId = targetPid
-                    viewModel.send(
-                        ThreadUiIntent.Load(
-                            threadId = threadId,
-                            page = 0,
-                            postId = targetPid,
-                            forumId = curForumId,
-                            seeLz = isSeeLz,
-                            sortType = curSortType
-                        )
-                    )
-                }
-                context.toastShort(context.getString(R.string.toast_jump_to_reading_history, targetFloor.toString()))
-            }
+            jumpController.onSelectBookmark(bookmark, firstPost?.get { id } ?: 0L)
         },
         searchJumpDialogState = searchJumpDialogState,
         totalFloors = totalFloorCount,
@@ -574,7 +398,7 @@ fun ThreadPage(
         totalPage = totalPage,
         firstPost = firstPost?.get(),
         loadedPosts = data,
-        onJumpToFloor = onJumpToFloor,
+        onJumpToFloor = jumpController::onJumpToFloor,
         onJumpToPage = { targetPage ->
             viewModel.send(
                 ThreadUiIntent.Load(
@@ -587,10 +411,10 @@ fun ThreadPage(
             )
         },
         onSelectSearchHit = { hit, query, hits ->
-            activeSearchKeyword = query
-            activeSearchHits = hits
-            currentHitIndex = hits.indexOf(hit).coerceAtLeast(0)
-            onJumpToHit(hit)
+            jumpController.activeSearchKeyword = query
+            jumpController.activeSearchHits = hits
+            jumpController.currentHitIndex = hits.indexOf(hit).coerceAtLeast(0)
+            jumpController.onJumpToHit(hit)
         }
     )
 
@@ -700,67 +524,25 @@ fun ThreadPage(
                 )
             }
         ) {
-            MyScaffold(
+            ThreadScaffold(
                 scaffoldState = scaffoldState,
-                topBar = {
-                    ThreadTopBar(
-                        forum = forum,
-                        onBack = handleBack,
-                        onForumClick = {
-                            val forumName = forum?.get { name }
-                            if (forumName != null) navigator.navigate(
-                                ForumPageDestination(
-                                    forumName
-                                )
-                            )
-                        },
-                        isGalleryMode = isGalleryMode,
-                        onToggleGalleryMode = { isGalleryMode = !isGalleryMode },
-                        onSearchClick = { searchJumpDialogState.show() }
-                    )
-                },
-                bottomBar = {
-                    ThreadBottomBar(
-                        user = user,
-                        onClickReply = {
-                            navigator.navigate(
-                                ReplyPageDestination(
-                                    forumId = curForumId ?: 0,
-                                    forumName = forum?.get { name }.orEmpty(),
-                                    threadId = threadId,
-                                )
-                            )
-                        },
-                        onAgree = {
-                            val firstPostId =
-                                thread?.get { firstPostId }.takeIf { it != 0L }
-                                    ?: firstPost?.get { id }
-                                    ?: 0L
-                            if (firstPostId != 0L) viewModel.send(
-                                ThreadUiIntent.AgreeThread(
-                                    threadId,
-                                    firstPostId,
-                                    !hasThreadAgreed
-                                )
-                            )
-                        },
-                        onClickMore = {
-                            if (bottomSheetState.isVisible) {
-                                closeBottomSheet()
-                            } else {
-                                openBottomSheet()
-                            }
-                        },
-                        hasAgreed = hasThreadAgreed,
-                        agreeNum = threadAgreeNum,
-                        modifier = Modifier
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                onClick = {}
-                            )
-                    )
-                },
+                forum = forum,
+                onBack = handleBack,
+                navigator = navigator,
+                isGalleryMode = isGalleryMode,
+                onToggleGalleryMode = { isGalleryMode = !isGalleryMode },
+                onSearchClick = { searchJumpDialogState.show() },
+                user = user,
+                curForumId = curForumId,
+                threadId = threadId,
+                thread = thread,
+                firstPost = firstPost,
+                hasThreadAgreed = hasThreadAgreed,
+                threadAgreeNum = threadAgreeNum,
+                bottomSheetState = bottomSheetState,
+                openBottomSheet = openBottomSheet,
+                closeBottomSheet = closeBottomSheet,
+                viewModel = viewModel,
             ) { paddingValues ->
                 ThreadPageMenuSheetContainer(
                     sheetState = bottomSheetState,
@@ -819,7 +601,7 @@ fun ThreadPage(
                         nextPagePostId = nextPagePostId,
                         isSeeLz = isSeeLz,
                         isImmersiveMode = isImmersiveMode,
-                        highlightedFloor = highlightedFloor,
+                        highlightedFloor = jumpController.highlightedFloor,
                         thread = thread,
                         firstPost = firstPost,
                         firstPostContentRenders = firstPostContentRenders,
@@ -834,24 +616,20 @@ fun ThreadPage(
                         pullRefreshState = pullRefreshState,
                         enablePullRefresh = enablePullRefresh,
                         readingProgressState = readingProgressState,
-                        activeSearchKeyword = activeSearchKeyword,
-                        activeSearchHits = activeSearchHits,
-                        currentHitIndex = currentHitIndex,
-                        onHitIndexChange = { currentHitIndex = it },
-                        onJumpToHit = onJumpToHit,
-                        onCloseSearch = {
-                            activeSearchKeyword = ""
-                            activeSearchHits = emptyList()
-                            highlightedFloor = -1
-                        },
-                        onJumpToResume = onJumpToResume,
+                        activeSearchKeyword = jumpController.activeSearchKeyword,
+                        activeSearchHits = jumpController.activeSearchHits,
+                        currentHitIndex = jumpController.currentHitIndex,
+                        onHitIndexChange = { jumpController.currentHitIndex = it },
+                        onJumpToHit = jumpController::onJumpToHit,
+                        onCloseSearch = jumpController::closeSearch,
+                        onJumpToResume = jumpController::onJumpToResume,
                         onOpenBookmarkEdit = openBookmarkEdit,
                         onDeletePost = { post ->
                             deletePost = post
                             confirmDeleteDialogState.show()
                         },
                         onExitGalleryMode = { isGalleryMode = false },
-                        onPendingScrollToPost = { pendingScrollToPostId = it },
+                        onPendingScrollToPost = { jumpController.pendingScrollToPostId = it },
                         scaffoldState = scaffoldState,
                     )
                 }

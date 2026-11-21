@@ -2,44 +2,27 @@ package com.huanchengfly.tieba.post.utils
 
 import android.app.Activity
 import android.content.Context
-import android.content.res.ColorStateList
-import android.graphics.Color
-import android.graphics.drawable.BitmapDrawable
 import android.os.Build
 import android.view.View
-import android.view.ViewGroup
 import android.webkit.WebView
 import android.widget.TextView
 import androidx.annotation.ColorInt
 import androidx.annotation.StyleRes
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
-import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-import com.github.panpf.sketch.fetch.newFileUri
-import com.github.panpf.sketch.request.DisplayRequest
-import com.github.panpf.sketch.request.DisplayResult
-import com.github.panpf.sketch.request.execute
-import com.github.panpf.sketch.resize.Scale
-import com.google.android.material.appbar.AppBarLayout
 import com.huanchengfly.tieba.post.App
 import com.huanchengfly.tieba.post.App.Companion.INSTANCE
-import com.huanchengfly.tieba.post.App.Companion.translucentBackground
-import com.huanchengfly.tieba.post.R
 import com.huanchengfly.tieba.post.activities.BaseActivity
 import com.huanchengfly.tieba.post.dataStore
 import com.huanchengfly.tieba.post.getBoolean
 import com.huanchengfly.tieba.post.getInt
 import com.huanchengfly.tieba.post.getString
-import com.huanchengfly.tieba.post.interfaces.BackgroundTintable
 import com.huanchengfly.tieba.post.putBoolean
 import com.huanchengfly.tieba.post.putString
 import com.huanchengfly.tieba.post.ui.common.theme.utils.ThemeUtils
-import com.huanchengfly.tieba.post.ui.widgets.theme.TintSwipeRefreshLayout
-import kotlinx.coroutines.launch
-import java.util.Locale
 
 object ThemeUtil {
     val themeState: MutableState<String> by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
@@ -85,14 +68,10 @@ object ThemeUtil {
     val dataStore: DataStore<Preferences>
         get() = INSTANCE.dataStore
 
-    fun getTextColor(context: Context?): Int {
-        return ThemeUtils.getColorByAttr(context, R.attr.colorText)
-    }
+    fun getTextColor(context: Context?): Int = ThemeTintHelper.getTextColor(context)
 
     @JvmStatic
-    fun getSecondaryTextColor(context: Context?): Int {
-        return ThemeUtils.getColorByAttr(context, R.attr.colorTextSecondary)
-    }
+    fun getSecondaryTextColor(context: Context?): Int = ThemeTintHelper.getSecondaryTextColor(context)
 
     fun switchToNightMode(context: Activity) {
         switchToNightMode(context, true)
@@ -161,67 +140,28 @@ object ThemeUtil {
     }
 
     @JvmStatic
-    fun setChipThemeByLevel(level: String?, parent: View, vararg textViews: TextView) {
-        setChipTheme(Util.getIconColorByLevel(level), parent, *textViews)
-    }
+    fun setChipThemeByLevel(level: String?, parent: View, vararg textViews: TextView) =
+        ThemeTintHelper.setChipThemeByLevel(level, parent, *textViews)
 
-    fun setChipTheme(@ColorInt color: Int, parent: View, vararg textViews: TextView) {
-        parent.backgroundTintList = ColorStateList.valueOf(color)
-        for (textView in textViews) {
-            textView.setTextColor(ThemeUtils.getColorByAttr(parent.context, R.attr.colorOnAccent))
-        }
-    }
+    fun setChipTheme(@ColorInt color: Int, parent: View, vararg textViews: TextView) =
+        ThemeTintHelper.setChipTheme(color, parent, *textViews)
 
     @JvmStatic
-    fun setThemeForSwipeRefreshLayout(swipeRefreshLayout: SwipeRefreshLayout) {
-        if (swipeRefreshLayout is TintSwipeRefreshLayout) {
-            swipeRefreshLayout.tint()
-            return
-        }
-        val context = swipeRefreshLayout.context
-        val resources = context.resources
-        if (resources != null) {
-            swipeRefreshLayout.setProgressBackgroundColorSchemeColor(resources.getColor(R.color.color_swipe_refresh_bg))
-            swipeRefreshLayout.setColorSchemeColors(
-                ThemeUtils.getColorByAttr(
-                    context,
-                    R.attr.colorAccent
-                )
-            )
-        }
-    }
+    fun setThemeForSwipeRefreshLayout(swipeRefreshLayout: SwipeRefreshLayout) =
+        ThemeTintHelper.setThemeForSwipeRefreshLayout(swipeRefreshLayout)
 
     @JvmStatic
-    fun isNightMode(): Boolean {
-        return isNightMode(getRawTheme())
-    }
+    fun isNightMode(): Boolean = isNightMode(getRawTheme())
 
     @JvmStatic
-    fun isNightMode(theme: String): Boolean {
-        return theme.lowercase(Locale.getDefault()).contains("dark") && !theme.contains(
-            THEME_TRANSLUCENT,
-            ignoreCase = true
-        )
-    }
+    fun isNightMode(theme: String): Boolean = ThemeNameMapper.isNightMode(theme)
 
-    fun isTranslucentTheme(): Boolean {
-        return isTranslucentTheme(getRawTheme())
-    }
+    fun isTranslucentTheme(): Boolean = isTranslucentTheme(getRawTheme())
 
     @JvmStatic
-    fun isTranslucentTheme(theme: String): Boolean {
-        return theme.equals(
-            THEME_TRANSLUCENT,
-            ignoreCase = true
-        ) || theme.contains(
-            THEME_TRANSLUCENT,
-            ignoreCase = true
-        )
-    }
+    fun isTranslucentTheme(theme: String): Boolean = ThemeNameMapper.isTranslucentTheme(theme)
 
-    fun isDynamicTheme(theme: String): Boolean {
-        return theme.endsWith("_dynamic")
-    }
+    fun isDynamicTheme(theme: String): Boolean = ThemeNameMapper.isDynamicTheme(theme)
 
     fun isStatusBarFontDark(): Boolean {
         val theme = getRawTheme()
@@ -237,9 +177,7 @@ object ThemeUtil {
         }
     }
 
-    fun isNavigationBarFontDark(): Boolean {
-        return !isNightMode()
-    }
+    fun isNavigationBarFontDark(): Boolean = !isNightMode()
 
     fun setTheme(context: Activity) {
         val nowTheme = getCurrentTheme()
@@ -267,153 +205,26 @@ object ThemeUtil {
     }
 
     @JvmStatic
-    fun setTranslucentThemeWebViewBackground(webView: WebView?) {
-        if (webView == null) {
-            return
-        }
-        if (!isTranslucentTheme()) {
-            return
-        }
-        webView.setBackgroundColor(Color.WHITE)
-    }
+    fun setTranslucentThemeWebViewBackground(webView: WebView?) =
+        TranslucentThemeViewHelper.setTranslucentThemeWebViewBackground(webView)
 
-    private fun setAppBarFitsSystemWindow(view: View?, appBarFitsSystemWindow: Boolean) {
-        if (view == null) return
-        if (view is AppBarLayout) {
-            view.setFitsSystemWindows(appBarFitsSystemWindow)
-            view.clipToPadding = !appBarFitsSystemWindow
-            return
-        }
-        if (view is ViewGroup) {
-            for (i in 0 until view.childCount) {
-                setAppBarFitsSystemWindow(view.getChildAt(i), appBarFitsSystemWindow)
-            }
-        }
-    }
-
-    fun setTranslucentBackground(view: View?) {
-        if (view == null) {
-            return
-        }
-        if (!isTranslucentTheme()) {
-            return
-        }
-        view.backgroundTintList = null
-        view.setBackgroundColor(Color.TRANSPARENT)
-    }
+    fun setTranslucentBackground(view: View?) =
+        TranslucentThemeViewHelper.setTranslucentBackground(view)
 
     @JvmStatic
-    fun setTranslucentDialogBackground(view: View?) {
-        if (view == null) {
-            return
-        }
-        if (!isTranslucentTheme()) {
-            return
-        }
-        view.backgroundTintList = null
-        view.setBackgroundColor(
-            ThemeUtils.getColorById(
-                view.context,
-                R.color.theme_color_card_grey_dark
-            )
-        )
-    }
+    fun setTranslucentDialogBackground(view: View?) =
+        TranslucentThemeViewHelper.setTranslucentDialogBackground(view)
 
     fun setTranslucentThemeBackground(
         activity: BaseActivity,
         view: View?,
         setFitsSystemWindow: Boolean = true,
         useCache: Boolean = false,
-    ) {
-        if (view == null) {
-            return
-        }
-        if (!isTranslucentTheme()) {
-            if (setFitsSystemWindow) {
-                setAppBarFitsSystemWindow(view, false)
-                view.fitsSystemWindows = false
-                (view as ViewGroup).clipToPadding = true
-            }
-            return
-        }
-        if (setFitsSystemWindow) {
-            if (view is CoordinatorLayout) {
-                setAppBarFitsSystemWindow(view, true)
-                view.setFitsSystemWindows(false)
-                (view as ViewGroup).clipToPadding = true
-            } else {
-                setAppBarFitsSystemWindow(view, false)
-                view.fitsSystemWindows = true
-                (view as ViewGroup).clipToPadding = false
-            }
-        }
-        view.backgroundTintList = null
-        if (view is BackgroundTintable) {
-            (view as BackgroundTintable).setBackgroundTintResId(0)
-        }
-        val backgroundFilePath = dataStore.getString(KEY_TRANSLUCENT_THEME_BACKGROUND_PATH)
-        if (backgroundFilePath == null) {
-            view.setBackgroundColor(Color.BLACK)
-            return
-        }
-        if (useCache && translucentBackground != null &&
-            (translucentBackground !is BitmapDrawable || !(translucentBackground as BitmapDrawable).bitmap.isRecycled)
-        ) {
-            view.background = translucentBackground
-            return
-        }
-        activity.launch {
-            val result = DisplayRequest(activity, newFileUri(backgroundFilePath)) {
-                resizeScale(Scale.CENTER_CROP)
-            }.execute()
-            if (result is DisplayResult.Success) {
-                if (useCache) {
-                    translucentBackground = result.drawable
-                }
-                view.background = result.drawable
-            } else {
-                view.setBackgroundColor(Color.BLACK)
-            }
-        }
-    }
+    ) = TranslucentThemeViewHelper.setTranslucentThemeBackground(activity, view, setFitsSystemWindow, useCache)
 
     @StyleRes
-    private fun getThemeByName(themeName: String): Int {
-        return when (themeName.lowercase(Locale.getDefault())) {
-            THEME_TRANSLUCENT, THEME_TRANSLUCENT_LIGHT -> R.style.TiebaLite_Translucent_Light
-            THEME_TRANSLUCENT_DARK -> R.style.TiebaLite_Translucent_Dark
-            THEME_DEFAULT -> R.style.TiebaLite_Tieba
-            THEME_BLACK -> R.style.TiebaLite_Black
-            THEME_PURPLE -> R.style.TiebaLite_Purple
-            THEME_PINK -> R.style.TiebaLite_Pink
-            THEME_RED -> R.style.TiebaLite_Red
-            THEME_BLUE_DARK -> R.style.TiebaLite_Dark_Blue
-            THEME_GREY_DARK -> R.style.TiebaLite_Dark_Grey
-            THEME_AMOLED_DARK -> R.style.TiebaLite_Dark_Amoled
-            THEME_CUSTOM -> R.style.TiebaLite_Custom
-            else -> R.style.TiebaLite_Tieba
-        }
-    }
+    private fun getThemeByName(themeName: String): Int = ThemeNameMapper.getThemeByName(themeName)
 
     @JvmStatic
-    fun getRawTheme(): String {
-        val theme = themeState.value
-        return when (theme.lowercase(Locale.getDefault())) {
-            THEME_TRANSLUCENT,
-            THEME_TRANSLUCENT_LIGHT,
-            THEME_TRANSLUCENT_DARK,
-            THEME_CUSTOM,
-            THEME_DEFAULT,
-            THEME_BLACK,
-            THEME_PURPLE,
-            THEME_PINK,
-            THEME_RED,
-            THEME_BLUE_DARK,
-            THEME_GREY_DARK,
-            THEME_AMOLED_DARK,
-            -> theme.lowercase(Locale.getDefault())
-
-            else -> THEME_DEFAULT
-        }
-    }
+    fun getRawTheme(): String = ThemeNameMapper.normalizeThemeName(themeState.value)
 }

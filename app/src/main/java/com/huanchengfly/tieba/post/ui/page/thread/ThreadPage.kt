@@ -1,8 +1,6 @@
 package com.huanchengfly.tieba.post.ui.page.thread
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -17,7 +15,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -30,30 +27,19 @@ import com.huanchengfly.tieba.post.api.models.protos.Post
 import com.huanchengfly.tieba.post.api.models.protos.SimpleForum
 import com.huanchengfly.tieba.post.api.models.protos.ThreadInfo
 import com.huanchengfly.tieba.post.api.models.protos.User
-import com.huanchengfly.tieba.post.arch.GlobalEvent
 import com.huanchengfly.tieba.post.arch.ImmutableHolder
 import com.huanchengfly.tieba.post.arch.collectPartialAsState
-import com.huanchengfly.tieba.post.arch.onEvent
-import com.huanchengfly.tieba.post.arch.onGlobalEvent
 import com.huanchengfly.tieba.post.arch.pageViewModel
 import com.huanchengfly.tieba.post.arch.wrapImmutable
-import com.huanchengfly.tieba.post.models.database.FloorBookmark
-import com.huanchengfly.tieba.post.toastShort
 import com.huanchengfly.tieba.post.ui.common.PbContentRender
 import com.huanchengfly.tieba.post.ui.page.ProvideNavigator
-import com.huanchengfly.tieba.post.ui.page.destinations.ForumPageDestination
-import com.huanchengfly.tieba.post.ui.page.destinations.ReplyPageDestination
 import com.huanchengfly.tieba.post.ui.page.destinations.ThreadPageDestination
 import com.huanchengfly.tieba.post.ui.widgets.compose.ErrorScreen
 import com.huanchengfly.tieba.post.ui.widgets.compose.LazyLoad
 import com.huanchengfly.tieba.post.ui.widgets.compose.MyBackHandler
-import com.huanchengfly.tieba.post.ui.widgets.compose.MyScaffold
 import com.huanchengfly.tieba.post.ui.widgets.compose.PredictiveBackBox
-import com.huanchengfly.tieba.post.ui.widgets.compose.ThreadSearchHit
 import com.huanchengfly.tieba.post.ui.widgets.compose.extractGalleryImages
-import com.huanchengfly.tieba.post.ui.widgets.compose.rememberDialogState
 import com.huanchengfly.tieba.post.ui.widgets.compose.states.StateScreen
-import com.huanchengfly.tieba.post.utils.FloorBookmarkUtil
 import com.ramcosta.composedestinations.annotation.DeepLink
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
@@ -314,108 +300,33 @@ fun ThreadPage(
         onClearWaitLoadSuccess = { waitLoadSuccessAndScrollToFirstReply = false }
     )
 
-    val updateCollectMarkDialogState = rememberDialogState()
-    var readFloorBeforeBack by remember {
-        mutableIntStateOf(1)
-    }
+    val dialogController = rememberThreadDialogController(
+        threadId = threadId,
+        curForumId = curForumId,
+        curForumName = curForumName,
+        curTbs = curTbs,
+        author = author,
+        user = user,
+        viewModel = viewModel,
+        navigator = navigator,
+        jumpController = jumpController,
+        coroutineScope = coroutineScope,
+    )
 
-    val confirmDeleteDialogState = rememberDialogState()
-    var deletePost by remember { mutableStateOf<ImmutableHolder<Post>?>(null) }
-
-    var bookmarkTargetPost by remember { mutableStateOf<Post?>(null) }
-    var bookmarkInitialNote by remember { mutableStateOf("") }
-    var bookmarkIsExisting by remember { mutableStateOf(false) }
-    val bookmarkEditDialogState = rememberDialogState()
-
-    var threadBookmarks by remember { mutableStateOf<List<FloorBookmark>>(emptyList()) }
-    val bookmarksDialogState = rememberDialogState()
-
-    val openBookmarkEdit: (Post) -> Unit = { post ->
-        bookmarkTargetPost = post
-        coroutineScope.launch {
-            val existing = FloorBookmarkUtil.findBookmark(threadId, post.id)
-            bookmarkIsExisting = existing != null
-            bookmarkInitialNote = existing?.note.orEmpty()
-            bookmarkEditDialogState.show()
-        }
-    }
-
-    val searchJumpDialogState = rememberDialogState()
     val totalFloorCount = thread?.get { replyNum } ?: (data.lastOrNull()?.post?.get { floor } ?: 1)
 
-    ThreadPageDialogs(
-        updateCollectMarkDialogState = updateCollectMarkDialogState,
-        readFloorBeforeBack = readFloorBeforeBack,
-        threadId = threadId,
+    ThreadPageDialogContainer(
+        dialogController = dialogController,
         lastVisibilityPostId = lastVisibilityPostId,
-        onNavUp = { navigator.navigateUp() },
-        confirmDeleteDialogState = confirmDeleteDialogState,
-        deletePost = deletePost,
-        curForumId = curForumId,
-        onDeleteThread = {
-            val isSelfThread = author?.get { id } == user.get { id }
-            viewModel.send(
-                ThreadUiIntent.DeleteThread(
-                    forumId = curForumId!!,
-                    forumName = curForumName.orEmpty(),
-                    threadId = threadId,
-                    deleteMyThread = isSelfThread,
-                    tbs = curTbs
-                )
-            )
-        },
-        onDeletePost = { postId ->
-            val isSelfPost = deletePost!!.get { author_id } == user.get { id }
-            viewModel.send(
-                ThreadUiIntent.DeletePost(
-                    forumId = curForumId!!,
-                    forumName = curForumName.orEmpty(),
-                    threadId = threadId,
-                    postId = postId,
-                    deleteMyPost = isSelfPost,
-                    tbs = curTbs
-                )
-            )
-        },
-        bookmarkEditDialogState = bookmarkEditDialogState,
-        bookmarksDialogState = bookmarksDialogState,
-        bookmarkTargetPost = bookmarkTargetPost,
-        bookmarkInitialNote = bookmarkInitialNote,
-        bookmarkIsExisting = bookmarkIsExisting,
-        threadBookmarks = threadBookmarks,
         threadTitle = threadTitle,
-        onBookmarksChanged = {
-            coroutineScope.launch {
-                threadBookmarks = FloorBookmarkUtil.getBookmarks(threadId)
-            }
-        },
-        onSelectBookmark = { bookmark ->
-            jumpController.onSelectBookmark(bookmark, firstPost?.get { id } ?: 0L)
-        },
-        searchJumpDialogState = searchJumpDialogState,
         totalFloors = totalFloorCount,
         currentPage = currentPageMax,
         totalPage = totalPage,
         firstPost = firstPost?.get(),
         loadedPosts = data,
-        onJumpToFloor = jumpController::onJumpToFloor,
-        onJumpToPage = { targetPage ->
-            viewModel.send(
-                ThreadUiIntent.Load(
-                    threadId = threadId,
-                    forumId = forum?.get { id } ?: forumId,
-                    page = targetPage,
-                    seeLz = isSeeLz,
-                    sortType = curSortType
-                )
-            )
-        },
-        onSelectSearchHit = { hit, query, hits ->
-            jumpController.activeSearchKeyword = query
-            jumpController.activeSearchHits = hits
-            jumpController.currentHitIndex = hits.indexOf(hit).coerceAtLeast(0)
-            jumpController.onJumpToHit(hit)
-        }
+        forumId = forum?.get { id } ?: forumId,
+        isSeeLz = isSeeLz,
+        curSortType = curSortType,
     )
 
     LaunchedEffect(Unit) {
@@ -468,9 +379,9 @@ fun ThreadPage(
         if (isGalleryMode) {
             isGalleryMode = false
         } else if (isCollected) {
-            readFloorBeforeBack = lastVisibilityPost?.get { floor } ?: 0
-            if (readFloorBeforeBack != 0) {
-                updateCollectMarkDialogState.show()
+            val floor = lastVisibilityPost?.get { floor } ?: 0
+            if (floor != 0) {
+                dialogController.openCollectMarkDialog(floor)
             } else {
                 navigator.navigateUp()
             }
@@ -485,10 +396,10 @@ fun ThreadPage(
             currentScreen = ThreadPageDestination,
             onBackConfirm = { reset ->
                 if (isCollected) {
-                    readFloorBeforeBack = lastVisibilityPost?.get { floor } ?: 0
-                    if (readFloorBeforeBack != 0) {
+                    val floor = lastVisibilityPost?.get { floor } ?: 0
+                    if (floor != 0) {
                         reset()
-                        updateCollectMarkDialogState.show()
+                        dialogController.openCollectMarkDialog(floor)
                     } else {
                         navigator.navigateUp()
                     }
@@ -531,7 +442,7 @@ fun ThreadPage(
                 navigator = navigator,
                 isGalleryMode = isGalleryMode,
                 onToggleGalleryMode = { isGalleryMode = !isGalleryMode },
-                onSearchClick = { searchJumpDialogState.show() },
+                onSearchClick = dialogController::openSearchJumpDialog,
                 user = user,
                 curForumId = curForumId,
                 threadId = threadId,
@@ -566,17 +477,9 @@ fun ThreadPage(
                     author = author,
                     firstPostContentRenders = firstPostContentRenders,
                     data = data,
-                    onJumpPageClick = { searchJumpDialogState.show() },
-                    onBookmarksClick = {
-                        coroutineScope.launch {
-                            threadBookmarks = FloorBookmarkUtil.getBookmarks(threadId)
-                            bookmarksDialogState.show()
-                        }
-                    },
-                    onDeleteClick = {
-                        deletePost = null
-                        confirmDeleteDialogState.show()
-                    },
+                    onJumpPageClick = dialogController::openSearchJumpDialog,
+                    onBookmarksClick = dialogController::openBookmarks,
+                    onDeleteClick = dialogController::openDeleteThread,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(paddingValues)
@@ -623,11 +526,8 @@ fun ThreadPage(
                         onJumpToHit = jumpController::onJumpToHit,
                         onCloseSearch = jumpController::closeSearch,
                         onJumpToResume = jumpController::onJumpToResume,
-                        onOpenBookmarkEdit = openBookmarkEdit,
-                        onDeletePost = { post ->
-                            deletePost = post
-                            confirmDeleteDialogState.show()
-                        },
+                        onOpenBookmarkEdit = dialogController::openBookmarkEdit,
+                        onDeletePost = dialogController::openDeletePost,
                         onExitGalleryMode = { isGalleryMode = false },
                         onPendingScrollToPost = { jumpController.pendingScrollToPostId = it },
                         scaffoldState = scaffoldState,

@@ -12,28 +12,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import com.huanchengfly.tieba.post.R
-import com.huanchengfly.tieba.post.api.TiebaApi
-import com.huanchengfly.tieba.post.api.models.LoginBean
 import com.huanchengfly.tieba.post.arch.GlobalEvent
 import com.huanchengfly.tieba.post.arch.emitGlobalEvent
 import com.huanchengfly.tieba.post.models.database.Account
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.flatMapConcat
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.zip
 import kotlinx.coroutines.launch
-import org.litepal.LitePal
 import org.litepal.LitePal.findAll
 import org.litepal.LitePal.where
-import org.litepal.extension.findAllAsync
 import org.litepal.extension.findFirst
-import java.util.UUID
 
 @Stable
 object AccountUtil {
@@ -59,6 +47,10 @@ object AccountUtil {
     private var mutableCurrentAccountState: MutableState<Account?> = mutableStateOf(null)
 
     private var mutableAllAccountsState: MutableState<List<Account>> = mutableStateOf(emptyList())
+
+    internal fun updateAllAccounts(accounts: List<Account>) {
+        mutableAllAccountsState.value = accounts
+    }
 
     val currentAccount
         get() = mutableCurrentAccountState.value
@@ -148,89 +140,23 @@ object AccountUtil {
             .putInt("now", id).commit()
     }
 
-    private fun updateAccount(
-        account: Account,
-        loginBean: LoginBean,
-    ) {
-        account.apply {
-            uid = loginBean.user.id
-            name = loginBean.user.name
-            portrait = loginBean.user.portrait
-            tbs = loginBean.anti.tbs
-            if (uuid.isNullOrBlank()) uuid = UUID.randomUUID().toString()
-        }
-    }
-
-    fun fetchAccountFlow(account: Account = getLoginInfo()!!): Flow<Account> {
-        return fetchAccountFlow(account.bduss, account.sToken, account.cookie)
-    }
+    fun fetchAccountFlow(account: Account = getLoginInfo()!!): Flow<Account> =
+        AccountSyncHelper.fetchAccountFlow(account)
 
     @OptIn(ExperimentalCoroutinesApi::class)
     fun fetchAccountFlow(
         bduss: String,
         sToken: String,
         cookie: String? = null
-    ): Flow<Account> {
-        return TiebaApi.getInstance()
-            .loginFlow(bduss, sToken)
-            .zip(TiebaApi.getInstance().initNickNameFlow(bduss, sToken)) { loginBean, _ ->
-                getAccountInfoByUid(loginBean.user.id)?.apply {
-                    this.bduss = bduss
-                    this.sToken = sToken
-                    this.cookie = cookie ?: getBdussCookie(bduss)
-                    updateAccount(this, loginBean)
-                } ?: Account(
-                    loginBean.user.id,
-                    loginBean.user.name,
-                    bduss,
-                    loginBean.anti.tbs,
-                    loginBean.user.portrait,
-                    sToken,
-                    cookie ?: getBdussCookie(bduss),
-                )
-            }
-            .zip(SofireUtils.fetchZid()) { account, zid ->
-                account.apply { this.zid = zid }
-            }
-            .flatMapConcat { account ->
-                TiebaApi.getInstance()
-                    .getUserInfoFlow(account.uid.toLong(), account.bduss, account.sToken)
-                    .map { checkNotNull(it.data_?.user) }
-                    .map { user ->
-                        account.apply {
-                            nameShow = user.nameShow
-                            portrait = user.portrait
-                        }
-                    }
-                    .catch {
-                        emit(account)
-                    }
-            }
-            .onEach { account ->
-                account.toEncryptedCopy().saveOrUpdateAsync("uid = ?", account.uid)
-                    .listen {
-                        LitePal.findAllAsync<Account>()
-                            .listen { list ->
-                                mutableAllAccountsState.value = list.map { it.decryptSensitiveFields() }
-                            }
-                    }
-            }
-            .flowOn(Dispatchers.IO)
-    }
+    ): Flow<Account> = AccountSyncHelper.fetchAccountFlow(bduss, sToken, cookie)
 
-    fun parseCookie(cookie: String): Map<String, String> {
-        return cookie
-            .split(";")
-            .map { it.trim().split("=") }
-            .filter { it.size > 1 }
-            .associate { it.first() to it.drop(1).joinToString("=") }
-    }
+    @JvmStatic
+    fun parseCookie(cookie: String): Map<String, String> = AccountCookieUtil.parseCookie(cookie)
 
     @JvmStatic
     fun updateLoginInfo(cookie: String): Boolean {
-        val cookies = parseCookie(cookie).mapKeys { it.key.uppercase() }
-        val bduss = cookies["BDUSS"]
-        val sToken = cookies["STOKEN"]
+        val bduss = AccountCookieUtil.extractBduss(cookie)
+        val sToken = AccountCookieUtil.extractSToken(cookie)
         if (bduss != null && sToken != null) {
             val account = getAccountInfoByBduss(bduss)
             account.apply {
@@ -261,70 +187,17 @@ object AccountUtil {
         Toast.makeText(context, R.string.toast_exit_account_success, Toast.LENGTH_SHORT).show()
     }
 
-    fun getSToken(): String? {
-        val account = getLoginInfo()
-        return account?.sToken
-    }
+    fun getSToken(): String? = getLoginInfo()?.sToken
 
-    fun getCookie(): String? {
-        val account = getLoginInfo()
-        return account?.cookie
-    }
+    fun getCookie(): String? = getLoginInfo()?.cookie
 
-    fun getUid(): String? {
-        val account = getLoginInfo()
-        return account?.uid
-    }
+    fun getUid(): String? = getLoginInfo()?.uid
 
-    fun getBduss(): String? {
-        val account = getLoginInfo()
-        return account?.bduss
-    }
+    fun getBduss(): String? = getLoginInfo()?.bduss
 
     @JvmStatic
-    fun getBdussCookie(): String? {
-        val bduss = getBduss()
-        return if (bduss != null) {
-            getBdussCookie(bduss)
-        } else null
-    }
+    fun getBdussCookie(): String? = getBduss()?.let { AccountCookieUtil.getBdussCookie(it) }
 
-    fun getBdussCookie(bduss: String): String {
-        return "BDUSS=$bduss; Path=/; Max-Age=315360000; Domain=.baidu.com; Httponly; Secure"
-    }
-}
-
-fun Account.toEncryptedCopy(): Account {
-    return Account(
-        uid = this.uid,
-        name = this.name,
-        bduss = AccountSecurityUtil.encrypt(this.bduss),
-        tbs = this.tbs,
-        portrait = this.portrait,
-        sToken = AccountSecurityUtil.encrypt(this.sToken),
-        cookie = AccountSecurityUtil.encrypt(this.cookie),
-        nameShow = this.nameShow,
-        intro = this.intro,
-        sex = this.sex,
-        fansNum = this.fansNum,
-        postNum = this.postNum,
-        threadNum = this.threadNum,
-        concernNum = this.concernNum,
-        tbAge = this.tbAge,
-        age = this.age,
-        birthdayShowStatus = this.birthdayShowStatus,
-        birthdayTime = this.birthdayTime,
-        constellation = this.constellation,
-        tiebaUid = this.tiebaUid,
-        loadSuccess = this.loadSuccess,
-        uuid = this.uuid,
-        zid = this.zid,
-    )
-}
-
-fun Account.decryptSensitiveFields(): Account {
-    this.bduss = AccountSecurityUtil.decrypt(this.bduss)
-    this.sToken = AccountSecurityUtil.decrypt(this.sToken)
-    this.cookie = AccountSecurityUtil.decrypt(this.cookie)
-    return this
+    @JvmStatic
+    fun getBdussCookie(bduss: String): String = AccountCookieUtil.getBdussCookie(bduss)
 }

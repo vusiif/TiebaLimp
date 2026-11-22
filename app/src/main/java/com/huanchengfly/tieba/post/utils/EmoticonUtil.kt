@@ -7,6 +7,8 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withAnnotation
 import com.huanchengfly.tieba.post.R
 import org.intellij.lang.annotations.RegExp
+import java.util.Collections
+import java.util.LinkedHashMap
 import java.util.regex.Pattern
 
 object EmoticonUtil {
@@ -23,6 +25,13 @@ object EmoticonUtil {
 
     @RegExp
     private val REGEX = "#\\((([一-龥\\w~])+)\\)"
+    private val PATTERN_EMOTICON_ALL: Pattern = Pattern.compile(REGEX)
+    private val EMOTICON_STRING_CACHE: MutableMap<String, AnnotatedString> =
+        Collections.synchronizedMap(object : LinkedHashMap<String, AnnotatedString>(512, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, AnnotatedString>?): Boolean {
+                return size > 512
+            }
+        })
     private val EMPTY_MAP: Map<String, Int> = emptyMap()
     private val EMOTICON_ALL_WEB_MAP: MutableMap<String, Int> = mutableMapOf()
     private val EMOTICON_CLASSIC_WEB_MAP: MutableMap<String, Int> = mutableMapOf()
@@ -119,9 +128,17 @@ object EmoticonUtil {
     @OptIn(ExperimentalTextApi::class)
     val String.emoticonString: AnnotatedString
         get() {
-            val regexPattern = Pattern.compile(getRegex(EMOTICON_ALL_TYPE))
-            val matcher = regexPattern.matcher(this)
-            return buildAnnotatedString {
+            if (!contains("#(")) {
+                return buildAnnotatedString {
+                    withAnnotation("Emoticon", "true") {
+                        append(this@emoticonString)
+                    }
+                }
+            }
+            EMOTICON_STRING_CACHE[this]?.let { return it }
+
+            val matcher = PATTERN_EMOTICON_ALL.matcher(this)
+            val result = buildAnnotatedString {
                 withAnnotation("Emoticon", "true") {
                     append(this@emoticonString)
                 }
@@ -139,6 +156,10 @@ object EmoticonUtil {
                     }
                 }
             }
+            if (length <= 500) {
+                EMOTICON_STRING_CACHE[this] = result
+            }
+            return result
         }
 
     @OptIn(ExperimentalTextApi::class)
@@ -147,8 +168,14 @@ object EmoticonUtil {
             if (hasStringAnnotations("Emoticon", 0, length)) {
                 return this
             }
-            val regexPattern = Pattern.compile(getRegex(EMOTICON_ALL_TYPE))
-            val matcher = regexPattern.matcher(this.text)
+            if (!this.text.contains("#(")) {
+                return buildAnnotatedString {
+                    withAnnotation("Emoticon", "true") {
+                        append(this@emoticonString)
+                    }
+                }
+            }
+            val matcher = PATTERN_EMOTICON_ALL.matcher(this.text)
             return buildAnnotatedString {
                 withAnnotation("Emoticon", "true") {
                     append(this@emoticonString)

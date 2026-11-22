@@ -134,14 +134,19 @@ data class PicContentRender(
         val widthFraction =
             if (LocalWindowSizeClass.current.widthSizeClass == WindowWidthSizeClass.Compact) 1f else 0.5f
         val context = LocalContext.current
+        val radius = context.appPreferences.radius
+        val cornerShape = remember(radius) { RoundedCornerShape(radius.dp) }
+        val aspectRatio = remember(width, height) {
+            if (width > 0 && height > 0) (width.toFloat() / height).coerceIn(0.1f, 10f) else 1f
+        }
 
         NetworkImage(
             imageUri = picUrl,
             contentDescription = null,
             modifier = Modifier
-                .clip(RoundedCornerShape(context.appPreferences.radius.dp))
+                .clip(cornerShape)
                 .fillMaxWidth(widthFraction)
-                .aspectRatio(width * 1f / height),
+                .aspectRatio(aspectRatio),
             photoViewData = photoViewData,
             contentScale = ContentScale.Crop
         )
@@ -301,7 +306,7 @@ fun PbContentText(
     val layoutResult = remember { mutableStateOf<TextLayoutResult?>(null) }
     EmoticonText(
         text = text,
-        modifier = modifier.pointerInput(Unit) {
+        modifier = modifier.pointerInput(text) {
             awaitEachGesture {
                 val change = awaitFirstDown()
                 val annotation =

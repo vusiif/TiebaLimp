@@ -41,15 +41,19 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.lang.ref.WeakReference
+import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.roundToInt
 
 @Composable
 fun calcLineHeightPx(style: TextStyle): Int {
     val textMeasurer = rememberTextMeasurer()
-    val textLayoutResult = textMeasurer.measure(
-        AnnotatedString(stringResource(id = R.string.single_chinese_char)),
-        style
-    )
-    return textLayoutResult.size.height
+    val char = stringResource(id = R.string.single_chinese_char)
+    return remember(style, char) {
+        textMeasurer.measure(
+            AnnotatedString(char),
+            style
+        ).size.height
+    }
 }
 
 data class Emoticon(
@@ -123,30 +127,39 @@ object EmoticonManager {
     private lateinit var contextRef: WeakReference<Context>
     private val emoticonIds: MutableList<String> = mutableListOf()
     private val emoticonMapping: MutableMap<String, String> = mutableMapOf()
+    private val idToNameMapping: MutableMap<String, String> = ConcurrentHashMap()
+    private val resIdCache: MutableMap<String, Int> = ConcurrentHashMap()
+    private val inlineContentCache: MutableMap<Int, Map<String, InlineTextContent>> = ConcurrentHashMap()
     private val drawableCache: MutableMap<String, Drawable> = mutableMapOf()
     private val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 
     fun getEmoticonInlineContent(
         sizePx: Float
     ): Map<String, InlineTextContent> {
-        return emoticonIds.associate { id ->
-            "Emoticon#$id" to InlineTextContent(
-                placeholder = Placeholder(
-                    sizePx.pxToSp().sp,
-                    sizePx.pxToSp().sp,
-                    PlaceholderVerticalAlign.TextCenter
-                ),
-                children = {
-                    AsyncImage(
-                        imageUri = rememberEmoticonUri(id = id),
-                        contentDescription = stringResource(
-                            id = R.string.emoticon,
-                            getEmoticonNameById(id) ?: ""
-                        ),
-                        modifier = Modifier.size(sizePx.pxToDp().dp)
-                    )
-                }
+        val sizeKey = (sizePx * 10).roundToInt()
+        return inlineContentCache.getOrPut(sizeKey) {
+            val sp = sizePx.pxToSp().sp
+            val dp = sizePx.pxToDp().dp
+            val placeholder = Placeholder(
+                sp,
+                sp,
+                PlaceholderVerticalAlign.TextCenter
             )
+            emoticonIds.associate { id ->
+                "Emoticon#$id" to InlineTextContent(
+                    placeholder = placeholder,
+                    children = {
+                        AsyncImage(
+                            imageUri = rememberEmoticonUri(id = id),
+                            contentDescription = stringResource(
+                                id = R.string.emoticon,
+                                getEmoticonNameById(id) ?: ""
+                            ),
+                            modifier = Modifier.size(dp)
+                        )
+                    }
+                )
+            }
         }
     }
 
@@ -171,6 +184,7 @@ object EmoticonManager {
         } else {
             emoticonMapping.putAll(emoticonCache.mapping)
         }
+        emoticonMapping.forEach { (name, id) -> idToNameMapping[id] = name }
         updateCache()
         coroutineScope.launch {
             withContext(Dispatchers.IO) {
@@ -232,7 +246,7 @@ object EmoticonManager {
     }
 
     private fun getEmoticonNameById(id: String): String? {
-        return emoticonMapping.firstNotNullOfOrNull { (name, emoticonId) ->
+        return idToNameMapping[id] ?: emoticonMapping.firstNotNullOfOrNull { (name, emoticonId) ->
             if (emoticonId == id) {
                 name
             } else {
@@ -243,7 +257,9 @@ object EmoticonManager {
 
     @SuppressLint("DiscouragedApi")
     private fun getEmoticonResId(context: Context, id: String): Int {
-        return context.resources.getIdentifier(id, "drawable", context.packageName)
+        return resIdCache.getOrPut(id) {
+            context.resources.getIdentifier(id, "drawable", context.packageName)
+        }
     }
 
     fun getEmoticonDrawable(context: Context, id: String?): Drawable? {
@@ -322,9 +338,11 @@ object EmoticonManager {
         }
         if (!emoticonMapping.containsKey(name)) {
             emoticonMapping[name] = realId
+            idToNameMapping[realId] = name
             changed = true
         }
         if (changed) {
+            inlineContentCache.clear()
             coroutineScope.launch {
                 updateCache()
             }

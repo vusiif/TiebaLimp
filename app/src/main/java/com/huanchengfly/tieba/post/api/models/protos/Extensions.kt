@@ -28,10 +28,19 @@ import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 
+private val MULTI_SPACE_REGEX = Regex(" {2,}")
+
+private fun parseBSize(bsize: String): Pair<Int, Int> {
+    val parts = bsize.split(",")
+    val w = parts.getOrNull(0)?.toIntOrNull() ?: 0
+    val h = parts.getOrNull(1)?.toIntOrNull() ?: 0
+    return Pair(w, h)
+}
+
 val List<Abstract>.abstractText: String
     get() = joinToString(separator = "") {
         when (it.type) {
-            0 -> it.text.replace(Regex(" {2,}"), " ")
+            0 -> it.text.replace(MULTI_SPACE_REGEX, " ")
             4 -> it.text
 
             else -> ""
@@ -41,7 +50,7 @@ val List<Abstract>.abstractText: String
 val ThreadInfo.abstractText: String
     get() = richAbstract.joinToString(separator = "") {
         when (it.type) {
-            0 -> it.text.replace(Regex(" {2,}"), " ")
+            0 -> it.text.replace(MULTI_SPACE_REGEX, " ")
             2 -> {
                 EmoticonManager.registerEmoticon(it.text, it.c)
                 "#(${it.c})"
@@ -54,7 +63,7 @@ val ThreadInfo.abstractText: String
 val PostInfoList.abstractText: String
     get() = rich_abstract.joinToString(separator = "") {
         when (it.type) {
-            0 -> it.text.replace(Regex(" {2,}"), " ")
+            0 -> it.text.replace(MULTI_SPACE_REGEX, " ")
             2 -> {
                 EmoticonManager.registerEmoticon(it.text, it.c)
                 "#(${it.c})"
@@ -260,8 +269,7 @@ val List<PbContent>.renders: ImmutableList<PbContentRender>
                 }
 
                 3 -> {
-                    val width = it.bsize.split(",")[0].toInt()
-                    val height = it.bsize.split(",")[1].toInt()
+                    val (width, height) = parseBSize(it.bsize)
                     renders.add(
                         PicContentRender(
                             picUrl = it.picUrl,
@@ -297,8 +305,7 @@ val List<PbContent>.renders: ImmutableList<PbContentRender>
 
                 5 -> {
                     if (it.src.isNotBlank()) {
-                        val width = it.bsize.split(",")[0].toInt()
-                        val height = it.bsize.split(",")[1].toInt()
+                        val (width, height) = parseBSize(it.bsize)
                         renders.add(
                             VideoContentRender(
                                 videoUrl = it.link,
@@ -336,8 +343,7 @@ val List<PbContent>.renders: ImmutableList<PbContentRender>
                 }
 
                 20 -> {
-                    val width = it.bsize.split(",")[0].toInt()
-                    val height = it.bsize.split(",")[1].toInt()
+                    val (width, height) = parseBSize(it.bsize)
                     renders.add(
                         PicContentRender(
                             picUrl = it.src,

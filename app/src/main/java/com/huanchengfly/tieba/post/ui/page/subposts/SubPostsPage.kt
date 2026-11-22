@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.huanchengfly.tieba.post.R
+import com.huanchengfly.tieba.post.api.models.protos.Post
 import com.huanchengfly.tieba.post.api.models.protos.SubPostList
 import com.huanchengfly.tieba.post.api.models.protos.User
 import com.huanchengfly.tieba.post.arch.ImmutableHolder
@@ -300,6 +301,49 @@ internal fun SubPostsContent(
                 )
             }
         ) { paddingValues ->
+            val onUserNavigate: (User) -> Unit = remember(navigator) {
+                { u: User -> navigator.navigate(UserProfilePageDestination(u.id)) }
+            }
+            val onCopyNavigate: (String) -> Unit = remember(navigator) {
+                { text: String -> navigator.navigate(CopyTextDialogPageDestination(text)) }
+            }
+            val onPostAgree: () -> Unit = remember(post, viewModel) {
+                {
+                    val hasAgreed = post?.get { agree?.hasAgree != 0 } == true
+                    viewModel.send(
+                        SubPostsUiIntent.Agree(
+                            forumId,
+                            threadId,
+                            postId,
+                            agree = !hasAgreed
+                        )
+                    )
+                }
+            }
+            val currentForumName = forum?.get { name }.orEmpty()
+            val onPostReplyClick: (Post) -> Unit = remember(currentForumName) {
+                { p: Post ->
+                    showReplyDialog(
+                        ReplyArgs(
+                            forumId = forumId,
+                            forumName = currentForumName,
+                            threadId = threadId,
+                            postId = postId,
+                            replyUserId = p.author?.id ?: p.author_id,
+                            replyUserName = p.author?.nameShow.takeIf { name -> !name.isNullOrEmpty() }
+                                ?: p.author?.name,
+                            replyUserPortrait = p.author?.portrait,
+                        )
+                    )
+                }
+            }
+            val onPostDeleteClick: (Post) -> Unit = remember {
+                { _: Post ->
+                    deleteSubPost = null
+                    confirmDeleteDialogState.show()
+                }
+            }
+
             LoadMoreLayout(
                 modifier = Modifier.padding(paddingValues),
                 isLoading = isLoading,
@@ -328,43 +372,12 @@ internal fun SubPostsContent(
                                     contentRenders = postContentRenders,
                                     canDelete = it.get { author_id } == account?.uid?.toLongOrNull(),
                                     showSubPosts = false,
-                                    onUserClick = {
-                                        navigator.navigate(UserProfilePageDestination(it.id))
-                                    },
-                                    onAgree = {
-                                        val hasAgreed = it.get { agree?.hasAgree != 0 }
-                                        viewModel.send(
-                                            SubPostsUiIntent.Agree(
-                                                forumId,
-                                                threadId,
-                                                postId,
-                                                agree = !hasAgreed
-                                            )
-                                        )
-                                    },
-                                    onReplyClick = {
-                                        showReplyDialog(
-                                            ReplyArgs(
-                                                forumId = forumId,
-                                                forumName = forum?.get { name } ?: "",
-                                                threadId = threadId,
-                                                postId = postId,
-                                                replyUserId = it.author?.id ?: it.author_id,
-                                                replyUserName = it.author?.nameShow.takeIf { name -> !name.isNullOrEmpty() }
-                                                    ?: it.author?.name,
-                                                replyUserPortrait = it.author?.portrait,
-                                            )
-                                        )
-                                    },
-                                    onMenuCopyClick = {
-                                        navigator.navigate(
-                                            CopyTextDialogPageDestination(it)
-                                        )
-                                    },
-                                ) {
-                                    deleteSubPost = null
-                                    confirmDeleteDialogState.show()
-                                }
+                                    onUserClick = onUserNavigate,
+                                    onAgree = onPostAgree,
+                                    onReplyClick = onPostReplyClick,
+                                    onMenuCopyClick = onCopyNavigate,
+                                    onMenuDeleteClick = onPostDeleteClick,
+                                )
                                 VerticalDivider(thickness = 2.dp)
                             }
                         }
@@ -391,9 +404,6 @@ internal fun SubPostsContent(
                     ) { index, item ->
                         val canDelete = remember(item, account) {
                             item.subPost.get { author_id } == account?.uid?.toLongOrNull()
-                        }
-                        val onUserClick = remember(navigator) {
-                            { u: User -> navigator.navigate(UserProfilePageDestination(u.id)) }
                         }
                         val onAgree = remember(item, forumId, threadId, postId, viewModel) {
                             { sp: SubPostList ->
@@ -427,11 +437,6 @@ internal fun SubPostsContent(
                                 )
                             }
                         }
-                        val onMenuCopyClick = remember(navigator) {
-                            { text: String ->
-                                navigator.navigate(CopyTextDialogPageDestination(text))
-                            }
-                        }
                         val onMenuDeleteClick = remember(item) {
                             { sp: SubPostList ->
                                 deleteSubPost = sp.wrapImmutable()
@@ -442,10 +447,10 @@ internal fun SubPostsContent(
                             item = item,
                             canDelete = canDelete,
                             threadAuthorId = thread?.get { author?.id },
-                            onUserClick = onUserClick,
+                            onUserClick = onUserNavigate,
                             onAgree = onAgree,
                             onReplyClick = onReplyClick,
-                            onMenuCopyClick = onMenuCopyClick,
+                            onMenuCopyClick = onCopyNavigate,
                             onMenuDeleteClick = onMenuDeleteClick,
                         )
                     }

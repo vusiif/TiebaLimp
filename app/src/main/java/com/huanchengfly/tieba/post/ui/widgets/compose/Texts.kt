@@ -153,8 +153,12 @@ fun EmoticonText(
         remember(sizePx) { (sizePx + lineSpacing.value.spToPxFloat()).pxToSpFloat().sp }
     val emoticonInlineContent =
         remember(sizePx) { EmoticonManager.getEmoticonInlineContent(sizePx * emoticonSize) }
+    val emoticonAnnotatedString = remember(text) { text.emoticonString }
+    val combinedInlineContent = remember(emoticonInlineContent, inlineContent) {
+        if (inlineContent.isEmpty()) emoticonInlineContent else emoticonInlineContent + inlineContent
+    }
     IconText(
-        text.emoticonString,
+        emoticonAnnotatedString,
         modifier,
         color,
         fontSize,
@@ -169,7 +173,7 @@ fun EmoticonText(
         softWrap,
         maxLines,
         minLines,
-        emoticonInlineContent + inlineContent,
+        combinedInlineContent,
         onTextLayout,
         style
     )
@@ -215,10 +219,12 @@ fun IconText(
         )
     )
     val sizePx = calcLineHeightPx(mergedStyle) * 9 / 10
-    val sizeSp = sizePx.pxToSp(LocalContext.current).sp
-    val sizeDp = sizePx.pxToDp().dp
+    val context = LocalContext.current
+    val sizeSp = remember(sizePx, context) { sizePx.pxToSp(context).sp }
+    val sizeDp = remember(sizePx) { sizePx.pxToDp().dp }
+    val accentColor = ExtendedTheme.colors.accent
     val iconInlineContent =
-        remember(sizeSp) {
+        remember(sizeSp, sizeDp, accentColor) {
             mapOf(
                 "link_icon" to InlineTextContent(
                     placeholder = Placeholder(
@@ -231,7 +237,7 @@ fun IconText(
                             Icons.Rounded.Link,
                             contentDescription = stringResource(id = R.string.link),
                             modifier = Modifier.size(sizeDp),
-                            tint = ExtendedTheme.colors.accent,
+                            tint = accentColor,
                         )
                     }
                 ),
@@ -246,7 +252,7 @@ fun IconText(
                             Icons.Rounded.SlowMotionVideo,
                             contentDescription = stringResource(id = R.string.desc_video),
                             modifier = Modifier.size(sizeDp),
-                            tint = ExtendedTheme.colors.accent,
+                            tint = accentColor,
                         )
                     }
                 ),
@@ -261,12 +267,15 @@ fun IconText(
                             Icons.Rounded.AccountCircle,
                             contentDescription = stringResource(id = R.string.user),
                             modifier = Modifier.size(sizeDp),
-                            tint = ExtendedTheme.colors.accent,
+                            tint = accentColor,
                         )
                     }
                 ),
             )
         }
+    val combinedInlineContent = remember(iconInlineContent, inlineContent) {
+        if (inlineContent.isEmpty()) iconInlineContent else iconInlineContent + inlineContent
+    }
     Text(
         text,
         modifier,
@@ -283,7 +292,7 @@ fun IconText(
         softWrap,
         maxLines,
         minLines,
-        iconInlineContent + inlineContent,
+        combinedInlineContent,
         onTextLayout,
         style
     )

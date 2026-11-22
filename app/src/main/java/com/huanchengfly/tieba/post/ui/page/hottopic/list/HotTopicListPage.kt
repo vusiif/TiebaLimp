@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.ContentAlpha
 import androidx.compose.material.ExperimentalMaterialApi
@@ -23,6 +24,7 @@ import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,7 +32,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -40,6 +41,7 @@ import com.huanchengfly.tieba.post.R
 import com.huanchengfly.tieba.post.api.models.protos.topicList.NewTopicList
 import com.huanchengfly.tieba.post.arch.collectPartialAsState
 import com.huanchengfly.tieba.post.arch.pageViewModel
+import com.huanchengfly.tieba.post.ui.common.theme.compose.BebasFontFamily
 import com.huanchengfly.tieba.post.ui.common.theme.compose.ExtendedTheme
 import com.huanchengfly.tieba.post.ui.common.theme.compose.OrangeA700
 import com.huanchengfly.tieba.post.ui.common.theme.compose.RedA700
@@ -52,6 +54,7 @@ import com.huanchengfly.tieba.post.ui.widgets.compose.MyLazyColumn
 import com.huanchengfly.tieba.post.ui.widgets.compose.NetworkImage
 import com.huanchengfly.tieba.post.ui.widgets.compose.Sizes
 import com.huanchengfly.tieba.post.ui.widgets.compose.TitleCentredToolbar
+import com.huanchengfly.tieba.post.utils.LazyListImagePreloadEffect
 import com.huanchengfly.tieba.post.utils.StringUtil.getShortNumString
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
@@ -61,16 +64,18 @@ private fun TopicImage(
     index: Int,
     imageUri: String
 ) {
-    val boxModifier = if (index < 3) {
-        Modifier
-            .fillMaxWidth()
-            .aspectRatio(2.39f)
-            .clip(Shapes.medium)
-    } else {
-        Modifier
-            .size(Sizes.Medium)
-            .aspectRatio(1f)
-            .clip(Shapes.small)
+    val boxModifier = remember(index) {
+        if (index < 3) {
+            Modifier
+                .fillMaxWidth()
+                .aspectRatio(2.39f)
+                .clip(Shapes.medium)
+        } else {
+            Modifier
+                .size(Sizes.Medium)
+                .aspectRatio(1f)
+                .clip(Shapes.small)
+        }
     }
     Box(
         modifier = boxModifier
@@ -87,12 +92,7 @@ private fun TopicImage(
             fontSize = 10.sp,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colors.background,
-            fontFamily = FontFamily(
-                Typeface.createFromAsset(
-                    LocalContext.current.assets,
-                    "bebas.ttf"
-                )
-            ),
+            fontFamily = BebasFontFamily,
             modifier = Modifier
                 .background(
                     when (index) {
@@ -191,6 +191,15 @@ fun HotTopicListPage(
             refreshing = isRefreshing,
             onRefresh = { viewModel.send(HotTopicListUiIntent.Load) }
         )
+        val lazyListState = rememberLazyListState()
+
+        LazyListImagePreloadEffect(
+            state = lazyListState,
+            items = topicList,
+            preloadAhead = 5,
+            extractUrls = { listOfNotNull(it.topic_image) }
+        )
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -198,6 +207,7 @@ fun HotTopicListPage(
                 .pullRefresh(pullRefreshState)
         ) {
             MyLazyColumn(
+                state = lazyListState,
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 contentPadding = PaddingValues(16.dp)
             ) {

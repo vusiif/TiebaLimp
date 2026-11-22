@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.ContentAlpha
 import androidx.compose.material.ExperimentalMaterialApi
@@ -26,6 +27,7 @@ import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,11 +41,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.huanchengfly.tieba.post.ui.widgets.compose.placeholder
 import com.huanchengfly.tieba.post.R
+import com.huanchengfly.tieba.post.api.models.protos.SimpleForum
+import com.huanchengfly.tieba.post.api.models.protos.ThreadInfo
+import com.huanchengfly.tieba.post.api.models.protos.User
 import com.huanchengfly.tieba.post.api.models.protos.hasAgree
 import com.huanchengfly.tieba.post.arch.GlobalEvent
 import com.huanchengfly.tieba.post.arch.collectPartialAsState
 import com.huanchengfly.tieba.post.arch.onGlobalEvent
 import com.huanchengfly.tieba.post.arch.pageViewModel
+import com.huanchengfly.tieba.post.ui.common.theme.compose.BebasFontFamily
 import com.huanchengfly.tieba.post.ui.common.theme.compose.ExtendedTheme
 import com.huanchengfly.tieba.post.ui.common.theme.compose.OrangeA700
 import com.huanchengfly.tieba.post.ui.common.theme.compose.RedA700
@@ -64,7 +70,9 @@ import com.huanchengfly.tieba.post.ui.widgets.compose.VerticalDivider
 import com.huanchengfly.tieba.post.ui.widgets.compose.VerticalGrid
 import com.huanchengfly.tieba.post.ui.widgets.compose.items
 import com.huanchengfly.tieba.post.ui.widgets.compose.itemsIndexed
+import com.huanchengfly.tieba.post.utils.LazyListImagePreloadEffect
 import com.huanchengfly.tieba.post.utils.StringUtil.getShortNumString
+import com.huanchengfly.tieba.post.utils.url
 import com.ramcosta.composedestinations.annotation.Destination
 
 @OptIn(ExperimentalMaterialApi::class)
@@ -110,8 +118,61 @@ fun HotPage(
     val pullRefreshState = rememberPullRefreshState(
         refreshing = isLoading,
         onRefresh = { viewModel.send(HotUiIntent.Load) })
+
+    val lazyListState = rememberLazyListState()
+    val headerItemCount = remember(topicList.isNotEmpty(), threadList.isNotEmpty(), tabList.isNotEmpty()) {
+        (if (topicList.isNotEmpty()) 3 else 0) + (if (threadList.isNotEmpty()) (if (tabList.isNotEmpty()) 1 else 0) + 1 else 0)
+    }
+
+    LazyListImagePreloadEffect(
+        state = lazyListState,
+        items = if (isLoadingThreadList) emptyList() else threadList,
+        preloadAhead = 5,
+        itemOffset = headerItemCount,
+        extractUrls = { it.get { media }.map { m -> m.url } }
+    )
+
+    val onClick = remember(navigator) {
+        { it: ThreadInfo ->
+            navigator.navigate(
+                ThreadPageDestination(
+                    threadId = it.id,
+                    threadInfo = it
+                )
+            )
+        }
+    }
+    val onClickReply = remember(navigator) {
+        { it: ThreadInfo ->
+            navigator.navigate(
+                ThreadPageDestination(
+                    threadId = it.id,
+                    scrollToReply = true
+                )
+            )
+        }
+    }
+    val onAgree = remember(viewModel) {
+        { it: ThreadInfo ->
+            viewModel.send(
+                HotUiIntent.Agree(
+                    threadId = it.threadId,
+                    postId = it.firstPostId,
+                    hasAgree = it.hasAgree
+                )
+            )
+        }
+    }
+    val onClickForum = remember(navigator) {
+        { it: SimpleForum -> navigator.navigate(ForumPageDestination(it.name)) }
+    }
+    val onClickUser = remember(navigator) {
+        { it: User -> navigator.navigate(UserProfilePageDestination(it.id)) }
+    }
+
     Box(modifier = Modifier.pullRefresh(pullRefreshState)) {
         MyLazyColumn(
+            state = lazyListState,
             modifier = Modifier
                 .fillMaxWidth(),
         ) {
@@ -151,12 +212,7 @@ fun HotPage(
                                                 ContentAlpha.medium
                                             )
                                         },
-                                        fontFamily = FontFamily(
-                                            Typeface.createFromAsset(
-                                                LocalContext.current.assets,
-                                                "bebas.ttf"
-                                            )
-                                        ),
+                                        fontFamily = BebasFontFamily,
                                         modifier = Modifier.padding(bottom = 2.dp)
                                     )
                                     Text(
@@ -292,33 +348,11 @@ fun HotPage(
                         Container {
                             FeedCard(
                                 item = item,
-                                onClick = {
-                                    navigator.navigate(
-                                        ThreadPageDestination(
-                                            threadId = it.id,
-                                            threadInfo = it
-                                        )
-                                    )
-                                },
-                                onClickReply = {
-                                    navigator.navigate(
-                                        ThreadPageDestination(
-                                            threadId = it.id,
-                                            scrollToReply = true
-                                        )
-                                    )
-                                },
-                                onAgree = {
-                                    viewModel.send(
-                                        HotUiIntent.Agree(
-                                            threadId = it.threadId,
-                                            postId = it.firstPostId,
-                                            hasAgree = it.hasAgree
-                                        )
-                                    )
-                                },
-                                onClickForum = { navigator.navigate(ForumPageDestination(it.name)) },
-                                onClickUser = { navigator.navigate(UserProfilePageDestination(it.id)) },
+                                onClick = onClick,
+                                onClickReply = onClickReply,
+                                onAgree = onAgree,
+                                onClickForum = onClickForum,
+                                onClickUser = onClickUser,
                             ) {
                                 Column(
                                     horizontalAlignment = Alignment.End,
@@ -349,18 +383,6 @@ fun HotPage(
                                 }
                             }
                         }
-//                        ThreadListItem(
-//                            index = index,
-//                            itemHolder = item,
-//                            onClick = {
-//                                navigator.navigate(
-//                                    ThreadPageDestination(
-//                                        threadId = it.id,
-//                                        threadInfo = it
-//                                    )
-//                                )
-//                            }
-//                        )
                     }
                 }
             }

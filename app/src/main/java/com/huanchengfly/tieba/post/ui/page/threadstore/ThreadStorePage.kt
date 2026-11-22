@@ -65,6 +65,7 @@ import com.huanchengfly.tieba.post.ui.widgets.compose.Sizes
 import com.huanchengfly.tieba.post.ui.widgets.compose.TitleCentredToolbar
 import com.huanchengfly.tieba.post.ui.widgets.compose.UserHeader
 import com.huanchengfly.tieba.post.ui.widgets.compose.states.StateScreen
+import com.huanchengfly.tieba.post.utils.LazyListImagePreloadEffect
 import com.huanchengfly.tieba.post.utils.StringUtil
 import com.huanchengfly.tieba.post.utils.StringUtil.getUsernameAnnotatedString
 import com.huanchengfly.tieba.post.utils.appPreferences
@@ -169,6 +170,44 @@ fun ThreadStorePage(
 
             val lazyListState = rememberLazyListState()
 
+            LazyListImagePreloadEffect(
+                state = lazyListState,
+                items = data,
+                preloadAhead = 5,
+                extractUrls = { listOfNotNull(StringUtil.getAvatarUrl(it.author.userPortrait)) }
+            )
+
+            val onUserClick = remember(navigator) {
+                { info: ThreadStoreBean.ThreadStoreInfo ->
+                    val lzUid = info.author.lzUid
+                    if (lzUid != null) {
+                        navigator.navigate(UserProfilePageDestination(lzUid.toLong()))
+                    }
+                }
+            }
+            val onItemClick = remember(navigator, context) {
+                { info: ThreadStoreBean.ThreadStoreInfo ->
+                    navigator.navigate(
+                        ThreadPageDestination(
+                            threadId = info.threadId.toLong(),
+                            postId = info.markPid.toLong(),
+                            seeLz = context.appPreferences.collectThreadSeeLz,
+                            sortType = if (context.appPreferences.collectThreadDescSort) ThreadSortType.SORT_TYPE_DESC else ThreadSortType.SORT_TYPE_DEFAULT,
+                            from = ThreadPageFrom.FROM_STORE,
+                            extra = ThreadPageFromStoreExtra(
+                                maxPid = info.maxPid.toLong(),
+                                maxFloor = info.postNo.toInt()
+                            )
+                        )
+                    )
+                }
+            }
+            val onItemDelete = remember(viewModel) {
+                { info: ThreadStoreBean.ThreadStoreInfo ->
+                    viewModel.send(ThreadStoreUiIntent.Delete(info.threadId))
+                }
+            }
+
             Box(modifier = Modifier.pullRefresh(pullRefreshState)) {
                 LoadMoreLayout(
                     isLoading = isLoadingMore,
@@ -181,35 +220,14 @@ fun ThreadStorePage(
                             items = data,
                             key = { it.threadId }
                         ) { info ->
+                            val userClickAction = remember(info, onUserClick) { { onUserClick(info) } }
+                            val clickAction = remember(info, onItemClick) { { onItemClick(info) } }
+                            val deleteAction = remember(info, onItemDelete) { { onItemDelete(info) } }
                             StoreItem(
                                 info = info,
-                                onUserClick = {
-                                    info.author.lzUid?.let {
-                                        navigator.navigate(UserProfilePageDestination(it.toLong()))
-                                    }
-                                },
-                                onClick = {
-                                    navigator.navigate(
-                                        ThreadPageDestination(
-                                            threadId = info.threadId.toLong(),
-                                            postId = info.markPid.toLong(),
-                                            seeLz = context.appPreferences.collectThreadSeeLz,
-                                            sortType = if(context.appPreferences.collectThreadDescSort) ThreadSortType.SORT_TYPE_DESC else ThreadSortType.SORT_TYPE_DEFAULT,
-                                            from = ThreadPageFrom.FROM_STORE,
-                                            extra = ThreadPageFromStoreExtra(
-                                                maxPid = info.maxPid.toLong(),
-                                                maxFloor = info.postNo.toInt()
-                                            )
-                                        )
-                                    )
-                                },
-                                onDelete = {
-                                    viewModel.send(
-                                        ThreadStoreUiIntent.Delete(
-                                            info.threadId
-                                        )
-                                    )
-                                }
+                                onUserClick = userClickAction,
+                                onClick = clickAction,
+                                onDelete = deleteAction,
                             )
                         }
                     }
@@ -236,9 +254,72 @@ private fun StoreItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
+    val contentColor = LocalContentColor.current
     val hasUpdate = remember(info) { info.count != "0" && info.postNo != "0" }
     val isDeleted = remember(info) { info.isDeleted == "1" }
+    val avatarUrl = remember(info) { StringUtil.getAvatarUrl(info.author.userPortrait) }
+    val userName = remember(info, context, contentColor) {
+        getUsernameAnnotatedString(
+            context,
+            info.author.name ?: "",
+            info.author.nameShow,
+            contentColor
+        )
+    }
+    val title = remember(info, hasUpdate) {
+        buildAnnotatedString {
+            append(info.title)
+            if (hasUpdate) {
+                append(" ")
+                appendInlineContent("Update", info.postNo)
+            }
+        }
+    }
+    val updateTip = stringResource(
+        id = R.string.tip_thread_store_update,
+        info.postNo
+    )
     val textMeasurer = rememberTextMeasurer()
+    val inlineContent = if (hasUpdate) {
+        val result = remember(updateTip, textMeasurer) {
+            textMeasurer.measure(
+                AnnotatedString(updateTip),
+                style = UpdateTipTextStyle
+            ).size
+        }
+        val width = result.width.pxToSp() + 12F.dpToPxFloat().pxToSp() * 2 + 1
+        val height = result.height.pxToSp() + 4F.dpToPxFloat().pxToSp() * 2
+        mapOf(
+            "Update" to InlineTextContent(
+                placeholder = Placeholder(
+                    width = width.sp,
+                    height = height.sp,
+                    placeholderVerticalAlign = PlaceholderVerticalAlign.TextCenter
+                ),
+                children = {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                color = ExtendedTheme.colors.chip,
+                                shape = RoundedCornerShape(3.dp)
+                            )
+                            .padding(vertical = 4.dp, horizontal = 12.dp)
+                    ) {
+                        Text(
+                            text = updateTip,
+                            style = UpdateTipTextStyle,
+                            color = ExtendedTheme.colors.onChip,
+                            modifier = Modifier.align(Alignment.Center)
+                        )
+                    }
+                }
+            )
+        )
+    } else {
+        emptyMap()
+    }
     LongClickMenu(
         menuContent = {
             DropdownMenuItem(onClick = onDelete) {
@@ -255,75 +336,21 @@ private fun StoreItem(
             UserHeader(
                 avatar = {
                     Avatar(
-                        data = StringUtil.getAvatarUrl(info.author.userPortrait),
+                        data = avatarUrl,
                         size = Sizes.Small,
                         contentDescription = null
                     )
                 },
                 name = {
-                    Text(
-                        text = getUsernameAnnotatedString(
-                            LocalContext.current,
-                            info.author.name ?: "",
-                            info.author.nameShow,
-                            LocalContentColor.current
-                        )
-                    )
+                    Text(text = userName)
                 },
                 onClick = onUserClick,
             )
-            val title = remember(info, hasUpdate) {
-                buildAnnotatedString {
-                    append(info.title)
-                    if (hasUpdate) {
-                        append(" ")
-                        appendInlineContent("Update", info.postNo)
-                    }
-                }
-            }
-            val updateTip = stringResource(
-                id = R.string.tip_thread_store_update,
-                info.postNo
-            )
-            val result = remember {
-                textMeasurer.measure(
-                    AnnotatedString(updateTip),
-                    style = UpdateTipTextStyle
-                ).size
-            }
-            val width = result.width.pxToSp() + 12F.dpToPxFloat().pxToSp() * 2 + 1
-            val height = result.height.pxToSp() + 4F.dpToPxFloat().pxToSp() * 2
             Text(
                 text = title,
                 fontSize = 15.sp,
                 color = if (isDeleted) ExtendedTheme.colors.textDisabled else ExtendedTheme.colors.text,
-                inlineContent = mapOf(
-                    "Update" to InlineTextContent(
-                        placeholder = Placeholder(
-                            width = width.sp,
-                            height = height.sp,
-                            placeholderVerticalAlign = PlaceholderVerticalAlign.TextCenter
-                        ),
-                        children = {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(
-                                        color = ExtendedTheme.colors.chip,
-                                        shape = RoundedCornerShape(3.dp)
-                                    )
-                                    .padding(vertical = 4.dp, horizontal = 12.dp)
-                            ) {
-                                Text(
-                                    text = updateTip,
-                                    style = UpdateTipTextStyle,
-                                    color = ExtendedTheme.colors.onChip,
-                                    modifier = Modifier.align(Alignment.Center)
-                                )
-                            }
-                        }
-                    )
-                )
+                inlineContent = inlineContent
             )
             if (isDeleted) {
                 Text(

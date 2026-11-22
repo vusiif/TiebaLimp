@@ -12,9 +12,13 @@ import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.huanchengfly.tieba.post.api.models.protos.SimpleForum
+import com.huanchengfly.tieba.post.api.models.protos.ThreadInfo
+import com.huanchengfly.tieba.post.api.models.protos.User
 import com.huanchengfly.tieba.post.api.models.protos.hasAgree
 import com.huanchengfly.tieba.post.arch.CommonUiEvent.ScrollToTop.bindScrollToTopEvent
 import com.huanchengfly.tieba.post.arch.GlobalEvent
@@ -34,6 +38,8 @@ import com.huanchengfly.tieba.post.ui.widgets.compose.LazyLoad
 import com.huanchengfly.tieba.post.ui.widgets.compose.LoadMoreLayout
 import com.huanchengfly.tieba.post.ui.widgets.compose.MyLazyColumn
 import com.huanchengfly.tieba.post.ui.widgets.compose.VerticalDivider
+import com.huanchengfly.tieba.post.utils.LazyListImagePreloadEffect
+import com.huanchengfly.tieba.post.utils.url
 import kotlinx.collections.immutable.persistentListOf
 
 @OptIn(ExperimentalMaterialApi::class)
@@ -75,6 +81,53 @@ fun ConcernPage(
     val lazyListState = rememberLazyListState()
     viewModel.bindScrollToTopEvent(lazyListState = lazyListState)
 
+    LazyListImagePreloadEffect(
+        state = lazyListState,
+        items = data,
+        preloadAhead = 5,
+        extractUrls = { it.threadList?.media?.map { m -> m.url } ?: emptyList() }
+    )
+
+    val onClick = remember(navigator) {
+        { it: ThreadInfo ->
+            navigator.navigate(
+                ThreadPageDestination(
+                    it.threadId,
+                    it.forumId,
+                    threadInfo = it
+                )
+            )
+        }
+    }
+    val onClickReply = remember(navigator) {
+        { it: ThreadInfo ->
+            navigator.navigate(
+                ThreadPageDestination(
+                    it.threadId,
+                    it.forumId,
+                    scrollToReply = true
+                )
+            )
+        }
+    }
+    val onAgree = remember(viewModel) {
+        { it: ThreadInfo ->
+            viewModel.send(
+                ConcernUiIntent.Agree(
+                    it.threadId,
+                    it.firstPostId,
+                    it.hasAgree
+                )
+            )
+        }
+    }
+    val onClickForum = remember(navigator) {
+        { it: SimpleForum -> navigator.navigate(ForumPageDestination(it.name)) }
+    }
+    val onClickUser = remember(navigator) {
+        { it: User -> navigator.navigate(UserProfilePageDestination(it.id)) }
+    }
+
     Box(
         modifier = Modifier.pullRefresh(pullRefreshState)
     ) {
@@ -98,35 +151,11 @@ fun ConcernPage(
                             Column {
                                 FeedCard(
                                     item = wrapImmutable(item.threadList!!),
-                                    onClick = {
-                                        navigator.navigate(
-                                            ThreadPageDestination(
-                                                it.threadId,
-                                                it.forumId,
-                                                threadInfo = it
-                                            )
-                                        )
-                                    },
-                                    onClickReply = {
-                                        navigator.navigate(
-                                            ThreadPageDestination(
-                                                it.threadId,
-                                                it.forumId,
-                                                scrollToReply = true
-                                            )
-                                        )
-                                    },
-                                    onAgree = {
-                                        viewModel.send(
-                                            ConcernUiIntent.Agree(
-                                                it.threadId,
-                                                it.firstPostId,
-                                                it.hasAgree
-                                            )
-                                        )
-                                    },
-                                    onClickForum = { navigator.navigate(ForumPageDestination(it.name)) },
-                                    onClickUser = { navigator.navigate(UserProfilePageDestination(it.id)) },
+                                    onClick = onClick,
+                                    onClickReply = onClickReply,
+                                    onAgree = onAgree,
+                                    onClickForum = onClickForum,
+                                    onClickUser = onClickUser,
                                 )
                                 if (index < data.size - 1) {
                                     VerticalDivider(

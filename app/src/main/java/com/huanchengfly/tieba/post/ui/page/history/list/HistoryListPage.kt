@@ -14,6 +14,7 @@ import androidx.compose.material.DropdownMenuItem
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -44,6 +45,7 @@ import com.huanchengfly.tieba.post.ui.widgets.compose.UserHeader
 import com.huanchengfly.tieba.post.ui.widgets.compose.rememberMenuState
 import com.huanchengfly.tieba.post.utils.DateTimeUtils
 import com.huanchengfly.tieba.post.utils.HistoryUtil
+import com.huanchengfly.tieba.post.utils.LazyListImagePreloadEffect
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -94,6 +96,43 @@ fun HistoryListPage(
         snackbarHostState.showSnackbar(context.getString(R.string.delete_history_success))
     }
     val lazyListState = rememberLazyListState()
+    val allHistoryData = remember(todayHistoryData, beforeHistoryData) { todayHistoryData + beforeHistoryData }
+
+    LazyListImagePreloadEffect(
+        state = lazyListState,
+        items = allHistoryData,
+        preloadAhead = 5,
+        extractUrls = { listOfNotNull(it.avatar) }
+    )
+
+    val onItemClick = remember(navigator) {
+        { it: History ->
+            when (it.type) {
+                HistoryUtil.TYPE_FORUM -> {
+                    navigator.navigate(ForumPageDestination(it.data))
+                }
+
+                HistoryUtil.TYPE_THREAD -> {
+                    val extra =
+                        if (it.extras != null) it.extras.fromJson<ThreadHistoryInfoBean>() else null
+                    navigator.navigate(
+                        ThreadPageDestination(
+                            it.data.toLong(),
+                            postId = extra?.pid?.toLongOrNull() ?: 0L,
+                            seeLz = extra?.isSeeLz ?: false,
+                            from = ThreadPageFrom.FROM_HISTORY
+                        )
+                    )
+                }
+            }
+        }
+    }
+    val onItemDelete = remember(viewModel) {
+        { it: History ->
+            viewModel.send(HistoryListUiIntent.Delete(it.id))
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -129,30 +168,9 @@ fun HistoryListPage(
                         key = { it.id }
                     ) { info ->
                         HistoryItem(
-                            info,
-                            onDelete = {
-                                viewModel.send(HistoryListUiIntent.Delete(it.id))
-                            },
-                            onClick = {
-                                when (it.type) {
-                                    HistoryUtil.TYPE_FORUM -> {
-                                        navigator.navigate(ForumPageDestination(it.data))
-                                    }
-
-                                    HistoryUtil.TYPE_THREAD -> {
-                                        val extra =
-                                            if (it.extras != null) it.extras.fromJson<ThreadHistoryInfoBean>() else null
-                                        navigator.navigate(
-                                            ThreadPageDestination(
-                                                it.data.toLong(),
-                                                postId = extra?.pid?.toLongOrNull() ?: 0L,
-                                                seeLz = extra?.isSeeLz ?: false,
-                                                from = ThreadPageFrom.FROM_HISTORY
-                                            )
-                                        )
-                                    }
-                                }
-                            }
+                            info = info,
+                            onDelete = onItemDelete,
+                            onClick = onItemClick
                         )
                     }
                 }
@@ -172,30 +190,9 @@ fun HistoryListPage(
                         key = { it.id }
                     ) { info ->
                         HistoryItem(
-                            info,
-                            onDelete = {
-                                viewModel.send(HistoryListUiIntent.Delete(it.id))
-                            },
-                            onClick = {
-                                when (it.type) {
-                                    HistoryUtil.TYPE_FORUM -> {
-                                        navigator.navigate(ForumPageDestination(it.data))
-                                    }
-
-                                    HistoryUtil.TYPE_THREAD -> {
-                                        val extra =
-                                            if (it.extras != null) it.extras.fromJson<ThreadHistoryInfoBean>() else null
-                                        navigator.navigate(
-                                            ThreadPageDestination(
-                                                it.data.toLong(),
-                                                postId = extra?.pid?.toLongOrNull() ?: 0L,
-                                                seeLz = extra?.isSeeLz ?: false,
-                                                from = ThreadPageFrom.FROM_HISTORY
-                                            )
-                                        )
-                                    }
-                                }
-                            }
+                            info = info,
+                            onDelete = onItemDelete,
+                            onClick = onItemClick
                         )
                     }
                 }
@@ -211,18 +208,29 @@ private fun HistoryItem(
     onClick: (History) -> Unit = {},
     onDelete: (History) -> Unit = {},
 ) {
+    val context = LocalContext.current
     val menuState = rememberMenuState()
+    val title = remember(info) {
+        (if (info.type == HistoryUtil.TYPE_THREAD) info.username else info.title).orEmpty()
+    }
+    val relativeTime = remember(info, context) {
+        DateTimeUtils.getRelativeTimeString(context, info.timestamp)
+    }
+    val isThread = remember(info) { info.type == HistoryUtil.TYPE_THREAD }
+    val onItemDelete = remember(info, onDelete) { { onDelete(info) } }
+    val onItemClick = remember(info, onClick) { { onClick(info) } }
+
     LongClickMenu(
         menuContent = {
             DropdownMenuItem(onClick = {
-                onDelete(info)
+                onItemDelete()
                 menuState.expanded = false
             }) {
                 Text(text = stringResource(id = R.string.title_delete))
             }
         },
         menuState = menuState,
-        onClick = { onClick(info) }
+        onClick = onItemClick
     ) {
         Column(
             modifier = modifier
@@ -238,22 +246,16 @@ private fun HistoryItem(
                     )
                 },
                 name = {
-                    Text(
-                        text = (if (info.type == HistoryUtil.TYPE_THREAD) info.username else info.title)
-                            ?: ""
-                    )
+                    Text(text = title)
                 },
             ) {
                 Text(
-                    text = DateTimeUtils.getRelativeTimeString(
-                        LocalContext.current,
-                        info.timestamp
-                    ),
+                    text = relativeTime,
                     fontSize = 15.sp,
                     color = ExtendedTheme.colors.text,
                 )
             }
-            if (info.type == HistoryUtil.TYPE_THREAD) {
+            if (isThread) {
                 Text(
                     text = info.title,
                     fontSize = 15.sp,

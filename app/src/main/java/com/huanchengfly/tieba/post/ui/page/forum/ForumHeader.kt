@@ -38,6 +38,7 @@ import com.huanchengfly.tieba.post.api.models.protos.frsPage.ForumInfo
 import com.huanchengfly.tieba.post.arch.ImmutableHolder
 import com.huanchengfly.tieba.post.utils.AccountUtil.LocalAccount
 import com.huanchengfly.tieba.post.utils.requestPinShortcut
+import com.huanchengfly.tieba.post.ui.common.theme.compose.BebasFontFamily
 import com.huanchengfly.tieba.post.ui.common.theme.compose.ExtendedTheme
 import com.huanchengfly.tieba.post.ui.widgets.compose.Avatar
 import com.huanchengfly.tieba.post.ui.widgets.compose.AvatarPlaceholder
@@ -228,12 +229,7 @@ internal fun RowScope.StatCardItem(
         Text(
             text = statNum.getShortNumString(),
             fontSize = 20.sp,
-            fontFamily = FontFamily(
-                Typeface.createFromAsset(
-                    LocalContext.current.assets,
-                    "bebas.ttf"
-                )
-            ),
+            fontFamily = BebasFontFamily,
         )
         Spacer(modifier = Modifier.height(2.dp))
         Text(

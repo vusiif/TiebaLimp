@@ -1,10 +1,16 @@
 package com.huanchengfly.tieba.post.ui.common.theme.compose
 
+import android.graphics.Typeface
 import androidx.compose.material.Typography
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import com.huanchengfly.tieba.post.App
+
+val BebasFontFamily: FontFamily by lazy {
+    FontFamily(Typeface.createFromAsset(App.INSTANCE.assets, "bebas.ttf"))
+}
 
 internal val DefaultTextStyle = TextStyle.Default.copy()
 

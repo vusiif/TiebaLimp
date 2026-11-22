@@ -46,6 +46,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.huanchengfly.tieba.post.R
+import com.huanchengfly.tieba.post.api.models.protos.SimpleForum
 import com.huanchengfly.tieba.post.api.models.protos.ThreadInfo
 import com.huanchengfly.tieba.post.api.models.protos.User
 import com.huanchengfly.tieba.post.api.models.protos.personalized.DislikeReason
@@ -341,24 +342,26 @@ private fun FeedList(
                                 .padding(vertical = 8.dp, horizontal = 16.dp)
                         ) {
                             Column {
+                                val onClickForumAction = remember(onOpenForum) {
+                                    { forum: SimpleForum -> onOpenForum(forum.name) }
+                                }
+                                val onDislikeClick = remember(item, onDislike) {
+                                    { clickTime: Long, reasons: ImmutableList<ImmutableHolder<DislikeReason>> ->
+                                        onDislike(item.get(), clickTime, reasons)
+                                    }
+                                }
                                 FeedCard(
                                     item = item,
                                     onClick = onItemClick,
                                     onClickReply = onItemReplyClick,
                                     onAgree = onAgree,
-                                    onClickForum = remember {
-                                        {
-                                            onOpenForum(it.name)
-                                        }
-                                    },
+                                    onClickForum = onClickForumAction,
                                     onClickUser = onClickUser,
                                 ) {
                                     if (personalized != null) {
                                         Dislike(
                                             personalized = personalized,
-                                            onDislike = { clickTime, reasons ->
-                                                onDislike(item.get(), clickTime, reasons)
-                                            }
+                                            onDislike = onDislikeClick
                                         )
                                     }
                                 }

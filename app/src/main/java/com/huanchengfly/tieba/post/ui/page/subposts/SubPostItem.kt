@@ -54,7 +54,7 @@ fun getDescText(
 fun SubPostItem(
     item: SubPostItemData,
     threadAuthorId: Long? = null,
-    canDelete: (SubPostList) -> Boolean = { false },
+    canDelete: Boolean = false,
     onUserClick: (User) -> Unit = {},
     onAgree: (SubPostList) -> Unit = {},
     onReplyClick: (SubPostList) -> Unit = {},
@@ -72,6 +72,36 @@ fun SubPostItem(
     val agreeNum = remember(subPost) {
         subPost.get { agree?.diffAgreeNum ?: 0L }
     }
+    val avatarUrl = remember(author) { author?.get { StringUtil.getAvatarUrl(portrait) } }
+    val isLz = remember(author, threadAuthorId) {
+        author?.get { id } == threadAuthorId
+    }
+    val userLevel = remember(author) { author?.get { level_id } ?: 0 }
+    val bawuType = remember(author) { author?.get { bawuType } }
+    val userName = remember(author, context) {
+        author?.let {
+            StringUtil.getUsernameAnnotatedString(
+                context,
+                it.get { name },
+                it.get { nameShow }
+            )
+        }
+    }
+    val descText = remember(subPost, author) {
+        getDescText(
+            subPost.get { time }.toLong(),
+            author?.get { ip_address }
+        )
+    }
+    val onUserClickItem = remember(author, onUserClick) {
+        { author?.let { onUserClick(it.get()) } ?: Unit }
+    }
+    val onAgreeItem = remember(subPost, onAgree) {
+        { onAgree(subPost.get()) }
+    }
+    val onReplyItem = remember(subPost, onReplyClick) {
+        { onReplyClick(subPost.get()) }
+    }
     val menuState = rememberMenuState()
     BlockableContent(
         blocked = blocked,
@@ -87,7 +117,7 @@ fun SubPostItem(
                 if (!context.appPreferences.hideReply) {
                     DropdownMenuItem(
                         onClick = {
-                            onReplyClick(subPost.get())
+                            onReplyItem()
                             menuState.expanded = false
                         }
                     ) {
@@ -114,7 +144,7 @@ fun SubPostItem(
                 ) {
                     Text(text = stringResource(id = R.string.title_report))
                 }
-                if (canDelete(subPost.get()) && onMenuDeleteClick != null) {
+                if (canDelete && onMenuDeleteClick != null) {
                     DropdownMenuItem(
                         onClick = {
                             onMenuDeleteClick(subPost.get())
@@ -125,7 +155,7 @@ fun SubPostItem(
                     }
                 }
             },
-            onClick = { onReplyClick(subPost.get()) }.takeUnless { context.appPreferences.hideReply }
+            onClick = onReplyItem.takeUnless { context.appPreferences.hideReply }
         ) {
             Card(
                 header = {
@@ -133,38 +163,30 @@ fun SubPostItem(
                         UserHeader(
                             avatar = {
                                 Avatar(
-                                    data = StringUtil.getAvatarUrl(author.get { portrait }),
+                                    data = avatarUrl,
                                     size = Sizes.Small,
                                     contentDescription = null
                                 )
                             },
                             name = {
-                                UserNameText(
-                                    userName = StringUtil.getUsernameAnnotatedString(
-                                        LocalContext.current,
-                                        author.get { name },
-                                        author.get { nameShow }
-                                    ),
-                                    userLevel = author.get { level_id },
-                                    isLz = author.get { id } == threadAuthorId,
-                                    bawuType = author.get { bawuType },
-                                )
+                                userName?.let {
+                                    UserNameText(
+                                        userName = it,
+                                        userLevel = userLevel,
+                                        isLz = isLz,
+                                        bawuType = bawuType,
+                                    )
+                                }
                             },
                             desc = {
-                                Text(
-                                    text = getDescText(
-                                        subPost.get { time }.toLong(),
-                                        author.get { ip_address })
-                                )
+                                Text(text = descText)
                             },
-                            onClick = {
-                                onUserClick(author.get())
-                            }
+                            onClick = onUserClickItem
                         ) {
                             PostAgreeBtn(
                                 hasAgreed = hasAgreed,
                                 agreeNum = agreeNum,
-                                onClick = { onAgree(subPost.get()) }
+                                onClick = onAgreeItem
                             )
                         }
                     }
@@ -182,4 +204,31 @@ fun SubPostItem(
             )
         }
     }
+}
+
+@Deprecated(
+    message = "Use Boolean canDelete to prevent allocating lambdas during recomposition",
+    replaceWith = ReplaceWith("SubPostItem(item, threadAuthorId, canDelete(item.subPost.get()), onUserClick, onAgree, onReplyClick, onMenuCopyClick, onMenuDeleteClick)")
+)
+@Composable
+fun SubPostItem(
+    item: SubPostItemData,
+    threadAuthorId: Long? = null,
+    canDelete: (SubPostList) -> Boolean,
+    onUserClick: (User) -> Unit = {},
+    onAgree: (SubPostList) -> Unit = {},
+    onReplyClick: (SubPostList) -> Unit = {},
+    onMenuCopyClick: ((String) -> Unit)? = null,
+    onMenuDeleteClick: ((SubPostList) -> Unit)? = null,
+) {
+    SubPostItem(
+        item = item,
+        threadAuthorId = threadAuthorId,
+        canDelete = remember(item, canDelete) { canDelete(item.subPost.get()) },
+        onUserClick = onUserClick,
+        onAgree = onAgree,
+        onReplyClick = onReplyClick,
+        onMenuCopyClick = onMenuCopyClick,
+        onMenuDeleteClick = onMenuDeleteClick,
+    )
 }

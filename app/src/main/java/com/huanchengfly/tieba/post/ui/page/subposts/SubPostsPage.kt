@@ -23,6 +23,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.huanchengfly.tieba.post.R
 import com.huanchengfly.tieba.post.api.models.protos.SubPostList
+import com.huanchengfly.tieba.post.api.models.protos.User
 import com.huanchengfly.tieba.post.arch.ImmutableHolder
 import com.huanchengfly.tieba.post.arch.collectPartialAsState
 import com.huanchengfly.tieba.post.arch.onEvent
@@ -383,50 +384,64 @@ internal fun SubPostsContent(
                         items = subPosts,
                         key = { _, subPost -> subPost.id }
                     ) { index, item ->
-                        SubPostItem(
-                            item = item,
-                            canDelete = { it.author_id == account?.uid?.toLongOrNull() },
-                            threadAuthorId = thread?.get { author?.id },
-                            onUserClick = {
-                                navigator.navigate(UserProfilePageDestination(it.id))
-                            },
-                            onAgree = {
-                                val hasAgreed = it.agree?.hasAgree != 0
+                        val canDelete = remember(item, account) {
+                            item.subPost.get { author_id } == account?.uid?.toLongOrNull()
+                        }
+                        val onUserClick = remember(navigator) {
+                            { u: User -> navigator.navigate(UserProfilePageDestination(u.id)) }
+                        }
+                        val onAgree = remember(item, forumId, threadId, postId, viewModel) {
+                            { sp: SubPostList ->
+                                val hasAgreed = sp.agree?.hasAgree != 0
                                 viewModel.send(
                                     SubPostsUiIntent.Agree(
                                         forumId,
                                         threadId,
                                         postId,
-                                        subPostId = it.id,
+                                        subPostId = sp.id,
                                         agree = !hasAgreed
                                     )
                                 )
-                            },
-                            onReplyClick = {
+                            }
+                        }
+                        val forumName = forum?.get { name } ?: ""
+                        val onReplyClick = remember(item, forumId, forumName, threadId, postId) {
+                            { sp: SubPostList ->
                                 showReplyDialog(
                                     ReplyArgs(
                                         forumId = forumId,
-                                        forumName = forum?.get { name } ?: "",
+                                        forumName = forumName,
                                         threadId = threadId,
                                         postId = postId,
-                                        subPostId = it.id,
-                                        replyUserId = it.author?.id ?: it.author_id,
-                                        replyUserName = it.author?.nameShow.takeIf { name -> !name.isNullOrEmpty() }
-                                            ?: it.author?.name,
-                                        replyUserPortrait = it.author?.portrait,
+                                        subPostId = sp.id,
+                                        replyUserId = sp.author?.id ?: sp.author_id,
+                                        replyUserName = sp.author?.nameShow.takeIf { name -> !name.isNullOrEmpty() }
+                                            ?: sp.author?.name,
+                                        replyUserPortrait = sp.author?.portrait,
                                     )
                                 )
-                            },
-                            onMenuCopyClick = {
-                                navigator.navigate(
-                                    CopyTextDialogPageDestination(it)
-                                )
-//                                TiebaUtil.copyText(context, it)
-                            },
-                            onMenuDeleteClick = {
-                                deleteSubPost = it.wrapImmutable()
+                            }
+                        }
+                        val onMenuCopyClick = remember(navigator) {
+                            { text: String ->
+                                navigator.navigate(CopyTextDialogPageDestination(text))
+                            }
+                        }
+                        val onMenuDeleteClick = remember(item) {
+                            { sp: SubPostList ->
+                                deleteSubPost = sp.wrapImmutable()
                                 confirmDeleteDialogState.show()
-                            },
+                            }
+                        }
+                        SubPostItem(
+                            item = item,
+                            canDelete = canDelete,
+                            threadAuthorId = thread?.get { author?.id },
+                            onUserClick = onUserClick,
+                            onAgree = onAgree,
+                            onReplyClick = onReplyClick,
+                            onMenuCopyClick = onMenuCopyClick,
+                            onMenuDeleteClick = onMenuDeleteClick,
                         )
                     }
                 }

@@ -212,11 +212,12 @@ internal fun ThreadMedia(
                     if (isSinglePhoto) 2f else 3f
                 }
                 if (hideMedia) {
+                    val rawMedias = remember(medias) { medias.map { it.get() } }
                     val photoViewData = remember(
-                        medias, forumId, forumName, threadId
+                        rawMedias, forumId, forumName, threadId
                     ) {
                         getPhotoViewData(
-                            medias = medias.map { it.get() },
+                            medias = rawMedias,
                             forumId = forumId,
                             forumName = forumName,
                             threadId = threadId,
@@ -247,6 +248,7 @@ internal fun ThreadMedia(
                     val showMediaCount = remember(medias) { min(medias.size, 3) }
                     val hasMoreMedia = remember(medias) { medias.size > 3 }
                     val showMedias = remember(medias) { medias.subList(0, showMediaCount) }
+                    val rawMedias = remember(medias) { medias.map { it.get() } }
                     Box {
                         Row(
                             modifier = Modifier
@@ -257,10 +259,10 @@ internal fun ThreadMedia(
                         ) {
                             showMedias.fastForEachIndexed { index, media ->
                                 val photoViewData = remember(
-                                    index, medias, forumId, forumName, threadId
+                                    index, rawMedias, forumId, forumName, threadId
                                 ) {
                                     getPhotoViewData(
-                                        medias = medias.map { it.get() },
+                                        medias = rawMedias,
                                         forumId = forumId,
                                         forumName = forumName,
                                         threadId = threadId,
@@ -300,12 +302,17 @@ internal fun ThreadMedia(
     item: ImmutableHolder<ThreadInfo>,
     modifier: Modifier = Modifier,
 ) {
+    val forumId = remember(item) { item.get { forumId } }
+    val forumName = remember(item) { item.get { forumName } }
+    val threadId = remember(item) { item.get { threadId } }
+    val medias = remember(item) { item.getImmutableList { media } }
+    val videoInfo = remember(item) { item.get { videoInfo }?.wrapImmutable() }
     ThreadMedia(
-        forumId = item.get { forumId },
-        forumName = item.get { forumName },
-        threadId = item.get { threadId },
-        medias = item.getImmutableList { media },
-        videoInfo = item.get { videoInfo }?.wrapImmutable(),
+        forumId = forumId,
+        forumName = forumName,
+        threadId = threadId,
+        medias = medias,
+        videoInfo = videoInfo,
         modifier = modifier,
     )
 }

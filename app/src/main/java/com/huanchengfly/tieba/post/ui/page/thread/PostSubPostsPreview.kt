@@ -14,6 +14,7 @@ import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -88,19 +89,25 @@ fun PostSubPostsPreview(
                     )
                 },
             ) {
+                val onReplyClick = remember(item, post, onSubPostReplyClick) {
+                    if (onSubPostReplyClick != null) {
+                        { it: SubPostList -> onSubPostReplyClick(post, it) }
+                    } else null
+                }
+                val onCopyClick = remember(item, onMenuCopyClick) {
+                    if (onMenuCopyClick != null) {
+                        { it: SubPostList -> onMenuCopyClick(it.content.plainText) }
+                    } else null
+                }
                 SubPostItem(
                     subPostList = item.subPost,
                     subPostContent = item.subPostContent,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 12.dp),
-                    onReplyClick = {
-                        onSubPostReplyClick?.invoke(post, it)
-                    },
+                    onReplyClick = onReplyClick,
                     onOpenSubPosts = onOpenSubPosts,
-                    onMenuCopyClick = {
-                        onMenuCopyClick?.invoke(it.content.plainText)
-                    }
+                    onMenuCopyClick = onCopyClick
                 )
             }
         }
@@ -178,6 +185,22 @@ private fun SubPostItem(
             onOpenSubPosts(subPostList.get { id })
         }
     ) {
+        val lzChip = buildChipInlineContent(
+            stringResource(id = R.string.tip_lz),
+            backgroundColor = ExtendedTheme.colors.textSecondary.copy(alpha = 0.1f),
+            color = ExtendedTheme.colors.textSecondary
+        )
+        val bawuChip = buildChipInlineContent(
+            "吧务",
+            color = ExtendedTheme.colors.primary,
+            backgroundColor = ExtendedTheme.colors.primary.copy(alpha = 0.1f)
+        )
+        val inlineContent = remember(lzChip, bawuChip) {
+            mapOf(
+                "Lz" to lzChip,
+                "Bawu" to bawuChip,
+            )
+        }
         ProvideTextStyle(value = MaterialTheme.typography.body2.copy(color = ExtendedTheme.colors.text)) {
             PbContentText(
                 text = subPostContent,
@@ -187,18 +210,7 @@ private fun SubPostItem(
                 overflow = TextOverflow.Ellipsis,
                 maxLines = 4,
                 lineSpacing = 0.4.sp,
-                inlineContent = mapOf(
-                    "Lz" to buildChipInlineContent(
-                        stringResource(id = R.string.tip_lz),
-                        backgroundColor = ExtendedTheme.colors.textSecondary.copy(alpha = 0.1f),
-                        color = ExtendedTheme.colors.textSecondary
-                    ),
-                    "Bawu" to buildChipInlineContent(
-                        "吧务",
-                        color = ExtendedTheme.colors.primary,
-                        backgroundColor = ExtendedTheme.colors.primary.copy(alpha = 0.1f)
-                    ),
-                )
+                inlineContent = inlineContent
             )
         }
     }

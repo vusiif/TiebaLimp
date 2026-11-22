@@ -28,6 +28,7 @@ import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -228,9 +229,10 @@ private fun ThreadList(
                 ) {
                     if (item.isTop == 1) {
                         val title = item.title.takeUnless { it.isBlank() } ?: item.abstractText
+                        val onTopItemClick = remember(item, onItemClicked) { { onItemClicked(item) } }
                         TopThreadItem(
                             title = title,
-                            onClick = { onItemClicked(item) },
+                            onClick = onTopItemClick,
                             modifier = Modifier.fillMaxWidth(),
                         )
                     } else {

@@ -58,50 +58,118 @@ import kotlinx.collections.immutable.persistentListOf
 
 @Composable
 private fun UserHeader(
-    userProvider: () -> ImmutableHolder<User>,
-    timeProvider: () -> Int,
+    user: ImmutableHolder<User>,
+    time: Int,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     content: @Composable RowScope.() -> Unit,
 ) {
     val context = LocalContext.current
-    val user = remember(userProvider) { userProvider() }
-    val time = remember(timeProvider) { timeProvider() }
+    val contentColor = LocalContentColor.current
+    val avatarUrl = remember(user) { user.get { StringUtil.getAvatarUrl(portrait) } }
+    val userName = remember(user, context, contentColor) {
+        user.get {
+            StringUtil.getUsernameAnnotatedString(
+                context = context,
+                username = name,
+                nickname = nameShow,
+                color = contentColor
+            )
+        }
+    }
+    val userLevel = remember(user) { user.get { level_id } }
     val bawuType = remember(user) { user.get { bawuType } }
     val ipAddress = remember(user) { user.get { ip_address } }
+    val descText = remember(time, ipAddress, context) {
+        val relativeTime = DateTimeUtils.getRelativeTimeString(
+            context,
+            time.toString()
+        )
+        if (ipAddress.isNotBlank()) {
+            "$relativeTime  ${context.getString(R.string.text_ip_location, ipAddress)}"
+        } else {
+            relativeTime
+        }
+    }
     UserHeader(
         avatar = {
             Avatar(
-                data = user.get { StringUtil.getAvatarUrl(portrait) },
+                data = avatarUrl,
                 size = Sizes.Small,
                 contentDescription = null
             )
         },
         name = {
             UserNameText(
-                userName = StringUtil.getUsernameAnnotatedString(
-                    context = LocalContext.current,
-                    username = user.get { name },
-                    nickname = user.get { nameShow },
-                    color = LocalContentColor.current
-                ),
-                userLevel = user.get { level_id },
+                userName = userName,
+                userLevel = userLevel,
                 bawuType = bawuType
             )
         },
         onClick = onClick,
         desc = {
-            val relativeTime = DateTimeUtils.getRelativeTimeString(
-                context,
-                time.toString()
-            )
-            val descText = if (ipAddress.isNotBlank()) {
-                "$relativeTime  ${stringResource(R.string.text_ip_location, ipAddress)}"
-            } else {
-                relativeTime
-            }
             Text(text = descText)
         },
+        content = content,
+        modifier = modifier
+    )
+}
+
+@Composable
+fun UserHeader(
+    name: String,
+    nameShow: String,
+    portrait: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    time: Int? = null,
+    ip: String? = null,
+    content: @Composable RowScope.() -> Unit = {},
+) {
+    val context = LocalContext.current
+    val contentColor = LocalContentColor.current
+    val avatarUrl = remember(portrait) { StringUtil.getAvatarUrl(portrait) }
+    val userName = remember(name, nameShow, context, contentColor) {
+        StringUtil.getUsernameAnnotatedString(
+            context = context,
+            username = name,
+            nickname = nameShow,
+            color = contentColor
+        )
+    }
+    val descText = remember(time, ip, context) {
+        val relativeTime = time?.let {
+            DateTimeUtils.getRelativeTimeString(
+                context,
+                it.toString()
+            )
+        }.orEmpty()
+        val ipStr = ip.orEmpty()
+        if (ipStr.isNotBlank()) {
+            if (relativeTime.isNotEmpty()) "$relativeTime  ${context.getString(R.string.text_ip_location, ipStr)}"
+            else context.getString(R.string.text_ip_location, ipStr)
+        } else {
+            relativeTime
+        }
+    }
+    UserHeader(
+        avatar = {
+            Avatar(
+                data = avatarUrl,
+                size = Sizes.Small,
+                contentDescription = null
+            )
+        },
+        name = {
+            Text(
+                text = userName,
+                color = ExtendedTheme.colors.text
+            )
+        },
+        onClick = onClick,
+        desc = (@Composable {
+            Text(text = descText)
+        }).takeIf { time != null || !ip.isNullOrBlank() },
         content = content,
         modifier = modifier
     )
@@ -118,49 +186,15 @@ fun UserHeader(
     ipProvider: (() -> String)? = null,
     content: @Composable RowScope.() -> Unit = {},
 ) {
-    val context = LocalContext.current
-    val name = remember(nameProvider) { nameProvider() }
-    val nameShow = remember(nameShowProvider) { nameShowProvider() }
-    val portrait = remember(portraitProvider) { portraitProvider() }
-    val time = remember(timeProvider) { timeProvider?.invoke() }
-    val ip = remember(ipProvider) { ipProvider?.invoke().orEmpty() }
     UserHeader(
-        avatar = {
-            Avatar(
-                data = StringUtil.getAvatarUrl(portrait),
-                size = Sizes.Small,
-                contentDescription = null
-            )
-        },
-        name = {
-            Text(
-                text = StringUtil.getUsernameAnnotatedString(
-                    context = LocalContext.current,
-                    username = name,
-                    nickname = nameShow,
-                    color = LocalContentColor.current
-                ),
-                color = ExtendedTheme.colors.text
-            )
-        },
+        name = nameProvider(),
+        nameShow = nameShowProvider(),
+        portrait = portraitProvider(),
         onClick = onClick,
-        desc = (@Composable {
-            val relativeTime = time?.let {
-                DateTimeUtils.getRelativeTimeString(
-                    context,
-                    it.toString()
-                )
-            }.orEmpty()
-            val descText = if (ip.isNotBlank()) {
-                if (relativeTime.isNotEmpty()) "$relativeTime  ${stringResource(R.string.text_ip_location, ip)}"
-                else stringResource(R.string.text_ip_location, ip)
-            } else {
-                relativeTime
-            }
-            Text(text = descText)
-        }).takeIf { time != null || ip.isNotBlank() },
-        content = content,
-        modifier = modifier
+        modifier = modifier,
+        time = timeProvider?.invoke(),
+        ip = ipProvider?.invoke(),
+        content = content
     )
 }
 
@@ -173,16 +207,14 @@ fun Card(
     onClick: (() -> Unit)? = null,
     contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp),
 ) {
-    val cardModifier = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
-
-    val paddingModifier = if (action != null) Modifier.padding(top = 16.dp)
-    else Modifier.padding(vertical = 16.dp)
+    val baseModifier = remember(onClick, action != null, contentPadding) {
+        (if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .then(if (action != null) Modifier.padding(top = 16.dp) else Modifier.padding(vertical = 16.dp))
+            .padding(contentPadding)
+    }
 
     Column(
-        modifier = cardModifier
-            .then(modifier)
-            .then(paddingModifier)
-            .padding(contentPadding)
+        modifier = baseModifier.then(modifier)
     ) {
         header()
         Column(
@@ -403,8 +435,8 @@ fun FeedCard(
                     { onClickUser(it.get()) }
                 }
                 UserHeader(
-                    userProvider = { it },
-                    timeProvider = { item.get { lastTimeInt } },
+                    user = it,
+                    time = item.get { lastTimeInt },
                     onClick = onHeaderUserClick,
                 ) { dislikeAction() }
             }
@@ -510,11 +542,11 @@ fun FeedCard(
     Card(
         header = {
             UserHeader(
-                nameProvider = { item.get { user_name } },
-                nameShowProvider = { item.get { name_show } },
-                portraitProvider = { item.get { user_portrait } },
-                timeProvider = { item.get { create_time } },
-                ipProvider = { item.get { ip } },
+                name = item.get { user_name },
+                nameShow = item.get { name_show },
+                portrait = item.get { user_portrait },
+                time = item.get { create_time },
+                ip = item.get { ip },
                 onClick = onCardUser,
             )
         },
@@ -526,12 +558,17 @@ fun FeedCard(
                 showAbstract = item.get { abstractText.isNotBlank() },
             )
 
+            val forumId = remember(item) { item.get { forum_id } }
+            val forumName = remember(item) { item.get { forum_name } }
+            val threadId = remember(item) { item.get { thread_id } }
+            val medias = remember(item) { item.getImmutableList { media } }
+            val videoInfo = remember(item) { item.getNullableImmutable { video_info } }
             ThreadMedia(
-                forumId = item.get { forum_id },
-                forumName = item.get { forum_name },
-                threadId = item.get { thread_id },
-                medias = item.getImmutableList { media },
-                videoInfo = item.getNullableImmutable { video_info }
+                forumId = forumId,
+                forumName = forumName,
+                threadId = threadId,
+                medias = medias,
+                videoInfo = videoInfo
             )
 
             item.getNullableImmutable { origin_thread_info }

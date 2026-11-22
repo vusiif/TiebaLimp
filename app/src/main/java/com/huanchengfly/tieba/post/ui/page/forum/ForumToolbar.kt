@@ -19,6 +19,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -132,6 +133,19 @@ internal fun ForumToolbar(
     forumId: Long? = null,
 ) {
     val navigator = LocalNavigator.current
+    val onBackPressed: () -> Unit = remember(navigator) {
+        {
+            navigator.navigateUp()
+            Unit
+        }
+    }
+    val onSearchClick = remember(navigator, forumName, forumId) {
+        {
+            if (forumId != null) {
+                navigator.navigate(ForumSearchPostPageDestination(forumName, forumId))
+            }
+        }
+    }
     Toolbar(
         title = {
             if (showTitle) Text(
@@ -141,14 +155,10 @@ internal fun ForumToolbar(
                 )
             )
         },
-        navigationIcon = { BackNavigationIcon(onBackPressed = { navigator.navigateUp() }) },
+        navigationIcon = { BackNavigationIcon(onBackPressed = onBackPressed) },
         actions = {
             if (forumId != null) {
-                IconButton(
-                    onClick = {
-                        navigator.navigate(ForumSearchPostPageDestination(forumName, forumId))
-                    }
-                ) {
+                IconButton(onClick = onSearchClick) {
                     Icon(
                         imageVector = Icons.Rounded.Search,
                         contentDescription = stringResource(id = R.string.btn_search_in_forum)

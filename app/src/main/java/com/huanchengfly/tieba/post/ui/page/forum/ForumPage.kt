@@ -48,6 +48,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -326,10 +327,11 @@ fun ForumPage(
                     )
                 },
                 floatingActionButton = {
-                    if (context.appPreferences.forumFabFunction != "hide") {
-                        FloatingActionButton(
-                            onClick = {
-                                when (context.appPreferences.forumFabFunction) {
+                    val fabFunction = context.appPreferences.forumFabFunction
+                    if (fabFunction != "hide") {
+                        val onFabClick: () -> Unit = remember(fabFunction, currentPage, forumName, context) {
+                            {
+                                when (fabFunction) {
                                     "refresh" -> {
                                         coroutineScope.launch {
                                             emitGlobalEventSuspend(
@@ -363,13 +365,17 @@ fun ForumPage(
                                         context.toastShort(R.string.toast_feature_unavailable)
                                     }
                                 }
-                            },
+                                Unit
+                            }
+                        }
+                        FloatingActionButton(
+                            onClick = onFabClick,
                             backgroundColor = ExtendedTheme.colors.windowBackground,
                             contentColor = ExtendedTheme.colors.primary,
                             modifier = Modifier.navigationBarsPadding()
                         ) {
                             Icon(
-                                imageVector = when (context.appPreferences.forumFabFunction) {
+                                imageVector = when (fabFunction) {
                                     "refresh" -> Icons.Rounded.Refresh
                                     "back_to_top" -> Icons.Rounded.VerticalAlignTop
                                     else -> Icons.Rounded.Add
@@ -467,23 +473,28 @@ fun ForumPage(
                                             headerHeight = it.height.toFloat()
                                         }
                                 ) {
-                                    forumInfo?.let { holder ->
-                                        ForumHeader(
-                                            forumInfoImmutableHolder = holder,
-                                            onOpenForumInfo = {
+                                    val onOpenForumInfo = remember(forumInfo, navigator) {
+                                        {
+                                            forumInfo?.let { holder ->
                                                 navigator.navigate(
                                                     ForumDetailPageDestination(
-                                                        forumId = holder.get { this.id })
+                                                        forumId = holder.get { this.id }
+                                                    )
                                                 )
-                                            },
-                                            onBtnClick = {
+                                            }
+                                            Unit
+                                        }
+                                    }
+                                    val onBtnClick = remember(forumInfo, viewModel, tbs, account) {
+                                        {
+                                            forumInfo?.let { holder ->
                                                 val (forum) = holder
                                                 when {
                                                     forum.is_like != 1 -> viewModel.send(
                                                         ForumUiIntent.Like(
                                                             forum.id,
                                                             forum.name,
-                                                            tbs ?: account!!.tbs
+                                                            tbs ?: account?.tbs.orEmpty()
                                                         )
                                                     )
 
@@ -492,12 +503,20 @@ fun ForumPage(
                                                             ForumUiIntent.SignIn(
                                                                 forum.id,
                                                                 forum.name,
-                                                                tbs ?: account!!.tbs
+                                                                tbs ?: account?.tbs.orEmpty()
                                                             )
                                                         )
                                                     }
                                                 }
-                                            },
+                                            }
+                                            Unit
+                                        }
+                                    }
+                                    forumInfo?.let { holder ->
+                                        ForumHeader(
+                                            forumInfoImmutableHolder = holder,
+                                            onOpenForumInfo = onOpenForumInfo,
+                                            onBtnClick = onBtnClick,
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .padding(16.dp)
@@ -506,11 +525,29 @@ fun ForumPage(
                                 }
                             }
 
-                            val tabTextStyle = MaterialTheme.typography.button.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp,
-                                letterSpacing = 0.sp
-                            )
+                            val tabTextStyle = remember {
+                                TextStyle(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    letterSpacing = 0.sp
+                                )
+                            }
+                            val onTab0Click = remember(pagerState) {
+                                {
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(0)
+                                    }
+                                    Unit
+                                }
+                            }
+                            val onTab1Click = remember(pagerState) {
+                                {
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(1)
+                                    }
+                                    Unit
+                                }
+                            }
 
                             ScrollableTabRow(
                                 selectedTabIndex = currentPage,
@@ -538,11 +575,7 @@ fun ForumPage(
                                 }
                                 TabClickMenu(
                                     selected = currentPage == 0,
-                                    onClick = {
-                                        coroutineScope.launch {
-                                            pagerState.animateScrollToPage(0)
-                                        }
-                                    },
+                                    onClick = onTab0Click,
                                     text = {
                                         Text(
                                             text = stringResource(id = R.string.tab_forum_latest),
@@ -579,11 +612,7 @@ fun ForumPage(
                                 )
                                 Tab(
                                     selected = currentPage == 1,
-                                    onClick = {
-                                        coroutineScope.launch {
-                                            pagerState.animateScrollToPage(1)
-                                        }
-                                    },
+                                    onClick = onTab1Click,
                                     selectedContentColor = ExtendedTheme.colors.primary,
                                     unselectedContentColor = ExtendedTheme.colors.textSecondary
                                 ) {
@@ -602,17 +631,19 @@ fun ForumPage(
                             }
 
                             if (forumInfo != null) {
+                                val currentForumId = forumInfo!!.get { id }
+                                val currentForumName = forumInfo!!.get { name }
                                 HorizontalPager(
                                     state = pagerState,
                                     modifier = Modifier.fillMaxSize(),
                                     key = { it },
                                     verticalAlignment = Alignment.Top,
                                     userScrollEnabled = true,
-                                ) {
+                                ) { pageIndex ->
                                     ForumThreadListPage(
-                                        forumId = forumInfo!!.get { id },
-                                        forumName = forumInfo!!.get { name },
-                                        isGood = it == 1,
+                                        forumId = currentForumId,
+                                        forumName = currentForumName,
+                                        isGood = pageIndex == 1,
                                     )
                                 }
                             }

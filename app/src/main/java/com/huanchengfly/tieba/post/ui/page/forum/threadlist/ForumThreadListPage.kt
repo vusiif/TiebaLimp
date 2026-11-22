@@ -113,6 +113,23 @@ private enum class ItemType {
     Top, PlainText, SingleMedia, MultiMedia, Video
 }
 
+private val TopChipShape = RoundedCornerShape(3.dp)
+
+@Composable
+private fun ClassifyChipItem(
+    text: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Chip(
+        text = text,
+        invertColor = isSelected,
+        onClick = onClick,
+        modifier = modifier
+    )
+}
+
 @Composable
 private fun GoodClassifyTabs(
     goodClassifyHolders: ImmutableList<ImmutableHolder<Classify>>,
@@ -127,10 +144,14 @@ private fun GoodClassifyTabs(
             items = goodClassifyHolders,
             key = { it.get { "${class_id}_$class_name" } }
         ) { holder ->
-            Chip(
-                text = holder.get { class_name },
-                invertColor = selectedItem == holder.get { class_id },
-                onClick = { onSelected(holder.get { class_id }) }
+            val classId = holder.get { class_id }
+            val className = holder.get { class_name }
+            val isSelected = selectedItem == classId
+            val onClick = remember(classId, onSelected) { { onSelected(classId) } }
+            ClassifyChipItem(
+                text = className,
+                isSelected = isSelected,
+                onClick = onClick
             )
         }
     }
@@ -152,7 +173,7 @@ private fun TopThreadItem(
     ) {
         Chip(
             text = type,
-            shape = RoundedCornerShape(3.dp)
+            shape = TopChipShape
         )
         Text(
             text = title,
@@ -239,7 +260,9 @@ private fun ThreadList(
                     modifier = Modifier.fillMaxWidth(itemFraction)
                 ) {
                     if (item.isTop == 1) {
-                        val title = item.title.takeUnless { it.isBlank() } ?: item.abstractText
+                        val title = remember(item.title, item.abstractText) {
+                            item.title.takeUnless { it.isBlank() } ?: item.abstractText
+                        }
                         val onTopItemClick = remember(item, onItemClicked) { { onItemClicked(item) } }
                         TopThreadItem(
                             title = title,
@@ -356,9 +379,14 @@ fun ForumThreadListPage(
         prop1 = ForumThreadListUiState::goodClassifies,
         initial = persistentListOf()
     )
+    val onRefresh = remember(viewModel, context, forumName, isGood) {
+        {
+            viewModel.send(getRefreshIntent(context, forumName, isGood))
+        }
+    }
     val pullRefreshState = rememberPullRefreshState(
         refreshing = isRefreshing,
-        onRefresh = { viewModel.send(getRefreshIntent(context, forumName, isGood)) }
+        onRefresh = onRefresh
     )
     Box(
         modifier = Modifier.fillMaxSize()
@@ -367,26 +395,80 @@ fun ForumThreadListPage(
             modifier = Modifier.fillMaxSize()
         ) {
             if (isGood) {
-                GoodClassifyTabs(
-                    goodClassifyHolders = goodClassifies,
-                    selectedItem = goodClassifyId,
-                    onSelected = {
+                val onClassifySelected = remember(viewModel, context, forumName) {
+                    { classId: Int ->
                         viewModel.send(
                             getRefreshIntent(
                                 context,
                                 forumName,
                                 true,
-                                goodClassifyId = it
+                                goodClassifyId = classId
                             )
                         )
                     }
+                }
+                GoodClassifyTabs(
+                    goodClassifyHolders = goodClassifies,
+                    selectedItem = goodClassifyId,
+                    onSelected = onClassifySelected
                 )
             }
 
-            LoadMoreLayout(
-                isLoading = isLoadingMore,
-                isError = isLoadMoreError,
-                onLoadMore = {
+            val onItemClicked = remember(navigator) {
+                { it: ThreadInfo ->
+                    navigator.navigate(
+                        ThreadPageDestination(
+                            it.threadId,
+                            forumId = it.forumId,
+                            threadInfo = it
+                        )
+                    )
+                }
+            }
+            val onItemReplyClicked = remember(navigator) {
+                { it: ThreadInfo ->
+                    navigator.navigate(
+                        ThreadPageDestination(
+                            it.threadId,
+                            forumId = it.forumId,
+                            scrollToReply = true
+                        )
+                    )
+                }
+            }
+            val onAgree = remember(viewModel) {
+                { it: ThreadInfo ->
+                    viewModel.send(
+                        ForumThreadListUiIntent.Agree(
+                            it.threadId,
+                            it.firstPostId,
+                            it.agree?.hasAgree ?: 0
+                        )
+                    )
+                }
+            }
+            val onOpenForumRule = remember(navigator, forumId) {
+                {
+                    navigator.navigate(ForumRuleDetailPageDestination(forumId))
+                }
+            }
+            val onOriginThreadClicked = remember(navigator) {
+                { it: OriginThreadInfo ->
+                    navigator.navigate(
+                        ThreadPageDestination(
+                            threadId = it.tid.toLong(),
+                            forumId = it.fid,
+                        )
+                    )
+                }
+            }
+            val onUserClicked = remember(navigator) {
+                { it: User ->
+                    navigator.navigate(UserProfilePageDestination(it.id))
+                }
+            }
+            val onLoadMore = remember(viewModel, context, forumId, forumName, currentPage, threadListIds, isGood) {
+                {
                     viewModel.send(
                         getLoadMoreIntent(
                             context,
@@ -397,7 +479,14 @@ fun ForumThreadListPage(
                             isGood
                         )
                     )
-                },
+                }
+            }
+
+            LoadMoreLayout(
+                isLoading = isLoadingMore,
+                isError = isLoadMoreError,
+                onLoadMore = onLoadMore,
+                onRetry = onLoadMore,
                 loadEnd = !hasMore,
                 lazyListState = lazyListState,
                 isEmpty = threadList.isEmpty(),
@@ -406,46 +495,14 @@ fun ForumThreadListPage(
                 ThreadList(
                     state = lazyListState,
                     items = threadList,
-                    onItemClicked = {
-                        navigator.navigate(
-                            ThreadPageDestination(
-                                it.threadId,
-                                forumId = it.forumId,
-                                threadInfo = it
-                            )
-                        )
-                    },
-                    onItemReplyClicked = {
-                        navigator.navigate(
-                            ThreadPageDestination(
-                                it.threadId,
-                                forumId = it.forumId,
-                                scrollToReply = true
-                            )
-                        )
-                    },
-                    onAgree = {
-                        viewModel.send(
-                            ForumThreadListUiIntent.Agree(
-                                it.threadId,
-                                it.firstPostId,
-                                it.agree?.hasAgree ?: 0
-                            )
-                        )
-                    },
+                    onItemClicked = onItemClicked,
+                    onItemReplyClicked = onItemReplyClicked,
+                    onAgree = onAgree,
                     forumRuleTitle = forumRuleTitle,
-                    onOpenForumRule = {
-                        navigator.navigate(ForumRuleDetailPageDestination(forumId))
-                    },
-                    onOriginThreadClicked = {
-                        navigator.navigate(
-                            ThreadPageDestination(
-                                threadId = it.tid.toLong(),
-                                forumId = it.fid,
-                            )
-                        )
-                    }
-                ) { navigator.navigate(UserProfilePageDestination(it.id)) }
+                    onOpenForumRule = onOpenForumRule,
+                    onOriginThreadClicked = onOriginThreadClicked,
+                    onUserClicked = onUserClicked
+                )
             }
         }
 

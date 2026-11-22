@@ -235,10 +235,13 @@ fun NetworkImage(
     var shouldLoad by remember { mutableStateOf(shouldLoadImage(context, skipNetworkCheck)) }
     val enableClick = remember(photoViewData, shouldLoad) { photoViewData != null || !shouldLoad }
 
-    val colorMask =
-        if (ExtendedTheme.colors.isNightMode && context.appPreferences.imageDarkenWhenNightMode) {
+    val isNightMode = ExtendedTheme.colors.isNightMode
+    val imageDarkenWhenNightMode = context.appPreferences.imageDarkenWhenNightMode
+    val colorMask = remember(isNightMode, imageDarkenWhenNightMode) {
+        if (isNightMode && imageDarkenWhenNightMode) {
             MaskTransformation(Color.parseColor("#99000000"))
         } else null
+    }
 
     var layoutSize by remember { mutableStateOf(IntSize.Zero) }
 
@@ -280,17 +283,28 @@ fun NetworkImage(
         )
     }
 
+    val imageModifier = if (enablePreview) {
+        Modifier
+            .fillMaxSize()
+            .onSizeChanged { layoutSize = it }
+            .onGloballyPositioned { layoutOffset = it.positionInWindow() }
+    } else {
+        Modifier.fillMaxSize()
+    }
+
     Box(
         modifier = Modifier
-            .pointerInput(enableClick) {
+            .pointerInput(enableClick, enablePreview) {
                 if (enableClick) {
                     detectTapGestures(
-                        onLongPress = {
-                            isLongPressing = true
-                        },
+                        onLongPress = if (enablePreview) {
+                            { isLongPressing = true }
+                        } else null,
                         onPress = {
-                            tryAwaitRelease()
-                            isLongPressing = false
+                            if (enablePreview) {
+                                tryAwaitRelease()
+                                isLongPressing = false
+                            }
                         },
                         onTap = {
                             if (!shouldLoad) {
@@ -307,23 +321,11 @@ fun NetworkImage(
                     )
                 }
             }
-            .pointerInput(Unit) {
-                detectDragGesturesAfterLongPress { change, dragAmount ->
-                    Log.i("NetworkImage", "dragAmount: $dragAmount")
-                }
-            }
             .then(modifier)
     ) {
         AsyncImage(
             request = request,
-            modifier = Modifier
-                .fillMaxSize()
-                .onSizeChanged {
-                    layoutSize = it
-                }
-                .onGloballyPositioned {
-                    layoutOffset = it.positionInWindow()
-                },
+            modifier = imageModifier,
             contentDescription = contentDescription,
             contentScale = contentScale,
             state = state,

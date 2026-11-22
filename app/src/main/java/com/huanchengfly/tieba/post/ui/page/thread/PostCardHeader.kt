@@ -2,6 +2,7 @@ package com.huanchengfly.tieba.post.ui.page.thread
 
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.huanchengfly.tieba.post.App
@@ -45,35 +46,43 @@ fun PostCardHeader(
     onAgree: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
+    val avatarUrl = remember(author.portrait) { StringUtil.getAvatarUrl(author.portrait) }
+    val userName = remember(author.name, author.nameShow, context) {
+        StringUtil.getUsernameAnnotatedString(
+            context,
+            author.name,
+            author.nameShow
+        )
+    }
+    val descText = remember(time, floor, author.ip_address) {
+        getDescText(
+            time,
+            floor,
+            author.ip_address
+        )
+    }
+    val isLz = remember(author.id, threadAuthorId) { author.id == threadAuthorId }
+
     UserHeader(
         modifier = modifier,
         avatar = {
             Avatar(
-                data = StringUtil.getAvatarUrl(author.portrait),
+                data = avatarUrl,
                 size = Sizes.Small,
                 contentDescription = null
             )
         },
         name = {
             UserNameText(
-                userName = StringUtil.getUsernameAnnotatedString(
-                    LocalContext.current,
-                    author.name,
-                    author.nameShow
-                ),
+                userName = userName,
                 userLevel = author.level_id,
-                isLz = author.id == threadAuthorId,
+                isLz = isLz,
                 bawuType = author.bawuType,
             )
         },
         desc = {
-            Text(
-                text = getDescText(
-                    time,
-                    floor,
-                    author.ip_address
-                )
-            )
+            Text(text = descText)
         },
         onClick = onUserClick
     ) {

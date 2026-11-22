@@ -50,18 +50,22 @@ fun ThreadFirstPostCard(
     onDeleteClick: (Post) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val canDelete = remember(firstPost, user) {
+        firstPost.get { author_id } == user.get { id }
+    }
+    val isCollected = remember(firstPost, thread) {
+        firstPost.get { id } == thread?.get { collectMarkPid }?.toLongOrNull()
+    }
     Container(modifier = modifier) {
         Column {
             PostCard(
                 postHolder = firstPost,
                 contentRenders = firstPostContentRenders,
                 threadAuthorId = author?.get { id } ?: 0L,
-                canDelete = { it.author_id == user.get { id } },
+                canDelete = canDelete,
                 immersiveMode = isImmersiveMode,
                 isSearchHighlighted = isSearchHighlighted,
-                isCollected = {
-                    it.id == thread?.get { collectMarkPid }?.toLongOrNull()
-                },
+                isCollected = isCollected,
                 showSubPosts = false,
                 onUserClick = {
                     navigator.navigate(

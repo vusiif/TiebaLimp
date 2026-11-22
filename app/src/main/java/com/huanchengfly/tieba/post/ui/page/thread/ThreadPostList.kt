@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AlignVerticalTop
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -66,6 +67,22 @@ private fun RenderPostCardItem(
 ) {
     val (item, blocked, renders, subPosts, blockResult) = postItem
     val reason = (blockResult as? FilterResult.Blocked)?.reason
+    val canDelete = remember(item, user) { item.get { author_id } == user.get { id } }
+    val isCollected = remember(item, thread) {
+        item.get { id } == thread?.get { collectMarkPid.toLongOrNull() }
+    }
+    val onCardUserClick = remember(onUserClick) {
+        { u: User -> onUserClick(u.id) }
+    }
+    val onCardAgree = remember(item, onAgreePost) {
+        {
+            val postHasAgreed = item.get { agree?.hasAgree == 1 }
+            onAgreePost(item, !postHasAgreed)
+        }
+    }
+    val onCardOpenSubPosts = remember(item, onOpenSubPosts) {
+        { subPostId: Long -> onOpenSubPosts(item.get { id }, subPostId) }
+    }
     PostCard(
         postHolder = item,
         contentRenders = renders,
@@ -74,17 +91,14 @@ private fun RenderPostCardItem(
         blocked = blocked,
         blockReason = reason,
         isSearchHighlighted = isSearchHighlighted,
-        canDelete = { it.author_id == user.get { id } },
+        canDelete = canDelete,
         immersiveMode = isImmersiveMode,
-        isCollected = { it.id == thread?.get { collectMarkPid.toLongOrNull() } },
-        onUserClick = { onUserClick(it.id) },
-        onAgree = {
-            val postHasAgreed = item.get { agree?.hasAgree == 1 }
-            onAgreePost(item, !postHasAgreed)
-        },
+        isCollected = isCollected,
+        onUserClick = onCardUserClick,
+        onAgree = onCardAgree,
         onReplyClick = onReplyClick,
         onSubPostReplyClick = onSubPostReplyClick,
-        onOpenSubPosts = { onOpenSubPosts(item.get { id }, it) },
+        onOpenSubPosts = onCardOpenSubPosts,
         onMenuCopyClick = onMenuCopyClick,
         onMenuFavoriteClick = onMenuFavoriteClick,
         onMenuBookmarkClick = onOpenBookmarkEdit,

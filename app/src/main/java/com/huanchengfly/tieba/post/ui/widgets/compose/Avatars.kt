@@ -11,6 +11,7 @@ import androidx.compose.material.Icon
 import androidx.compose.material.LocalContentAlpha
 import androidx.compose.material.LocalContentColor
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -123,11 +124,15 @@ fun Avatar(
 ) {
     val context = LocalContext.current
 
-    AsyncImage(
-        request = DisplayRequest(LocalContext.current, data) {
+    val request = remember(data, context) {
+        DisplayRequest(context, data) {
             placeholder(ImageUtil.getPlaceHolder(context, 0))
             crossfade()
-        },
+        }
+    }
+
+    AsyncImage(
+        request = request,
         contentDescription = contentDescription,
         contentScale = ContentScale.Crop,
         modifier = modifier.clip(shape),
@@ -143,11 +148,15 @@ fun Avatar(
 ) {
     val context = LocalContext.current
 
-    AsyncImage(
-        request = DisplayRequest(LocalContext.current, newResourceUri(data)) {
+    val request = remember(data, context) {
+        DisplayRequest(context, newResourceUri(data)) {
             placeholder(ImageUtil.getPlaceHolder(context, 0))
             crossfade()
-        },
+        }
+    }
+
+    AsyncImage(
+        request = request,
         contentDescription = contentDescription,
         contentScale = ContentScale.Crop,
         modifier = modifier

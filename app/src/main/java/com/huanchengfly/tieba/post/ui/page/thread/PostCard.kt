@@ -53,9 +53,9 @@ fun PostCard(
     blocked: Boolean = false,
     blockReason: String? = null,
     isSearchHighlighted: Boolean = false,
-    canDelete: (Post) -> Boolean = { false },
+    canDelete: Boolean = false,
     immersiveMode: Boolean = false,
-    isCollected: (Post) -> Boolean = { false },
+    isCollected: Boolean = false,
     showSubPosts: Boolean = true,
     onUserClick: (User) -> Unit = {},
     onAgree: () -> Unit = {},
@@ -81,7 +81,9 @@ fun PostCard(
     val hasPadding = remember(key1 = postHolder, key2 = immersiveMode) {
         postHolder.get { floor > 1 } && !immersiveMode
     }
-    val paddingModifier = Modifier.padding(start = if (hasPadding) Sizes.Small + 8.dp else 0.dp)
+    val paddingModifier = remember(hasPadding) {
+        Modifier.padding(start = if (hasPadding) Sizes.Small + 8.dp else 0.dp)
+    }
     val author = postHolder.get { author!! }
     val showTitle = remember(postHolder) {
         post.title.isNotBlank() && post.floor <= 1 && post.is_ntitle != 1
@@ -127,6 +129,17 @@ fun PostCard(
                 onClick = { isFoldExpanded = true }
             )
         } else {
+            val onHeaderUserClick = remember(author, onUserClick) {
+                { onUserClick(author) }
+            }
+            val accentColor = ExtendedTheme.colors.accent
+            val cardModifier = remember(isSearchHighlighted, accentColor) {
+                if (isSearchHighlighted) {
+                    Modifier
+                        .border(2.dp, accentColor, RoundedCornerShape(8.dp))
+                        .padding(2.dp)
+                } else Modifier
+            }
             LongClickMenu(
                 menuState = menuState,
                 indication = null,
@@ -136,8 +149,8 @@ fun PostCard(
                 menuContent = {
                     PostCardMenuContent(
                         post = post,
-                        isCollected = isCollected(post),
-                        canDelete = canDelete(post),
+                        isCollected = isCollected,
+                        canDelete = canDelete,
                         isFold = isFold,
                         onReplyClick = { onReplyClick(post) },
                         onCopyClick = onMenuCopyClick,
@@ -150,11 +163,7 @@ fun PostCard(
                 }
             ) {
                 Card(
-                    modifier = if (isSearchHighlighted) {
-                        Modifier
-                            .border(2.dp, ExtendedTheme.colors.accent, RoundedCornerShape(8.dp))
-                            .padding(2.dp)
-                    } else Modifier,
+                    modifier = cardModifier,
                     header = {
                         if (!immersiveMode) {
                             PostCardHeader(
@@ -164,7 +173,7 @@ fun PostCard(
                                 threadAuthorId = threadAuthorId,
                                 hasAgreed = hasAgreed,
                                 agreeNum = agreeNum,
-                                onUserClick = { onUserClick(author) },
+                                onUserClick = onHeaderUserClick,
                                 onAgree = onAgree
                             )
                         }
@@ -183,7 +192,7 @@ fun PostCard(
                                 )
                             }
 
-                            if (isCollected(post)) {
+                            if (isCollected) {
                                 Chip(
                                     text = stringResource(id = R.string.title_collected_floor),
                                     invertColor = true,
@@ -236,4 +245,56 @@ fun PostCard(
             }
         }
     }
+}
+
+@Deprecated(
+    message = "Use Boolean parameter for Compose recomposition optimization",
+    level = DeprecationLevel.HIDDEN
+)
+@Composable
+fun PostCard(
+    postHolder: ImmutableHolder<Post>,
+    contentRenders: ImmutableList<PbContentRender>,
+    subPosts: ImmutableList<SubPostItemData> = persistentListOf(),
+    threadAuthorId: Long = 0L,
+    blocked: Boolean = false,
+    blockReason: String? = null,
+    isSearchHighlighted: Boolean = false,
+    canDelete: (Post) -> Boolean,
+    immersiveMode: Boolean = false,
+    isCollected: (Post) -> Boolean = { false },
+    showSubPosts: Boolean = true,
+    onUserClick: (User) -> Unit = {},
+    onAgree: () -> Unit = {},
+    onReplyClick: (Post) -> Unit = {},
+    onSubPostReplyClick: ((Post, SubPostList) -> Unit)? = null,
+    onOpenSubPosts: (subPostId: Long) -> Unit = {},
+    onMenuCopyClick: ((String) -> Unit)? = null,
+    onMenuFavoriteClick: ((Post) -> Unit)? = null,
+    onMenuBookmarkClick: ((Post) -> Unit)? = null,
+    onMenuDeleteClick: ((Post) -> Unit)? = null,
+) {
+    val post = remember(postHolder) { postHolder.get() }
+    PostCard(
+        postHolder = postHolder,
+        contentRenders = contentRenders,
+        subPosts = subPosts,
+        threadAuthorId = threadAuthorId,
+        blocked = blocked,
+        blockReason = blockReason,
+        isSearchHighlighted = isSearchHighlighted,
+        canDelete = canDelete(post),
+        immersiveMode = immersiveMode,
+        isCollected = isCollected(post),
+        showSubPosts = showSubPosts,
+        onUserClick = onUserClick,
+        onAgree = onAgree,
+        onReplyClick = onReplyClick,
+        onSubPostReplyClick = onSubPostReplyClick,
+        onOpenSubPosts = onOpenSubPosts,
+        onMenuCopyClick = onMenuCopyClick,
+        onMenuFavoriteClick = onMenuFavoriteClick,
+        onMenuBookmarkClick = onMenuBookmarkClick,
+        onMenuDeleteClick = onMenuDeleteClick,
+    )
 }

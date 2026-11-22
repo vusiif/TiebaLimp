@@ -320,7 +320,7 @@ internal fun SubPostsContent(
                                 PostCard(
                                     postHolder = it,
                                     contentRenders = postContentRenders,
-                                    canDelete = { it.author_id == account?.uid?.toLongOrNull() },
+                                    canDelete = it.get { author_id } == account?.uid?.toLongOrNull(),
                                     showSubPosts = false,
                                     onUserClick = {
                                         navigator.navigate(UserProfilePageDestination(it.id))

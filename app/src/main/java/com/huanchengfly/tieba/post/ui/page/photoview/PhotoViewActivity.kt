@@ -36,11 +36,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.github.panpf.sketch.compose.rememberAsyncImageState
+import com.github.panpf.sketch.request.DisplayRequest
 import com.github.panpf.sketch.request.LoadState
+import com.github.panpf.sketch.stateimage.ThumbnailMemoryCacheStateImage
 import com.github.panpf.zoomimage.SketchZoomAsyncImage
 import com.google.accompanist.systemuicontroller.SystemUiController
 import com.huanchengfly.tieba.post.R
@@ -50,6 +53,7 @@ import com.huanchengfly.tieba.post.toastShort
 import com.huanchengfly.tieba.post.ui.common.theme.compose.ExtendedTheme
 import com.huanchengfly.tieba.post.ui.widgets.compose.LazyLoad
 import com.huanchengfly.tieba.post.ui.widgets.compose.ProvideContentColor
+import com.huanchengfly.tieba.post.utils.ImagePreloader
 import com.huanchengfly.tieba.post.utils.ImageUtil
 import com.huanchengfly.tieba.post.utils.download
 import kotlin.math.roundToInt
@@ -57,6 +61,7 @@ import kotlin.math.roundToInt
 @Composable
 private fun ViewPhoto(
     imageUri: String,
+    thumbnailUri: String? = null,
     modifier: Modifier = Modifier,
     onTap: (offset: Offset) -> Unit = {},
 ) {
@@ -64,6 +69,7 @@ private fun ViewPhoto(
         modifier = modifier,
         contentAlignment = Alignment.Center
     ) {
+        val context = LocalContext.current
         val state = rememberAsyncImageState()
         val progress by remember {
             derivedStateOf {
@@ -76,8 +82,16 @@ private fun ViewPhoto(
                 state.loadState is LoadState.Started
             }
         }
+        val request = remember(context, imageUri, thumbnailUri) {
+            DisplayRequest(context, imageUri) {
+                if (!thumbnailUri.isNullOrBlank()) {
+                    placeholder(ThumbnailMemoryCacheStateImage(thumbnailUri))
+                }
+                crossfade()
+            }
+        }
         SketchZoomAsyncImage(
-            imageUri = imageUri,
+            request = request,
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             onTap = onTap,
@@ -116,22 +130,33 @@ class PhotoViewActivity : BaseComposeActivityWithParcelable<PhotoViewData>() {
             viewModel.initialized = true
         }
         val uiState by viewModel.uiState.collectAsState()
-        val items by remember { derivedStateOf { uiState.data } }
-        val initialIndex by remember { derivedStateOf { uiState.initialIndex } }
-        val totalAmount by remember { derivedStateOf { uiState.totalAmount } }
-        val hasPrev by remember { derivedStateOf { uiState.hasPrev } }
-        val hasNext by remember { derivedStateOf { uiState.hasNext } }
-        val loadPicPageData by remember { derivedStateOf { uiState.loadPicPageData } }
-        val loaded by remember { derivedStateOf { uiState.data.isNotEmpty() } }
+        val items = uiState.data
+        val initialIndex = uiState.initialIndex
+        val totalAmount = uiState.totalAmount
+        val hasPrev = uiState.hasPrev
+        val hasNext = uiState.hasNext
+        val loadPicPageData = uiState.loadPicPageData
+        val loaded = items.isNotEmpty()
 
         Surface(color = Color.Black) {
             if (loaded) {
-                val pageCount by remember { derivedStateOf { items.size } }
+                val pageCount = items.size
 
                 val pagerState = rememberPagerState(initialPage = initialIndex) { pageCount }
 
                 LaunchedEffect(initialIndex) {
                     if (pagerState.currentPage != initialIndex) pagerState.scrollToPage(initialIndex)
+                }
+
+                LaunchedEffect(pagerState.currentPage, items) {
+                    val context = this@PhotoViewActivity
+                    val curr = pagerState.currentPage
+                    if (curr + 1 in items.indices) {
+                        ImagePreloader.preload(context, items[curr + 1].originUrl)
+                    }
+                    if (curr - 1 in items.indices) {
+                        ImagePreloader.preload(context, items[curr - 1].originUrl)
+                    }
                 }
 
                 LaunchedEffect(pagerState.currentPage, pageCount, loadPicPageData) {
@@ -159,11 +184,13 @@ class PhotoViewActivity : BaseComposeActivityWithParcelable<PhotoViewData>() {
                 Box(modifier = Modifier.fillMaxSize()) {
                     HorizontalPager(
                         state = pagerState,
-                        key = { "${items[it].picId}_${items[it].postId}" }
+                        key = { "${items[it].picId}_${items[it].postId}" },
+                        beyondBoundsPageCount = 1,
                     ) {
                         val item = items[it]
                         ViewPhoto(
                             imageUri = item.originUrl,
+                            thumbnailUri = item.url,
                             modifier = Modifier.fillMaxSize(),
                             onTap = {
                                 finish()

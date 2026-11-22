@@ -171,6 +171,12 @@ fun AppThemePage(
                     if (index == 0) {
                         Spacer(modifier = Modifier.size(16.dp))
                     }
+                    val onItemClick = remember(item) {
+                        {
+                            ThemeUtil.switchTheme(item)
+                            ThemeUtil.setUseDynamicTheme(false)
+                        }
+                    }
                     if (ThemeUtil.isNightMode(item)) {
                         ThemeItem(
                             themeName = name,
@@ -179,10 +185,7 @@ fun AppThemePage(
                             accentColor = backgroundColor,
                             contentColor = onBackgroundColor,
                             selected = !isDynamicTheme && currentTheme == item,
-                            onClick = {
-                                ThemeUtil.switchTheme(item)
-                                ThemeUtil.setUseDynamicTheme(false)
-                            }
+                            onClick = onItemClick
                         )
                     } else {
                         ThemeItem(
@@ -192,10 +195,7 @@ fun AppThemePage(
                             accentColor = accentColor,
                             contentColor = onAccentColor,
                             selected = !isDynamicTheme && currentTheme == item,
-                            onClick = {
-                                ThemeUtil.switchTheme(item)
-                                ThemeUtil.setUseDynamicTheme(false)
-                            }
+                            onClick = onItemClick
                         )
                     }
                 }

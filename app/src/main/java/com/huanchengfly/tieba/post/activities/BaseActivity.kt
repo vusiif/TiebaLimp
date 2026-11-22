@@ -49,7 +49,7 @@ abstract class BaseActivity : AppCompatActivity(), ExtraRefreshable, CoroutineSc
         get() = Dispatchers.Main + job
 
     private var mTintToolbar: TintToolbar? = null
-    private var oldTheme: String = ""
+    protected var oldTheme: String = ""
 
     private var isActivityRunning = true
     private var customStatusColor = -1
@@ -127,7 +127,7 @@ abstract class BaseActivity : AppCompatActivity(), ExtraRefreshable, CoroutineSc
         decorChild.setBackgroundColor(Color.BLACK)
     }
 
-    fun refreshUIIfNeed() {
+    open fun refreshUIIfNeed() {
         if (TextUtils.equals(oldTheme, ThemeUtil.getRawTheme()) &&
             ThemeUtil.THEME_CUSTOM != ThemeUtil.getRawTheme() &&
             !ThemeUtil.isTranslucentTheme()

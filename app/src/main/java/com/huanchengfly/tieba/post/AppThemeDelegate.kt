@@ -10,12 +10,27 @@ import com.huanchengfly.tieba.post.ui.common.theme.interfaces.ThemeSwitcher
 import com.huanchengfly.tieba.post.utils.ThemeUtil
 import com.huanchengfly.tieba.post.utils.Util
 import com.huanchengfly.tieba.post.utils.appPreferences
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Handles global theme switching, attribute resolution, dynamic tonal palette integration,
  * and custom/translucent theme color mapping.
  */
 object AppThemeDelegate : ThemeSwitcher {
+    private val identifierCache = ConcurrentHashMap<String, Int>()
+    private val staticColorCache = ConcurrentHashMap<Long, Int>()
+
+    private fun getIdentifierCached(
+        resources: android.content.res.Resources,
+        name: String,
+        defType: String,
+        packageName: String
+    ): Int {
+        return identifierCache.getOrPut(name) {
+            resources.getIdentifier(name, defType, packageName)
+        }
+    }
+
     private fun getDefaultColorResId(attrId: Int): Int {
         return when (attrId) {
             R.attr.colorPrimary -> R.color.default_color_primary
@@ -53,6 +68,26 @@ object AppThemeDelegate : ThemeSwitcher {
     @SuppressLint("DiscouragedApi")
     fun getColorByAttr(context: Context, attrId: Int, theme: String): Int {
         if (!App.isInitialized) return context.getColorCompat(getDefaultColorResId(attrId))
+        val isStatic = !ThemeUtil.isDynamicTheme(theme) &&
+                ThemeUtil.THEME_CUSTOM != theme &&
+                !ThemeUtil.isTranslucentTheme(theme) &&
+                attrId != R.attr.colorToolbar &&
+                attrId != R.attr.colorToolbarItem &&
+                attrId != R.attr.colorToolbarItemActive &&
+                attrId != R.attr.colorToolbarItemSecondary &&
+                attrId != R.attr.colorToolbarSurface &&
+                attrId != R.attr.colorOnToolbarSurface
+
+        if (isStatic) {
+            val key = (attrId.toLong() shl 32) or (theme.hashCode().toLong() and 0xFFFFFFFFL)
+            return staticColorCache.getOrPut(key) {
+                resolveColorByAttr(context, attrId, theme)
+            }
+        }
+        return resolveColorByAttr(context, attrId, theme)
+    }
+
+    private fun resolveColorByAttr(context: Context, attrId: Int, theme: String): Int {
         val resources = context.resources
         val packageName = context.packageName
         when (attrId) {
@@ -76,7 +111,7 @@ object AppThemeDelegate : ThemeSwitcher {
                     } else getColorByAttr(context, attrId, ThemeUtil.THEME_DEFAULT)
                 }
                 return context.getColorCompat(
-                    resources.getIdentifier(
+                    getIdentifierCached(resources,
                         "theme_color_primary_$theme",
                         "color",
                         packageName
@@ -115,7 +150,7 @@ object AppThemeDelegate : ThemeSwitcher {
                     getColorByAttr(context, R.attr.colorPrimary, theme)
                 } else {
                     context.getColorCompat(
-                        resources.getIdentifier(
+                        getIdentifierCached(resources,
                             "theme_color_accent_$theme",
                             "color",
                             packageName
@@ -126,7 +161,7 @@ object AppThemeDelegate : ThemeSwitcher {
             R.attr.colorOnAccent -> {
                 return if (ThemeUtil.isNightMode(theme) || ThemeUtil.isTranslucentTheme(theme)) {
                     context.getColorCompat(
-                        resources.getIdentifier(
+                        getIdentifierCached(resources,
                             "theme_color_on_accent_$theme",
                             "color",
                             packageName
@@ -137,7 +172,7 @@ object AppThemeDelegate : ThemeSwitcher {
             R.attr.colorToolbar -> {
                 return if (ThemeUtil.isNightMode(theme) || ThemeUtil.isTranslucentTheme(theme)) {
                     context.getColorCompat(
-                        resources.getIdentifier(
+                        getIdentifierCached(resources,
                             "theme_color_toolbar_$theme",
                             "color",
                             packageName
@@ -155,7 +190,7 @@ object AppThemeDelegate : ThemeSwitcher {
             R.attr.colorText -> {
                 return if (ThemeUtil.isTranslucentTheme(theme)) {
                     context.getColorCompat(
-                        resources.getIdentifier(
+                        getIdentifierCached(resources,
                             "color_text_$theme",
                             "color",
                             packageName
@@ -166,7 +201,7 @@ object AppThemeDelegate : ThemeSwitcher {
             R.attr.color_text_disabled -> {
                 return if (ThemeUtil.isTranslucentTheme(theme)) {
                     context.getColorCompat(
-                        resources.getIdentifier(
+                        getIdentifierCached(resources,
                             "color_text_disabled_$theme",
                             "color",
                             packageName
@@ -177,7 +212,7 @@ object AppThemeDelegate : ThemeSwitcher {
             R.attr.colorTextSecondary -> {
                 return if (ThemeUtil.isTranslucentTheme(theme)) {
                     context.getColorCompat(
-                        resources.getIdentifier(
+                        getIdentifierCached(resources,
                             "color_text_secondary_$theme",
                             "color",
                             packageName
@@ -198,7 +233,7 @@ object AppThemeDelegate : ThemeSwitcher {
                 }
                 return if (ThemeUtil.isNightMode(theme)) {
                     context.getColorCompat(
-                        resources.getIdentifier(
+                        getIdentifierCached(resources,
                             "theme_color_background_$theme",
                             "color",
                             packageName
@@ -209,7 +244,7 @@ object AppThemeDelegate : ThemeSwitcher {
             R.attr.colorWindowBackground -> {
                 return if (ThemeUtil.isTranslucentTheme(theme)) {
                     context.getColorCompat(
-                        resources.getIdentifier(
+                        getIdentifierCached(resources,
                             "theme_color_window_background_$theme",
                             "color",
                             packageName
@@ -217,7 +252,7 @@ object AppThemeDelegate : ThemeSwitcher {
                     )
                 } else if (ThemeUtil.isNightMode(theme)) {
                     context.getColorCompat(
-                        resources.getIdentifier(
+                        getIdentifierCached(resources,
                             "theme_color_background_$theme",
                             "color",
                             packageName
@@ -230,7 +265,7 @@ object AppThemeDelegate : ThemeSwitcher {
             R.attr.colorChip -> {
                 return if (ThemeUtil.isNightMode(theme) || ThemeUtil.isTranslucentTheme(theme)) {
                     context.getColorCompat(
-                        resources.getIdentifier(
+                        getIdentifierCached(resources,
                             "theme_color_chip_$theme",
                             "color",
                             packageName
@@ -241,7 +276,7 @@ object AppThemeDelegate : ThemeSwitcher {
             R.attr.colorOnChip -> {
                 return if (ThemeUtil.isNightMode(theme) || ThemeUtil.isTranslucentTheme(theme)) {
                     context.getColorCompat(
-                        resources.getIdentifier(
+                        getIdentifierCached(resources,
                             "theme_color_on_chip_$theme",
                             "color",
                             packageName
@@ -251,7 +286,7 @@ object AppThemeDelegate : ThemeSwitcher {
             }
             R.attr.colorUnselected -> {
                 return context.getColorCompat(
-                    if (ThemeUtil.isNightMode(theme)) resources.getIdentifier(
+                    if (ThemeUtil.isNightMode(theme)) getIdentifierCached(resources,
                         "theme_color_unselected_$theme",
                         "color",
                         packageName
@@ -264,7 +299,7 @@ object AppThemeDelegate : ThemeSwitcher {
                 }
                 return if (ThemeUtil.isNightMode(theme)) {
                     context.getColorCompat(
-                        resources.getIdentifier(
+                        getIdentifierCached(resources,
                             "theme_color_nav_$theme",
                             "color",
                             packageName
@@ -277,7 +312,7 @@ object AppThemeDelegate : ThemeSwitcher {
             R.attr.colorFloorCard -> {
                 return if (ThemeUtil.isNightMode(theme) || ThemeUtil.isTranslucentTheme(theme)) {
                     context.getColorCompat(
-                        resources.getIdentifier(
+                        getIdentifierCached(resources,
                             "theme_color_floor_card_$theme",
                             "color",
                             packageName
@@ -288,7 +323,7 @@ object AppThemeDelegate : ThemeSwitcher {
             R.attr.colorCard -> {
                 return if (ThemeUtil.isNightMode(theme) || ThemeUtil.isTranslucentTheme(theme)) {
                     context.getColorCompat(
-                        resources.getIdentifier(
+                        getIdentifierCached(resources,
                             "theme_color_card_$theme",
                             "color",
                             packageName
@@ -299,7 +334,7 @@ object AppThemeDelegate : ThemeSwitcher {
             R.attr.colorDivider -> {
                 return if (ThemeUtil.isNightMode(theme) || ThemeUtil.isTranslucentTheme(theme)) {
                     context.getColorCompat(
-                        resources.getIdentifier(
+                        getIdentifierCached(resources,
                             "theme_color_divider_$theme",
                             "color",
                             packageName
@@ -315,7 +350,7 @@ object AppThemeDelegate : ThemeSwitcher {
             R.attr.colorToolbarItem -> {
                 if (ThemeUtil.isTranslucentTheme(theme)) {
                     return context.getColorCompat(
-                        resources.getIdentifier(
+                        getIdentifierCached(resources,
                             "theme_color_toolbar_item_$theme",
                             "color",
                             packageName
@@ -329,7 +364,7 @@ object AppThemeDelegate : ThemeSwitcher {
             R.attr.colorToolbarItemActive -> {
                 if (ThemeUtil.isTranslucentTheme(theme)) {
                     return context.getColorCompat(
-                        resources.getIdentifier(
+                        getIdentifierCached(resources,
                             "theme_color_toolbar_item_active_$theme",
                             "color",
                             packageName
@@ -347,7 +382,7 @@ object AppThemeDelegate : ThemeSwitcher {
                     ThemeUtil.isTranslucentTheme(theme)
                 ) {
                     context.getColorCompat(
-                        resources.getIdentifier(
+                        getIdentifierCached(resources,
                             "theme_color_toolbar_item_secondary_$theme",
                             "color",
                             packageName
@@ -359,7 +394,7 @@ object AppThemeDelegate : ThemeSwitcher {
             R.attr.colorIndicator -> {
                 return if (ThemeUtil.isNightMode(theme) || ThemeUtil.isTranslucentTheme(theme)) {
                     context.getColorCompat(
-                        resources.getIdentifier(
+                        getIdentifierCached(resources,
                             "theme_color_indicator_$theme",
                             "color",
                             packageName
@@ -371,7 +406,7 @@ object AppThemeDelegate : ThemeSwitcher {
             R.attr.colorToolbarSurface -> {
                 return if (ThemeUtil.isTranslucentTheme(theme) || ThemeUtil.isNightMode(theme)) {
                     context.getColorCompat(
-                        resources.getIdentifier(
+                        getIdentifierCached(resources,
                             "theme_color_toolbar_surface_$theme",
                             "color",
                             packageName
@@ -385,7 +420,7 @@ object AppThemeDelegate : ThemeSwitcher {
             R.attr.colorOnToolbarSurface -> {
                 return if (ThemeUtil.isTranslucentTheme(theme) || ThemeUtil.isNightMode(theme)) {
                     context.getColorCompat(
-                        resources.getIdentifier(
+                        getIdentifierCached(resources,
                             "theme_color_on_toolbar_surface_$theme",
                             "color",
                             packageName
@@ -398,7 +433,7 @@ object AppThemeDelegate : ThemeSwitcher {
             R.attr.colorNavBarSurface -> {
                 return if (ThemeUtil.isNightMode(theme)) {
                     context.getColorCompat(
-                        resources.getIdentifier(
+                        getIdentifierCached(resources,
                             "theme_color_nav_bar_surface_$theme",
                             "color",
                             packageName
@@ -420,7 +455,7 @@ object AppThemeDelegate : ThemeSwitcher {
             R.attr.colorPlaceholder -> {
                 return if (ThemeUtil.isTranslucentTheme(theme) || ThemeUtil.isNightMode(theme)) {
                     context.getColorCompat(
-                        resources.getIdentifier(
+                        getIdentifierCached(resources,
                             "theme_color_placeholder_$theme",
                             "color",
                             packageName

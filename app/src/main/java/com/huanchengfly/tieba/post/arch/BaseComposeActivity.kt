@@ -59,6 +59,15 @@ abstract class BaseComposeActivity : BaseActivity() {
     override val isNeedFixBg: Boolean = false
     override val isNeedSetTheme: Boolean = false
 
+    override fun refreshUIIfNeed() {
+        val currentTheme = ThemeUtil.getRawTheme()
+        val translucencyChanged = oldTheme.contains(ThemeUtil.THEME_TRANSLUCENT) != ThemeUtil.isTranslucentTheme(currentTheme)
+        oldTheme = currentTheme
+        if (translucencyChanged) {
+            recreate()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 

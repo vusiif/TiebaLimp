@@ -247,9 +247,13 @@ fun NetworkImage(
 
     var layoutOffset by remember { mutableStateOf(Offset.Zero) }
 
-    val request = remember(imageUri, shouldLoad, colorMask) {
+    val placeholderDrawable = remember(context, isNightMode) {
+        ImageUtil.getPlaceHolder(context, 0)
+    }
+
+    val request = remember(imageUri, shouldLoad, colorMask, placeholderDrawable) {
         DisplayRequest(context, imageUri) {
-            placeholder(ImageUtil.getPlaceHolder(context, 0))
+            placeholder(placeholderDrawable)
             crossfade()
             if (!shouldLoad) {
                 depth(Depth.LOCAL)

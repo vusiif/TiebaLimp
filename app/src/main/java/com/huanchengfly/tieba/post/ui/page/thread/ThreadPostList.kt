@@ -37,12 +37,14 @@ import com.huanchengfly.tieba.post.api.models.protos.ThreadInfo
 import com.huanchengfly.tieba.post.api.models.protos.User
 import com.huanchengfly.tieba.post.arch.ImmutableHolder
 import com.huanchengfly.tieba.post.ui.common.PbContentRender
+import com.huanchengfly.tieba.post.ui.common.PicContentRender
 import com.huanchengfly.tieba.post.ui.common.theme.compose.ExtendedTheme
 import com.huanchengfly.tieba.post.ui.widgets.compose.Button
 import com.huanchengfly.tieba.post.ui.widgets.compose.Container
 import com.huanchengfly.tieba.post.ui.widgets.compose.MyLazyColumn
 import com.huanchengfly.tieba.post.ui.widgets.compose.TipScreen
 import com.huanchengfly.tieba.post.utils.BlockManager.FilterResult
+import com.huanchengfly.tieba.post.utils.LazyListImagePreloadEffect
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import kotlinx.collections.immutable.ImmutableList
 import kotlin.math.max
@@ -144,6 +146,17 @@ fun ThreadPostList(
     onMenuDeleteClick: (Post) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val headerOffset = (if (firstPost != null) 1 else 0) + 1 + (if (hasPrevious) 1 else 0)
+    LazyListImagePreloadEffect(
+        state = lazyListState,
+        items = data,
+        preloadAhead = 5,
+        itemOffset = headerOffset,
+        extractUrls = { postItem ->
+            postItem.contentRenders.filterIsInstance<PicContentRender>().map { it.picUrl }
+        }
+    )
+
     MyLazyColumn(
         state = lazyListState,
         modifier = modifier.fillMaxWidth()

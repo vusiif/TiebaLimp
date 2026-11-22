@@ -59,6 +59,8 @@ import com.huanchengfly.tieba.post.ui.page.destinations.UserProfilePageDestinati
 import com.huanchengfly.tieba.post.ui.page.forum.getSortType
 import com.huanchengfly.tieba.post.ui.widgets.compose.BlockTip
 import com.huanchengfly.tieba.post.ui.widgets.compose.BlockableContent
+import com.huanchengfly.tieba.post.utils.LazyListImagePreloadEffect
+import com.huanchengfly.tieba.post.utils.url
 import com.huanchengfly.tieba.post.ui.widgets.compose.Chip
 import com.huanchengfly.tieba.post.ui.widgets.compose.FeedCard
 import com.huanchengfly.tieba.post.ui.widgets.compose.LazyLoad
@@ -180,6 +182,15 @@ private fun ThreadList(
         WindowWidthSizeClass.Expanded -> 0.5f
         else -> 1f
     }
+    val itemOffset = if (!forumRuleTitle.isNullOrEmpty()) 1 else 0
+    LazyListImagePreloadEffect(
+        state = state,
+        items = items,
+        preloadAhead = 5,
+        itemOffset = itemOffset,
+        extractUrls = { (holder) -> holder.get { media }.map { it.url } }
+    )
+
     MyLazyColumn(
         state = state,
         horizontalAlignment = Alignment.CenterHorizontally,

@@ -58,20 +58,12 @@ import com.huanchengfly.tieba.post.ui.utils.getPhotoViewData
 import com.huanchengfly.tieba.post.utils.ImageUtil
 import com.huanchengfly.tieba.post.utils.PollVoteStore
 import com.huanchengfly.tieba.post.utils.appPreferences
+import com.huanchengfly.tieba.post.utils.url
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlin.math.max
 import kotlin.math.min
 
-private val ImmutableHolder<Media>.url: String
-    get() = ImageUtil.getUrl(
-        App.INSTANCE,
-        true,
-        get { originPic },
-        get { bigPic },
-        get { dynamicPic },
-        get { srcPic }
-    )
 
 @Composable
 fun Badge(

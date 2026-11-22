@@ -59,6 +59,8 @@ import com.huanchengfly.tieba.post.arch.onGlobalEvent
 import com.huanchengfly.tieba.post.arch.pageViewModel
 import com.huanchengfly.tieba.post.ui.common.theme.compose.ExtendedTheme
 import com.huanchengfly.tieba.post.ui.common.theme.compose.pullRefreshIndicator
+import com.huanchengfly.tieba.post.utils.LazyListImagePreloadEffect
+import com.huanchengfly.tieba.post.utils.url
 import com.huanchengfly.tieba.post.ui.models.ThreadItemData
 import com.huanchengfly.tieba.post.ui.page.LocalNavigator
 import com.huanchengfly.tieba.post.ui.page.destinations.ForumPageDestination
@@ -295,6 +297,13 @@ private fun FeedList(
     val data = dataProvider()
     val refreshPosition = refreshPositionProvider()
     val hiddenThreadIds = hiddenThreadIdsProvider()
+
+    LazyListImagePreloadEffect(
+        state = state,
+        items = data,
+        preloadAhead = 5,
+        extractUrls = { (item) -> item.get { media }.map { it.url } }
+    )
 
     MyLazyColumn(
         state = state,

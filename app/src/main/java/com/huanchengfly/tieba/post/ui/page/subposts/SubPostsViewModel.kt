@@ -204,11 +204,13 @@ sealed interface SubPostsPartialChange : PartialChange<SubPostsUiState> {
         override fun reduce(oldState: SubPostsUiState): SubPostsUiState =
             when (this) {
                 is Start -> oldState.copy(
-                    isRefreshing = true
+                    isRefreshing = true,
+                    isLoadMoreError = false
                 )
 
                 is Success -> oldState.copy(
                     isRefreshing = false,
+                    isLoadMoreError = false,
                     hasMore = hasMore,
                     currentPage = currentPage,
                     totalPage = totalPage,
@@ -247,11 +249,13 @@ sealed interface SubPostsPartialChange : PartialChange<SubPostsUiState> {
         override fun reduce(oldState: SubPostsUiState): SubPostsUiState =
             when (this) {
                 is Start -> oldState.copy(
-                    isLoading = true
+                    isLoading = true,
+                    isLoadMoreError = false
                 )
 
                 is Success -> oldState.copy(
                     isLoading = false,
+                    isLoadMoreError = false,
                     hasMore = hasMore,
                     currentPage = currentPage,
                     totalPage = totalPage,
@@ -261,6 +265,7 @@ sealed interface SubPostsPartialChange : PartialChange<SubPostsUiState> {
 
                 is Failure -> oldState.copy(
                     isLoading = false,
+                    isLoadMoreError = true,
                 )
             }
 
@@ -397,6 +402,7 @@ private fun SubPostItemData.updateAgreeStatus(hasAgreed: Int): SubPostItemData =
 
 data class SubPostsUiState(
     val isLoading: Boolean = false,
+    val isLoadMoreError: Boolean = false,
     val isRefreshing: Boolean = false,
 
     val hasMore: Boolean = true,

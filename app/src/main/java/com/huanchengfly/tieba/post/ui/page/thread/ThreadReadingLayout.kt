@@ -51,6 +51,7 @@ fun ThreadReadingLayout(
     galleryImages: List<ThreadGalleryImage>,
     hasMore: Boolean,
     isLoadingMore: Boolean,
+    isLoadMoreError: Boolean = false,
     isRefreshing: Boolean,
     hasPrevious: Boolean,
     loadMoreEnd: Boolean,
@@ -159,41 +160,46 @@ fun ThreadReadingLayout(
                 modifier = Modifier.fillMaxSize()
             )
         } else {
+            val performLoadMore = {
+                if (hasMore) {
+                    viewModel.send(
+                        ThreadUiIntent.LoadMore(
+                            threadId = threadId,
+                            page = if (curSortType == ThreadSortType.SORT_TYPE_DESC) totalPage - currentPageMax
+                            else currentPageMax + 1,
+                            forumId = forumId,
+                            postId = nextPagePostId,
+                            seeLz = isSeeLz,
+                            sortType = curSortType,
+                            postIds = data.map { it.post.get { id } }
+                        )
+                    )
+                } else if (data.isNotEmpty() && curSortType != ThreadSortType.SORT_TYPE_DESC) {
+                    viewModel.send(
+                        ThreadUiIntent.LoadLatestPosts(
+                            threadId = threadId,
+                            curLatestPostId = data.last().post.get { id },
+                            forumId = curForumId,
+                            seeLz = isSeeLz,
+                            sortType = curSortType
+                        )
+                    )
+                }
+            }
             LoadMoreLayout(
                 isLoading = isLoadingMore,
-                onLoadMore = {
-                    if (hasMore) {
-                        viewModel.send(
-                            ThreadUiIntent.LoadMore(
-                                threadId = threadId,
-                                page = if (curSortType == ThreadSortType.SORT_TYPE_DESC) totalPage - currentPageMax
-                                else currentPageMax + 1,
-                                forumId = forumId,
-                                postId = nextPagePostId,
-                                seeLz = isSeeLz,
-                                sortType = curSortType,
-                                postIds = data.map { it.post.get { id } }
-                            )
-                        )
-                    } else if (data.isNotEmpty() && curSortType != ThreadSortType.SORT_TYPE_DESC) {
-                        viewModel.send(
-                            ThreadUiIntent.LoadLatestPosts(
-                                threadId = threadId,
-                                curLatestPostId = data.last().post.get { id },
-                                forumId = curForumId,
-                                seeLz = isSeeLz,
-                                sortType = curSortType
-                            )
-                        )
-                    }
-                },
+                isError = isLoadMoreError,
+                onLoadMore = performLoadMore,
+                onRetry = performLoadMore,
                 loadEnd = loadMoreEnd,
                 indicator = { isLoading, end, willLoad ->
                     ThreadLoadMoreIndicator(
-                        isLoading,
-                        end,
-                        willLoad,
-                        hasMore
+                        isLoading = isLoading,
+                        loadMoreEnd = end,
+                        willLoad = willLoad,
+                        hasMore = hasMore,
+                        isError = isLoadMoreError,
+                        onRetry = performLoadMore
                     )
                 },
                 lazyListState = lazyListState,

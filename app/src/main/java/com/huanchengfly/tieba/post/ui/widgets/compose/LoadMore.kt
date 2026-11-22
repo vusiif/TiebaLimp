@@ -1,6 +1,7 @@
 package com.huanchengfly.tieba.post.ui.widgets.compose
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -17,8 +18,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.FractionalThreshold
+import androidx.compose.material.Icon
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -64,11 +68,15 @@ fun LoadMoreLayout(
     modifier: Modifier = Modifier,
     enableLoadMore: Boolean = true,
     loadEnd: Boolean = false,
+    isError: Boolean = false,
+    onRetry: (() -> Unit)? = null,
     indicator: @Composable (Boolean, Boolean, Boolean) -> Unit = { loading, end, willLoad ->
         DefaultIndicator(
             isLoading = loading,
             loadEnd = end,
-            willLoad = willLoad
+            willLoad = willLoad,
+            isError = isError,
+            onRetry = onRetry ?: onLoadMore
         )
     },
     lazyListState: LazyListState? = null,
@@ -105,6 +113,7 @@ fun LoadMoreLayout(
     val canLoadMore = remember(enableLoadMore, loadEnd) { enableLoadMore && !loadEnd }
     val curIsEmpty by rememberUpdatedState(newValue = isEmpty)
     val curIsLoading by rememberUpdatedState(newValue = isLoading)
+    val curIsError by rememberUpdatedState(newValue = isError)
     val curCanLoadMore by rememberUpdatedState(newValue = canLoadMore)
     val curPreloadCount by rememberUpdatedState(newValue = preloadCount)
 
@@ -114,7 +123,7 @@ fun LoadMoreLayout(
         curLazyListState?.let { state ->
             snapshotFlow {
                 val shouldPreload =
-                    !curIsEmpty && curCanLoadMore && !curIsLoading && curPreloadCount > 0
+                    !curIsEmpty && curCanLoadMore && !curIsLoading && !curIsError && curPreloadCount > 0
                 val isInPreloadRange =
                     state.firstVisibleItemIndex + state.layoutInfo.visibleItemsInfo.size - 1 >= state.layoutInfo.totalItemsCount - curPreloadCount
                 shouldPreload && isInPreloadRange
@@ -185,16 +194,20 @@ fun DefaultIndicator(
     isLoading: Boolean,
     loadEnd: Boolean,
     willLoad: Boolean,
+    isError: Boolean = false,
+    onRetry: (() -> Unit)? = null,
     loadingText: String = stringResource(id = R.string.text_loading),
     loadEndText: String = stringResource(id = R.string.no_more),
     pullToLoadText: String = stringResource(id = R.string.pull_to_load),
     releaseToLoadText: String = stringResource(id = R.string.release_to_load),
+    errorText: String = "${stringResource(id = R.string.text_load_failed)}，${stringResource(id = R.string.button_retry)}",
 ) {
     Surface(
         elevation = 8.dp,
         shape = RoundedCornerShape(100),
         color = ExtendedTheme.colors.loadMoreIndicator,
-        contentColor = ExtendedTheme.colors.text
+        contentColor = ExtendedTheme.colors.text,
+        modifier = if (isError && onRetry != null) Modifier.clickable(onClick = onRetry) else Modifier
     ) {
         Row(
             modifier = Modifier
@@ -211,6 +224,15 @@ fun DefaultIndicator(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(text = loadingText, modifier = Modifier.padding(horizontal = 8.dp))
+            } else if (isError) {
+                Icon(
+                    imageVector = Icons.Rounded.Refresh,
+                    contentDescription = errorText,
+                    modifier = Modifier.size(18.dp),
+                    tint = ExtendedTheme.colors.primary
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(text = errorText, modifier = Modifier.padding(horizontal = 6.dp))
             } else if (loadEnd) {
                 Text(text = loadEndText, modifier = Modifier.padding(horizontal = 8.dp))
             } else {

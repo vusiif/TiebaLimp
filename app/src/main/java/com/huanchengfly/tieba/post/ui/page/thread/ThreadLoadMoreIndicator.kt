@@ -1,6 +1,7 @@
 package com.huanchengfly.tieba.post.ui.page.thread
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -10,10 +11,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.CircularProgressIndicator
+import androidx.compose.material.Icon
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.ProvideTextStyle
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,12 +34,15 @@ internal fun ThreadLoadMoreIndicator(
     loadMoreEnd: Boolean,
     willLoad: Boolean,
     hasMore: Boolean,
+    isError: Boolean = false,
+    onRetry: (() -> Unit)? = null,
 ) {
     Surface(
         elevation = 8.dp,
         shape = RoundedCornerShape(100),
         color = ExtendedTheme.colors.loadMoreIndicator,
-        contentColor = ExtendedTheme.colors.text
+        contentColor = ExtendedTheme.colors.text,
+        modifier = if (isError && onRetry != null) Modifier.clickable(onClick = onRetry) else Modifier
     ) {
         Row(
             modifier = Modifier
@@ -56,6 +63,20 @@ internal fun ThreadLoadMoreIndicator(
                         Text(
                             text = stringResource(id = R.string.text_loading),
                             modifier = Modifier.padding(horizontal = 8.dp)
+                        )
+                    }
+
+                    isError -> {
+                        Icon(
+                            imageVector = Icons.Rounded.Refresh,
+                            contentDescription = stringResource(id = R.string.button_retry),
+                            modifier = Modifier.size(18.dp),
+                            tint = ExtendedTheme.colors.primary
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "${stringResource(id = R.string.text_load_failed)}，${stringResource(id = R.string.button_retry)}",
+                            modifier = Modifier.padding(horizontal = 6.dp)
                         )
                     }
 

@@ -99,6 +99,10 @@ fun PersonalizedPage(
         prop1 = PersonalizedUiState::isLoadingMore,
         initial = false
     )
+    val isLoadMoreError by viewModel.uiState.collectPartialAsState(
+        prop1 = PersonalizedUiState::isLoadMoreError,
+        initial = false
+    )
     val currentPage by viewModel.uiState.collectPartialAsState(
         prop1 = PersonalizedUiState::currentPage,
         initial = 1
@@ -187,6 +191,7 @@ fun PersonalizedPage(
         Box(modifier = Modifier.pullRefresh(pullRefreshState)) {
             LoadMoreLayout(
                 isLoading = isLoadingMore,
+                isError = isLoadMoreError,
                 onLoadMore = { viewModel.send(PersonalizedUiIntent.LoadMore(currentPage + 1)) },
                 loadEnd = false,
                 lazyListState = lazyListState,

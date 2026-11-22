@@ -132,6 +132,10 @@ fun ThreadPage(
         prop1 = ThreadUiState::isLoadingMore,
         initial = false
     )
+    val isLoadMoreError by viewModel.uiState.collectPartialAsState(
+        prop1 = ThreadUiState::isLoadMoreError,
+        initial = false
+    )
     val isError by viewModel.uiState.collectPartialAsState(
         prop1 = ThreadUiState::isError,
         initial = false
@@ -490,6 +494,7 @@ fun ThreadPage(
                         galleryImages = galleryImages,
                         hasMore = hasMore,
                         isLoadingMore = isLoadingMore,
+                        isLoadMoreError = isLoadMoreError,
                         isRefreshing = isRefreshing,
                         hasPrevious = hasPrevious,
                         loadMoreEnd = loadMoreEnd,

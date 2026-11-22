@@ -139,6 +139,10 @@ internal fun SubPostsContent(
         prop1 = SubPostsUiState::isLoading,
         initial = false
     )
+    val isLoadMoreError by viewModel.uiState.collectPartialAsState(
+        prop1 = SubPostsUiState::isLoadMoreError,
+        initial = false
+    )
     val anti by viewModel.uiState.collectPartialAsState(
         prop1 = SubPostsUiState::anti,
         initial = null
@@ -299,6 +303,7 @@ internal fun SubPostsContent(
             LoadMoreLayout(
                 modifier = Modifier.padding(paddingValues),
                 isLoading = isLoading,
+                isError = isLoadMoreError,
                 onLoadMore = {
                     viewModel.send(
                         SubPostsUiIntent.LoadMore(

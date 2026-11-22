@@ -64,11 +64,12 @@ sealed interface ThreadPartialChange : PartialChange<ThreadUiState> {
 
     sealed class Load : ThreadPartialChange {
         override fun reduce(oldState: ThreadUiState): ThreadUiState = when (this) {
-            is Start -> oldState.copy(isRefreshing = true)
+            is Start -> oldState.copy(isRefreshing = true, isLoadMoreError = false)
 
             is Success -> oldState.copy(
                 isRefreshing = false,
                 isError = false,
+                isLoadMoreError = false,
                 error = null,
                 title = title,
                 author = wrapImmutable(author),
@@ -182,13 +183,14 @@ sealed interface ThreadPartialChange : PartialChange<ThreadUiState> {
 
     sealed class LoadMore : ThreadPartialChange {
         override fun reduce(oldState: ThreadUiState): ThreadUiState = when (this) {
-            is Start -> oldState.copy(isLoadingMore = true)
+            is Start -> oldState.copy(isLoadingMore = true, isLoadMoreError = false)
             is Success -> {
                 val uniqueData = data.filterNot { item ->
                     oldState.data.any { it.post.get { id } == item.post.get { id } }
                 }
                 oldState.copy(
                     isLoadingMore = false,
+                    isLoadMoreError = false,
                     author = wrapImmutable(author),
                     data = (oldState.data + uniqueData).toImmutableList(),
                     threadInfo = threadInfo.wrapImmutable(),
@@ -200,7 +202,7 @@ sealed interface ThreadPartialChange : PartialChange<ThreadUiState> {
                 )
             }
 
-            is Failure -> oldState.copy(isLoadingMore = false)
+            is Failure -> oldState.copy(isLoadingMore = false, isLoadMoreError = true)
         }
 
         data object Start : LoadMore()
@@ -256,13 +258,14 @@ sealed interface ThreadPartialChange : PartialChange<ThreadUiState> {
 
     sealed class LoadLatestPosts : ThreadPartialChange {
         override fun reduce(oldState: ThreadUiState): ThreadUiState = when (this) {
-            Start -> oldState.copy(isLoadingMore = true)
+            Start -> oldState.copy(isLoadingMore = true, isLoadMoreError = false)
             is Success -> {
                 val uniqueData = data.filterNot { item ->
                     oldState.data.any { it.post.get { id } == item.post.get { id } }
                 }
                 oldState.copy(
                     isLoadingMore = false,
+                    isLoadMoreError = false,
                     author = wrapImmutable(author),
                     data = (oldState.data + uniqueData).toImmutableList(),
                     threadInfo = threadInfo.wrapImmutable(),
@@ -274,8 +277,8 @@ sealed interface ThreadPartialChange : PartialChange<ThreadUiState> {
                 )
             }
 
-            SuccessWithNoNewPost -> oldState.copy(isLoadingMore = false)
-            is Failure -> oldState.copy(isLoadingMore = false)
+            SuccessWithNoNewPost -> oldState.copy(isLoadingMore = false, isLoadMoreError = false)
+            is Failure -> oldState.copy(isLoadingMore = false, isLoadMoreError = true)
         }
 
         data object Start : LoadLatestPosts()

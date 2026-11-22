@@ -1,5 +1,6 @@
 package com.huanchengfly.tieba.post.ui.widgets.compose.states
 
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
@@ -74,6 +75,10 @@ val DefaultErrorScreen: @Composable StateScreenScope.() -> Unit = {
     )
 }
 
+private enum class ScreenState {
+    CONTENT, LOADING, ERROR, EMPTY
+}
+
 @Composable
 fun StateScreen(
     isEmpty: Boolean,
@@ -97,15 +102,21 @@ fun StateScreen(
                 then clickableModifier,
         contentAlignment = Alignment.Center
     ) {
-        if (!isEmpty) {
-            stateScreenScope.content()
-        } else {
-            if (isLoading) {
-                stateScreenScope.loadingScreen()
-            } else if (isError) {
-                stateScreenScope.errorScreen()
-            } else {
-                stateScreenScope.emptyScreen()
+        val targetState = when {
+            !isEmpty -> ScreenState.CONTENT
+            isLoading -> ScreenState.LOADING
+            isError -> ScreenState.ERROR
+            else -> ScreenState.EMPTY
+        }
+        Crossfade(
+            targetState = targetState,
+            label = "StateScreenCrossfade"
+        ) { state ->
+            when (state) {
+                ScreenState.CONTENT -> stateScreenScope.content()
+                ScreenState.LOADING -> stateScreenScope.loadingScreen()
+                ScreenState.ERROR -> stateScreenScope.errorScreen()
+                ScreenState.EMPTY -> stateScreenScope.emptyScreen()
             }
         }
     }

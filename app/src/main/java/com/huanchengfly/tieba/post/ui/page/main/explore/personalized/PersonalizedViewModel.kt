@@ -276,12 +276,13 @@ sealed interface PersonalizedPartialChange : PartialChange<PersonalizedUiState> 
     sealed class Refresh private constructor() : PersonalizedPartialChange {
         override fun reduce(oldState: PersonalizedUiState): PersonalizedUiState =
             when (this) {
-                Start -> oldState.copy(isRefreshing = true)
+                Start -> oldState.copy(isRefreshing = true, isLoadMoreError = false)
                 is Success -> {
                     val oldSize = oldState.data.size
                     val newData = (data + oldState.data).distinctById()
                     oldState.copy(
                         isRefreshing = false,
+                        isLoadMoreError = false,
                         currentPage = 1,
                         data = newData,
                         refreshPosition = if (oldState.data.isEmpty()) 0 else (newData.size - oldSize),
@@ -308,15 +309,17 @@ sealed interface PersonalizedPartialChange : PartialChange<PersonalizedUiState> 
     sealed class LoadMore private constructor() : PersonalizedPartialChange {
         override fun reduce(oldState: PersonalizedUiState): PersonalizedUiState =
             when (this) {
-                Start -> oldState.copy(isLoadingMore = true)
+                Start -> oldState.copy(isLoadingMore = true, isLoadMoreError = false)
                 is Success -> oldState.copy(
                     isLoadingMore = false,
+                    isLoadMoreError = false,
                     currentPage = currentPage,
                     data = (oldState.data + data).distinctById(),
                 )
 
                 is Failure -> oldState.copy(
                     isLoadingMore = false,
+                    isLoadMoreError = true,
                     error = error.wrapImmutable()
                 )
             }
@@ -338,6 +341,7 @@ sealed interface PersonalizedPartialChange : PartialChange<PersonalizedUiState> 
 data class PersonalizedUiState(
     val isRefreshing: Boolean = true,
     val isLoadingMore: Boolean = false,
+    val isLoadMoreError: Boolean = false,
     val error: ImmutableHolder<Throwable>? = null,
     val currentPage: Int = 1,
     val data: ImmutableList<ThreadItemData> = persistentListOf(),

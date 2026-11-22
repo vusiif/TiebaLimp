@@ -324,6 +324,10 @@ fun ForumThreadListPage(
         prop1 = ForumThreadListUiState::isLoadingMore,
         initial = false
     )
+    val isLoadMoreError by viewModel.uiState.collectPartialAsState(
+        prop1 = ForumThreadListUiState::isLoadMoreError,
+        initial = false
+    )
     val hasMore by viewModel.uiState.collectPartialAsState(
         prop1 = ForumThreadListUiState::hasMore,
         initial = true
@@ -381,6 +385,7 @@ fun ForumThreadListPage(
 
             LoadMoreLayout(
                 isLoading = isLoadingMore,
+                isError = isLoadMoreError,
                 onLoadMore = {
                     viewModel.send(
                         getLoadMoreIntent(

@@ -3,19 +3,32 @@ package com.huanchengfly.tieba.post.ui.widgets.compose
 import android.content.Context
 import android.graphics.Color
 import android.util.Log
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.Icon
+import androidx.compose.material.Surface
+import androidx.compose.material.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -35,10 +48,13 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import com.github.panpf.sketch.compose.AsyncImage
 import com.github.panpf.sketch.compose.rememberAsyncImageState
@@ -48,6 +64,7 @@ import com.github.panpf.sketch.request.DisplayResult
 import com.github.panpf.sketch.stateimage.ThumbnailMemoryCacheStateImage
 import com.github.panpf.sketch.transform.MaskTransformation
 import com.huanchengfly.tieba.post.App
+import com.huanchengfly.tieba.post.R
 import com.huanchengfly.tieba.post.arch.BaseComposeActivity.Companion.LocalWindowSizeClass
 import com.huanchengfly.tieba.post.goToActivity
 import com.huanchengfly.tieba.post.models.PhotoViewData
@@ -233,7 +250,13 @@ fun NetworkImage(
     val context = LocalContext.current
 
     var shouldLoad by remember { mutableStateOf(shouldLoadImage(context, skipNetworkCheck)) }
-    val enableClick = remember(photoViewData, shouldLoad) { photoViewData != null || !shouldLoad }
+    val state = rememberAsyncImageState()
+    val isError by remember {
+        derivedStateOf { state.result is DisplayResult.Error }
+    }
+    val enableClick by remember {
+        derivedStateOf { photoViewData != null || !shouldLoad || isError }
+    }
 
     val isNightMode = ExtendedTheme.colors.isNightMode
     val imageDarkenWhenNightMode = context.appPreferences.imageDarkenWhenNightMode
@@ -264,7 +287,6 @@ fun NetworkImage(
         }
     }
 
-    val state = rememberAsyncImageState()
     val imageAspectRatio by remember {
         derivedStateOf {
             with(state.result) {
@@ -298,7 +320,7 @@ fun NetworkImage(
 
     Box(
         modifier = Modifier
-            .pointerInput(enableClick, enablePreview) {
+            .pointerInput(enableClick, enablePreview, isError) {
                 if (enableClick) {
                     detectTapGestures(
                         onLongPress = if (enablePreview) {
@@ -313,6 +335,8 @@ fun NetworkImage(
                         onTap = {
                             if (!shouldLoad) {
                                 shouldLoad = true
+                            } else if (isError) {
+                                state.restart()
                             } else if (photoViewData != null) {
                                 context.goToActivity<PhotoViewActivity> {
                                     putExtra(
@@ -334,6 +358,40 @@ fun NetworkImage(
             contentScale = contentScale,
             state = state,
         )
+
+        AnimatedVisibility(
+            visible = isError,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.Center)
+        ) {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = ExtendedTheme.colors.chip.copy(alpha = 0.92f),
+                contentColor = ExtendedTheme.colors.onChip,
+                elevation = 2.dp,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(16.dp))
+                    .clickable { state.restart() }
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Refresh,
+                        contentDescription = stringResource(R.string.button_retry),
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Text(
+                        text = stringResource(R.string.button_retry),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
     }
 }
 

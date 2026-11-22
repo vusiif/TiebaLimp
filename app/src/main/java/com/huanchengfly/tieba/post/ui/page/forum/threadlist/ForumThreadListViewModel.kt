@@ -279,9 +279,10 @@ sealed interface ForumThreadListPartialChange : PartialChange<ForumThreadListUiS
     sealed class Refresh : ForumThreadListPartialChange {
         override fun reduce(oldState: ForumThreadListUiState): ForumThreadListUiState =
             when (this) {
-                Start -> oldState.copy(isRefreshing = true)
+                Start -> oldState.copy(isRefreshing = true, isLoadMoreError = false)
                 is Success -> oldState.copy(
                     isRefreshing = false,
+                    isLoadMoreError = false,
                     threadList = threadList.distinctById(),
                     threadListIds = threadListIds.toImmutableList(),
                     goodClassifies = goodClassifies.toImmutableList(),
@@ -311,16 +312,17 @@ sealed interface ForumThreadListPartialChange : PartialChange<ForumThreadListUiS
     sealed class LoadMore : ForumThreadListPartialChange {
         override fun reduce(oldState: ForumThreadListUiState): ForumThreadListUiState =
             when (this) {
-                Start -> oldState.copy(isLoadingMore = true)
+                Start -> oldState.copy(isLoadingMore = true, isLoadMoreError = false)
                 is Success -> oldState.copy(
                     isLoadingMore = false,
+                    isLoadMoreError = false,
                     threadList = (oldState.threadList + threadList).distinctById(),
                     threadListIds = threadListIds.toImmutableList(),
                     currentPage = currentPage,
                     hasMore = hasMore
                 )
 
-                is Failure -> oldState.copy(isLoadingMore = false)
+                is Failure -> oldState.copy(isLoadingMore = false, isLoadMoreError = true)
             }
 
         data object Start : LoadMore()
@@ -402,6 +404,7 @@ sealed interface ForumThreadListPartialChange : PartialChange<ForumThreadListUiS
 data class ForumThreadListUiState(
     val isRefreshing: Boolean = false,
     val isLoadingMore: Boolean = false,
+    val isLoadMoreError: Boolean = false,
     val goodClassifyId: Int? = null,
     val forumRuleTitle: String? = null,
     val threadList: ImmutableList<ThreadItemData> = persistentListOf(),

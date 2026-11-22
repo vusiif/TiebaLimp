@@ -16,6 +16,7 @@ import kotlinx.collections.immutable.persistentListOf
 data class ThreadUiState(
     val isRefreshing: Boolean = false,
     val isLoadingMore: Boolean = false,
+    val isLoadMoreError: Boolean = false,
     val isLoadingLatestReply: Boolean = false,
     val isError: Boolean = false,
     val error: ImmutableHolder<Throwable>? = null,

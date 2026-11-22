@@ -207,29 +207,33 @@ fun ThreadContent(
     maxLines: Int = 5,
     highlightKeywords: ImmutableList<String> = persistentListOf(),
 ) {
-    val content = buildAnnotatedString {
-        if (showTitle) {
-            withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
-                if (isGood) {
-                    withStyle(style = SpanStyle(color = ExtendedTheme.colors.accent)) {
-                        append(stringResource(id = R.string.tip_good))
+    val accentColor = ExtendedTheme.colors.accent
+    val goodTip = stringResource(id = R.string.tip_good)
+    val content = remember(title, abstractText, tabName, showTitle, showAbstract, isGood, accentColor, goodTip) {
+        buildAnnotatedString {
+            if (showTitle) {
+                withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
+                    if (isGood) {
+                        withStyle(style = SpanStyle(color = accentColor)) {
+                            append(goodTip)
+                        }
+                        append(" ")
                     }
-                    append(" ")
-                }
 
-                if (tabName.isNotBlank()) {
-                    append(tabName)
-                    append(" | ")
-                }
+                    if (tabName.isNotBlank()) {
+                        append(tabName)
+                        append(" | ")
+                    }
 
-                append(title)
+                    append(title)
+                }
             }
-        }
-        if (showTitle && showAbstract) {
-            append('\n')
-        }
-        if (showAbstract) {
-            append(abstractText.emoticonString)
+            if (showTitle && showAbstract) {
+                append('\n')
+            }
+            if (showAbstract) {
+                append(abstractText.emoticonString)
+            }
         }
     }
 
@@ -373,16 +377,35 @@ fun FeedCard(
     onClickOriginThread: (OriginThreadInfo) -> Unit = {},
     dislikeAction: @Composable () -> Unit = {},
 ) {
+    val context = LocalContext.current
+    val onCardClick = remember(item, onClick) { { onClick(item.get()) } }
+    val onCardReply = remember(item, onClickReply) { { onClickReply(item.get()) } }
+    val onCardAgree = remember(item, onAgree) { { onAgree(item.get()) } }
+    val onCardShare = remember(item, context) {
+        {
+            val threadId = item.get { if (threadId != 0L) threadId else id }
+            val title = item.get { title }.ifBlank { null }
+            TiebaUtil.shareText(context, "https://tieba.baidu.com/p/$threadId", title)
+        }
+    }
+    val onCardOriginThread = remember(item, onClickOriginThread) {
+        { info: OriginThreadInfo -> onClickOriginThread(info) }
+    }
+    val onCardForum = remember(item, onClickForum) {
+        { forum: SimpleForum -> onClickForum(forum) }
+    }
+
     Card(
         header = {
             val author = remember(item) { item.getNullableImmutable { author } }
             author?.let {
+                val onHeaderUserClick = remember(it, onClickUser) {
+                    { onClickUser(it.get()) }
+                }
                 UserHeader(
                     userProvider = { it },
                     timeProvider = { item.get { lastTimeInt } },
-                    onClick = {
-                        onClickUser(it.get())
-                    },
+                    onClick = onHeaderUserClick,
                 ) { dislikeAction() }
             }
         },
@@ -408,7 +431,7 @@ fun FeedCard(
                             .clip(RoundedCornerShape(6.dp))
                             .background(ExtendedTheme.colors.floorCard)
                             .clickable {
-                                onClickOriginThread(it.get())
+                                onCardOriginThread(it.get())
                             }
                             .padding(16.dp)
                     )
@@ -427,36 +450,31 @@ fun FeedCard(
                 )
             }
 
-            ThreadForumInfo(item = item, onClick = onClickForum)
+            ThreadForumInfo(item = item, onClick = onCardForum)
         },
         action = {
-            val context = LocalContext.current
             Row(modifier = Modifier.fillMaxWidth()) {
                 ThreadShareBtn(
                     shareNum = item.get { shareNum },
-                    onClick = {
-                        val threadId = item.get { if (threadId != 0L) threadId else id }
-                        val title = item.get { title }.ifBlank { null }
-                        TiebaUtil.shareText(context, "https://tieba.baidu.com/p/$threadId", title)
-                    },
+                    onClick = onCardShare,
                     modifier = Modifier.weight(1f)
                 )
 
                 ThreadReplyBtn(
                     replyNum = item.get { replyNum },
-                    onClick = { onClickReply(item.get()) },
+                    onClick = onCardReply,
                     modifier = Modifier.weight(1f)
                 )
 
                 ThreadAgreeBtn(
                     hasAgree = item.get { agree?.hasAgree == 1 },
                     agreeNum = item.get { agreeNum },
-                    onClick = { onAgree(item.get()) },
+                    onClick = onCardAgree,
                     modifier = Modifier.weight(1f)
                 )
             }
         },
-        onClick = { onClick(item.get()) },
+        onClick = onCardClick,
         modifier = modifier,
     )
 }
@@ -472,6 +490,23 @@ fun FeedCard(
     onClickForum: (name: String) -> Unit = {},
     onClickOriginThread: (OriginThreadInfo) -> Unit = {},
 ) {
+    val context = LocalContext.current
+    val onCardClick = remember(item, onClick) { { onClick(item.get()) } }
+    val onCardReply = remember(item, onClickReply) { { onClickReply(item.get()) } }
+    val onCardAgree = remember(item, onAgree) { { onAgree(item.get()) } }
+    val onCardUser = remember(item, onClickUser) { { onClickUser(item.get { user_id }) } }
+    val onCardForum = remember(item, onClickForum) { { onClickForum(item.get { forum_name }) } }
+    val onCardShare = remember(item, context) {
+        {
+            val threadId = item.get { thread_id }
+            val title = item.get { title }.ifBlank { null }
+            TiebaUtil.shareText(context, "https://tieba.baidu.com/p/$threadId", title)
+        }
+    }
+    val onCardOriginThread = remember(item, onClickOriginThread) {
+        { it: OriginThreadInfo -> onClickOriginThread(it) }
+    }
+
     Card(
         header = {
             UserHeader(
@@ -480,9 +515,7 @@ fun FeedCard(
                 portraitProvider = { item.get { user_portrait } },
                 timeProvider = { item.get { create_time } },
                 ipProvider = { item.get { ip } },
-                onClick = {
-                    onClickUser(item.get { user_id })
-                },
+                onClick = onCardUser,
             )
         },
         content = {
@@ -509,7 +542,7 @@ fun FeedCard(
                             .clip(RoundedCornerShape(6.dp))
                             .background(ExtendedTheme.colors.floorCard)
                             .clickable {
-                                onClickOriginThread(it.get())
+                                onCardOriginThread(it.get())
                             }
                             .padding(16.dp)
                     )
@@ -531,37 +564,32 @@ fun FeedCard(
             ThreadForumInfo(
                 forumName = item.get { forum_name },
                 forumAvatar = null,
-                onClick = { onClickForum(item.get { forum_name }) }
+                onClick = onCardForum
             )
         },
         action = {
-            val context = LocalContext.current
             Row(modifier = Modifier.fillMaxWidth()) {
                 ThreadShareBtn(
                     shareNum = item.get { share_num }.toLong(),
-                    onClick = {
-                        val threadId = item.get { thread_id }
-                        val title = item.get { title }.ifBlank { null }
-                        TiebaUtil.shareText(context, "https://tieba.baidu.com/p/$threadId", title)
-                    },
+                    onClick = onCardShare,
                     modifier = Modifier.weight(1f)
                 )
 
                 ThreadReplyBtn(
                     replyNum = item.get { reply_num },
-                    onClick = { onClickReply(item.get()) },
+                    onClick = onCardReply,
                     modifier = Modifier.weight(1f)
                 )
 
                 ThreadAgreeBtn(
                     hasAgree = item.get { agree?.hasAgree == 1 },
                     agreeNum = item.get { agree_num },
-                    onClick = { onAgree(item.get()) },
+                    onClick = onCardAgree,
                     modifier = Modifier.weight(1f)
                 )
             }
         },
-        onClick = { onClick(item.get()) },
+        onClick = onCardClick,
         modifier = modifier,
     )
 }

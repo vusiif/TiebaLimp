@@ -1,5 +1,6 @@
 package com.huanchengfly.tieba.post.ui.page.photoview
 
+import android.content.ComponentCallbacks2
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -52,6 +53,7 @@ import androidx.compose.ui.unit.sp
 import com.github.panpf.sketch.compose.rememberAsyncImageState
 import com.github.panpf.sketch.request.DisplayRequest
 import com.github.panpf.sketch.request.LoadState
+import com.github.panpf.sketch.sketch
 import com.github.panpf.sketch.stateimage.ThumbnailMemoryCacheStateImage
 import com.github.panpf.zoomimage.SketchZoomAsyncImage
 import com.google.accompanist.systemuicontroller.SystemUiController
@@ -329,6 +331,14 @@ class PhotoViewActivity : BaseComposeActivityWithParcelable<PhotoViewData>() {
 
     override fun onCreateContent(systemUiController: SystemUiController) {
         systemUiController.isSystemBarsVisible = false
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        try {
+            sketch.memoryCache.trim(ComponentCallbacks2.TRIM_MEMORY_BACKGROUND)
+        } catch (_: Throwable) {
+        }
     }
 
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {

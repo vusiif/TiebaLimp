@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.ActivityManager
 import android.app.Application
+import android.content.ComponentCallbacks2
 import android.content.Context
 import android.content.res.Configuration
 import android.content.res.Resources
@@ -28,8 +29,10 @@ import com.huanchengfly.tieba.post.utils.AccountUtil
 import com.huanchengfly.tieba.post.utils.ActivityStackManager
 import com.huanchengfly.tieba.post.utils.AppIconUtil
 import com.huanchengfly.tieba.post.utils.BlockManager
+import com.huanchengfly.tieba.post.utils.BlockRuleMatcher
 import com.huanchengfly.tieba.post.utils.ClientUtils
 import com.huanchengfly.tieba.post.utils.EmoticonManager
+import com.huanchengfly.tieba.post.utils.EmoticonUtil
 import com.huanchengfly.tieba.post.utils.SharedPreferencesUtil
 import com.huanchengfly.tieba.post.utils.appPreferences
 import com.huanchengfly.tieba.post.utils.packageInfo
@@ -109,6 +112,10 @@ class App : Application(), SketchFactory {
         try {
             sketch.memoryCache.trim(level)
             sketch.bitmapPool.trim(level)
+            if (level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN) {
+                EmoticonUtil.clearCache()
+                BlockRuleMatcher.clearCache()
+            }
         } catch (_: Throwable) {
         }
     }
@@ -118,6 +125,8 @@ class App : Application(), SketchFactory {
         try {
             sketch.memoryCache.clear()
             sketch.bitmapPool.clear()
+            EmoticonUtil.clearCache()
+            BlockRuleMatcher.clearCache()
         } catch (_: Throwable) {
         }
     }

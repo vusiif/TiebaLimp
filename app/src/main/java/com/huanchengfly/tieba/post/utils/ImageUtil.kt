@@ -136,12 +136,27 @@ object ImageUtil {
         imageView?.disposeDisplay()
     }
 
+    @Volatile
+    private var cachedNightPlaceholderColor: Int? = null
+    @Volatile
+    private var cachedLightPlaceholderColor: Int? = null
+
+    fun getPlaceholderColor(context: Context): Int {
+        val night = isNightMode()
+        return if (night) {
+            cachedNightPlaceholderColor ?: ContextCompat.getColor(context, R.color.color_place_holder_night).also {
+                cachedNightPlaceholderColor = it
+            }
+        } else {
+            cachedLightPlaceholderColor ?: ContextCompat.getColor(context, R.color.color_place_holder).also {
+                cachedLightPlaceholderColor = it
+            }
+        }
+    }
+
     fun getPlaceHolder(context: Context, radius: Int): Drawable {
         val drawable = GradientDrawable()
-        val colorResId =
-            if (isNightMode()) R.color.color_place_holder_night else R.color.color_place_holder
-        val color = ContextCompat.getColor(context, colorResId)
-        drawable.setColor(color)
+        drawable.setColor(getPlaceholderColor(context))
         drawable.cornerRadius =
             DisplayUtil.dp2px(context, radius.toFloat()).toFloat()
         return drawable
@@ -149,10 +164,7 @@ object ImageUtil {
 
     fun getPlaceHolder(context: Context, radius: Float): Drawable {
         val drawable = GradientDrawable()
-        val colorResId =
-            if (isNightMode()) R.color.color_place_holder_night else R.color.color_place_holder
-        val color = ContextCompat.getColor(context, colorResId)
-        drawable.setColor(color)
+        drawable.setColor(getPlaceholderColor(context))
         drawable.cornerRadius = radius.dpToPxFloat()
         return drawable
     }

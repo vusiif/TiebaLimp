@@ -33,6 +33,10 @@ object EmoticonUtil {
             }
         })
     private val EMPTY_MAP: Map<String, Int> = emptyMap()
+
+    fun clearCache() {
+        EMOTICON_STRING_CACHE.clear()
+    }
     private val EMOTICON_ALL_WEB_MAP: MutableMap<String, Int> = mutableMapOf()
     private val EMOTICON_CLASSIC_WEB_MAP: MutableMap<String, Int> = mutableMapOf()
     private val EMOTICON_EMOJI_WEB_MAP: MutableMap<String, Int> = mutableMapOf()

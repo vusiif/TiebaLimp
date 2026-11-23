@@ -26,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
@@ -56,6 +57,9 @@ import com.huanchengfly.tieba.post.utils.TiebaUtil
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 
+private val RoundedCornerShape4 = RoundedCornerShape(4.dp)
+private val RoundedCornerShape6 = RoundedCornerShape(6.dp)
+
 @Composable
 private fun UserHeader(
     user: ImmutableHolder<User>,
@@ -83,7 +87,7 @@ private fun UserHeader(
     val descText = remember(time, ipAddress, context) {
         val relativeTime = DateTimeUtils.getRelativeTimeString(
             context,
-            time.toString()
+            time.toLong()
         )
         if (ipAddress.isNotBlank()) {
             "$relativeTime  ${context.getString(R.string.text_ip_location, ipAddress)}"
@@ -214,7 +218,7 @@ fun Card(
     }
 
     Column(
-        modifier = baseModifier.then(modifier)
+        modifier = Modifier.graphicsLayer().then(baseModifier).then(modifier)
     ) {
         header()
         Column(
@@ -339,7 +343,7 @@ fun ForumInfoChip(
     Row(
         modifier = Modifier
             .height(IntrinsicSize.Min)
-            .clip(RoundedCornerShape(4.dp))
+            .clip(RoundedCornerShape4)
             .background(color = ExtendedTheme.colors.chip)
             .clickable(onClick = onClick)
             .padding(4.dp),
@@ -353,7 +357,7 @@ fun ForumInfoChip(
                 modifier = Modifier
                     .fillMaxHeight()
                     .aspectRatio(1f),
-                shape = RoundedCornerShape(4.dp)
+                shape = RoundedCornerShape4
             )
         }
         Text(
@@ -460,7 +464,7 @@ fun FeedCard(
                     OriginThreadCard(
                         originThreadInfo = it,
                         modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
+                            .clip(RoundedCornerShape6)
                             .background(ExtendedTheme.colors.floorCard)
                             .clickable {
                                 onCardOriginThread(it.get())
@@ -576,7 +580,7 @@ fun FeedCard(
                     OriginThreadCard(
                         originThreadInfo = it,
                         modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
+                            .clip(RoundedCornerShape6)
                             .background(ExtendedTheme.colors.floorCard)
                             .clickable {
                                 onCardOriginThread(it.get())

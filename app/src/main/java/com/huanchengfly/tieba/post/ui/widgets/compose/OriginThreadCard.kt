@@ -64,13 +64,16 @@ import kotlinx.collections.immutable.persistentListOf
 import kotlin.math.max
 import kotlin.math.min
 
+private val RoundedCornerShape6 = RoundedCornerShape(6.dp)
+private val RoundedCornerShape8 = RoundedCornerShape(8.dp)
+private val RoundedCornerShape100 = RoundedCornerShape(100)
 
 @Composable
 fun Badge(
     icon: ImageVector,
     text: String,
     modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(100),
+    shape: Shape = RoundedCornerShape100,
     backgroundColor: Color = Color.Black.copy(0.5f),
     contentColor: Color = Color.White,
 ) {
@@ -101,7 +104,7 @@ internal fun MediaPlaceholder(
 ) {
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(6.dp))
+            .clip(RoundedCornerShape6)
             .background(ExtendedTheme.colors.chip)
             .clickable(
                 enabled = onClick != null
@@ -192,7 +195,7 @@ internal fun ThreadMedia(
                             modifier = Modifier
                                 .fillMaxWidth(singleMediaFraction)
                                 .aspectRatio(aspectRatio)
-                                .clip(RoundedCornerShape(8.dp))
+                                .clip(RoundedCornerShape8)
                         )
                     }
                 }
@@ -246,7 +249,7 @@ internal fun ThreadMedia(
                             modifier = Modifier
                                 .fillMaxWidth(mediaWidthFraction)
                                 .aspectRatio(mediaAspectRatio)
-                                .clip(RoundedCornerShape(8.dp)),
+                                .clip(RoundedCornerShape8),
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             showMedias.fastForEachIndexed { index, media ->

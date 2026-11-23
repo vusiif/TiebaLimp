@@ -44,6 +44,8 @@ import com.huanchengfly.tieba.post.utils.appPreferences
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 
+private val RoundedCornerShape8 = RoundedCornerShape(8.dp)
+
 @Composable
 fun PostCard(
     postHolder: ImmutableHolder<Post>,
@@ -136,7 +138,7 @@ fun PostCard(
             val cardModifier = remember(isSearchHighlighted, accentColor) {
                 if (isSearchHighlighted) {
                     Modifier
-                        .border(2.dp, accentColor, RoundedCornerShape(8.dp))
+                        .border(2.dp, accentColor, RoundedCornerShape8)
                         .padding(2.dp)
                 } else Modifier
             }

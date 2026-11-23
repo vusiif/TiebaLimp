@@ -32,6 +32,7 @@ import com.huanchengfly.tieba.post.utils.AppIconUtil
 import com.huanchengfly.tieba.post.utils.BlockManager
 import com.huanchengfly.tieba.post.utils.BlockRuleMatcher
 import com.huanchengfly.tieba.post.utils.ClientUtils
+import com.huanchengfly.tieba.post.utils.DateTimeUtils
 import com.huanchengfly.tieba.post.utils.EmoticonManager
 import com.huanchengfly.tieba.post.utils.EmoticonUtil
 import com.huanchengfly.tieba.post.utils.SharedPreferencesUtil
@@ -117,6 +118,7 @@ class App : Application(), SketchFactory {
             if (level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN) {
                 EmoticonUtil.clearCache()
                 BlockRuleMatcher.clearCache()
+                DateTimeUtils.clearCache()
             }
         } catch (_: Throwable) {
         }
@@ -129,6 +131,7 @@ class App : Application(), SketchFactory {
             sketch.bitmapPool.clear()
             EmoticonUtil.clearCache()
             BlockRuleMatcher.clearCache()
+            DateTimeUtils.clearCache()
         } catch (_: Throwable) {
         }
     }

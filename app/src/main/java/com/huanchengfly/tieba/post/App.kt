@@ -21,6 +21,7 @@ import com.github.gzuliyujiang.oaid.DeviceID
 import com.github.panpf.sketch.Sketch
 import com.github.panpf.sketch.SketchFactory
 import com.github.panpf.sketch.sketch
+import com.huanchengfly.tieba.post.api.retrofit.TiebaDns
 import com.huanchengfly.tieba.post.components.ClipBoardLinkDetector
 import com.huanchengfly.tieba.post.components.OAIDGetter
 import com.huanchengfly.tieba.post.ui.common.theme.interfaces.ThemeSwitcher
@@ -102,6 +103,7 @@ class App : Application(), SketchFactory {
             }
         }
         CoroutineScope(Dispatchers.IO).launch {
+            TiebaDns.prewarm()
             BlockManager.init()
             EmoticonManager.init(this@App)
         }

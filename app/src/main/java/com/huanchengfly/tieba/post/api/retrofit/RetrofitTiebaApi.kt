@@ -52,14 +52,24 @@ import kotlin.math.roundToInt
 
 
 object RetrofitTiebaApi {
-    private const val READ_TIMEOUT = 60L
-    private const val CONNECT_TIMEOUT = 60L
-    private const val WRITE_TIMEOUT = 60L
+    private const val READ_TIMEOUT = 30L
+    private const val CONNECT_TIMEOUT = 15L
+    private const val WRITE_TIMEOUT = 30L
 
     private val initTime = System.currentTimeMillis()
     internal val randomClientId = "wappc_${initTime}_${(Math.random() * 1000).roundToInt()}"
     private val stParamInterceptor = StParamInterceptor()
-    private val connectionPool = ConnectionPool(32, 5, TimeUnit.MINUTES)
+    val connectionPool = ConnectionPool(32, 5, TimeUnit.MINUTES)
+
+    val baseOkHttpClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .readTimeout(READ_TIMEOUT, TimeUnit.SECONDS)
+            .connectTimeout(CONNECT_TIMEOUT, TimeUnit.SECONDS)
+            .writeTimeout(WRITE_TIMEOUT, TimeUnit.SECONDS)
+            .connectionPool(connectionPool)
+            .dns(TiebaDns)
+            .build()
+    }
 
     private val defaultCommonParamInterceptor = CommonParamInterceptor(
         Param.BDUSS to { AccountUtil.getBduss() },
@@ -352,10 +362,7 @@ object RetrofitTiebaApi {
             .addConverterFactory(NullOnEmptyConverterFactory())
             .addConverterFactory(json.asConverterFactory())
             .addConverterFactory(gsonConverterFactory)
-            .client(OkHttpClient.Builder().apply {
-//                addInterceptor()
-                connectionPool(connectionPool)
-            }.build())
+            .client(baseOkHttpClient)
             .build()
             .create(SofireApi::class.java)
     }
@@ -370,10 +377,7 @@ object RetrofitTiebaApi {
         .addConverterFactory(NullOnEmptyConverterFactory())
         .addConverterFactory(json.asConverterFactory())
         .addConverterFactory(gsonConverterFactory)
-        .client(OkHttpClient.Builder().apply {
-            readTimeout(READ_TIMEOUT, TimeUnit.SECONDS)
-            connectTimeout(CONNECT_TIMEOUT, TimeUnit.SECONDS)
-            writeTimeout(WRITE_TIMEOUT, TimeUnit.SECONDS)
+        .client(baseOkHttpClient.newBuilder().apply {
             interceptors.forEach {
                 addInterceptor(it)
             }
@@ -382,7 +386,6 @@ object RetrofitTiebaApi {
             addInterceptor(ForceLoginInterceptor)
             addInterceptor(sortAndSignInterceptor)
             addInterceptor(ConnectivityInterceptor)
-            connectionPool(connectionPool)
         }.build())
         .build()
         .create(T::class.java)
@@ -396,10 +399,7 @@ object RetrofitTiebaApi {
         .addCallAdapterFactory(FlowCallAdapterFactory.create())
         .addConverterFactory(NullOnEmptyConverterFactory())
         .addConverterFactory(WireConverterFactory.create())
-        .client(OkHttpClient.Builder().apply {
-            readTimeout(READ_TIMEOUT, TimeUnit.SECONDS)
-            connectTimeout(CONNECT_TIMEOUT, TimeUnit.SECONDS)
-            writeTimeout(WRITE_TIMEOUT, TimeUnit.SECONDS)
+        .client(baseOkHttpClient.newBuilder().apply {
             interceptors.forEach {
                 addInterceptor(it)
             }
@@ -409,7 +409,6 @@ object RetrofitTiebaApi {
             addInterceptor(CookieInterceptor)
             addInterceptor(sortAndSignInterceptor)
             addInterceptor(ConnectivityInterceptor)
-            connectionPool(connectionPool)
         }.build())
         .build()
         .create(T::class.java)

@@ -13,6 +13,8 @@ import com.github.panpf.sketch.http.OkHttpStack
 import com.github.panpf.sketch.request.ImageOptions
 import com.github.panpf.sketch.request.PauseLoadWhenScrollingDrawableDecodeInterceptor
 import com.huanchengfly.tieba.post.api.getUserAgent
+import com.huanchengfly.tieba.post.api.retrofit.RetrofitTiebaApi
+import java.util.concurrent.TimeUnit
 
 /**
  * Factory helper for initializing the global Sketch image loading pipeline.
@@ -20,12 +22,18 @@ import com.huanchengfly.tieba.post.api.getUserAgent
 object AppSketchFactory {
     fun createSketch(context: Context): Sketch {
         val isLowRam = (context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager)?.isLowRamDevice == true
+        val sketchHttpClient = RetrofitTiebaApi.baseOkHttpClient.newBuilder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(20, TimeUnit.SECONDS)
+            .addInterceptor { chain ->
+                val request = chain.request().newBuilder()
+                    .header("User-Agent", getUserAgent())
+                    .build()
+                chain.proceed(request)
+            }
+            .build()
         return Sketch.Builder(context).apply {
-            httpStack(OkHttpStack.Builder().apply {
-                userAgent(getUserAgent())
-                connectTimeoutMillis(15000)
-                readTimeoutMillis(20000)
-            }.build())
+            httpStack(OkHttpStack(sketchHttpClient))
             globalImageOptions(ImageOptions {
                 crossfade(durationMillis = 200)
                 if (isLowRam) {

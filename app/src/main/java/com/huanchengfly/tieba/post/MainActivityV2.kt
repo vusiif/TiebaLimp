@@ -196,8 +196,10 @@ class MainActivityV2 : BaseComposeActivity() {
     }
 
     private fun initAutoSign() {
-        runCatching {
-            TiebaUtil.initAutoSign(this)
+        lifecycleScope.launch(Dispatchers.IO) {
+            runCatching {
+                TiebaUtil.initAutoSign(this@MainActivityV2)
+            }
         }
     }
 
@@ -210,16 +212,19 @@ class MainActivityV2 : BaseComposeActivity() {
                 newIntentFilter(NotifyJobService.ACTION_NEW_MESSAGE),
                 ContextCompat.RECEIVER_NOT_EXPORTED
             )
-            startService(Intent(this, NotifyJobService::class.java))
-            val builder = JobInfo.Builder(
-                JobServiceUtil.getJobId(this),
-                ComponentName(this, NotifyJobService::class.java)
-            )
-                .setPersisted(true)
-                .setPeriodic(30 * 60 * 1000L)
-                .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
-            val jobScheduler = getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
-            jobScheduler.schedule(builder.build())
+            lifecycleScope.launch(Dispatchers.IO) {
+                runCatching {
+                    val builder = JobInfo.Builder(
+                        JobServiceUtil.getJobId(this@MainActivityV2),
+                        ComponentName(this@MainActivityV2, NotifyJobService::class.java)
+                    )
+                        .setPersisted(true)
+                        .setPeriodic(30 * 60 * 1000L)
+                        .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
+                    val jobScheduler = getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
+                    jobScheduler.schedule(builder.build())
+                }
+            }
         }
         handler.postDelayed({
             requestNotificationPermission()

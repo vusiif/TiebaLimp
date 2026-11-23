@@ -9,6 +9,7 @@ import android.content.res.Configuration
 import android.content.res.Resources
 import android.graphics.drawable.Drawable
 import android.os.Build
+import android.os.Looper
 import android.os.Process
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -33,8 +34,10 @@ import com.huanchengfly.tieba.post.utils.SharedPreferencesUtil
 import com.huanchengfly.tieba.post.utils.appPreferences
 import com.huanchengfly.tieba.post.utils.packageInfo
 import dagger.hilt.android.HiltAndroidApp
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.litepal.LitePal
-import kotlin.concurrent.thread
 
 @HiltAndroidApp
 class App : Application(), SketchFactory {
@@ -77,16 +80,25 @@ class App : Application(), SketchFactory {
         ThemeUtils.init(ThemeDelegate)
         registerActivityLifecycleCallbacks(ClipBoardLinkDetector)
         registerActivityLifecycleCallbacks(OAIDGetter)
-        android.os.Handler(android.os.Looper.getMainLooper()).post {
-            try {
-                if (Config.userAgent == null) {
-                    Config.userAgent = WebSettings.getDefaultUserAgent(this@App)
+        val cachedUa = SharedPreferencesUtil.get(this, SharedPreferencesUtil.SP_WEBVIEW_INFO)
+            .getString("user_agent", null)
+        if (!cachedUa.isNullOrEmpty()) {
+            Config.userAgent = cachedUa
+        } else {
+            Looper.myQueue().addIdleHandler {
+                try {
+                    if (Config.userAgent == null) {
+                        val ua = WebSettings.getDefaultUserAgent(this@App)
+                        Config.userAgent = ua
+                        SharedPreferencesUtil.put(this@App, SharedPreferencesUtil.SP_WEBVIEW_INFO, "user_agent", ua)
+                    }
+                } catch (_: Throwable) {
+                    Config.userAgent = System.getProperty("http.agent")
                 }
-            } catch (_: Throwable) {
-                Config.userAgent = System.getProperty("http.agent")
+                false
             }
         }
-        thread {
+        CoroutineScope(Dispatchers.IO).launch {
             BlockManager.init()
             EmoticonManager.init(this@App)
         }
@@ -133,29 +145,45 @@ class App : Application(), SketchFactory {
     fun removeAllActivity() = ActivityStackManager.removeAllActivity()
 
     object Config {
+        @Volatile
         var inited: Boolean = false
 
+        @Volatile
         var isOAIDSupported: Boolean = false
+        @Volatile
         var statusCode: Int = -200
+        @Volatile
         var oaid: String = ""
+        @Volatile
         var encodedOAID: String = ""
+        @Volatile
         var isTrackLimited: Boolean = false
+        @Volatile
         var userAgent: String? = null
+        @Volatile
         var appFirstInstallTime: Long = 0L
+        @Volatile
         var appLastUpdateTime: Long = 0L
 
         fun init(context: Context) {
             if (!inited) {
-                isOAIDSupported = DeviceID.supportedOAID(context)
-                if (isOAIDSupported) {
-                    DeviceID.getOAID(context, OAIDGetter)
-                } else {
-                    statusCode = -200
-                    isTrackLimited = false
-                }
-                appFirstInstallTime = context.packageInfo.firstInstallTime
-                appLastUpdateTime = context.packageInfo.lastUpdateTime
+                val pkgInfo = context.packageInfo
+                appFirstInstallTime = pkgInfo.firstInstallTime
+                appLastUpdateTime = pkgInfo.lastUpdateTime
                 inited = true
+
+                CoroutineScope(Dispatchers.IO).launch {
+                    runCatching {
+                        val supported = DeviceID.supportedOAID(context)
+                        isOAIDSupported = supported
+                        if (supported) {
+                            DeviceID.getOAID(context, OAIDGetter)
+                        } else {
+                            statusCode = -200
+                            isTrackLimited = false
+                        }
+                    }
+                }
             }
         }
     }

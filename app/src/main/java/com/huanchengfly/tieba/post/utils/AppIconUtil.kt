@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.pm.PackageManager
 import com.huanchengfly.tieba.post.App
+import com.huanchengfly.tieba.post.BuildConfig
 import kotlinx.collections.immutable.persistentListOf
 
 
@@ -28,6 +29,7 @@ object LauncherIcons {
 
 object AppIconUtil {
     const val PREF_KEY_APP_ICON = "app_icon"
+    private const val KEY_APPLIED_ICON = "applied_launcher_icon_state"
 
     private val context: Context
         get() = App.INSTANCE
@@ -50,6 +52,13 @@ object AppIconUtil {
             newIcon = LauncherIcons.THEMED_ICON_MAPPING[newIcon] ?: newIcon
         }
 
+        val expectedState = "$newIcon:${BuildConfig.VERSION_CODE}"
+        val appliedState = SharedPreferencesUtil.get(context, SharedPreferencesUtil.SP_APP_DATA)
+            .getString(KEY_APPLIED_ICON, null)
+        if (appliedState == expectedState) {
+            return
+        }
+
         // MainActivityV2 must always remain enabled as the base activity for aliases and deep links
         context.packageManager.enableComponent(ComponentName(context, LauncherIcons.LEGACY_MAIN_ACTIVITY_V2))
 
@@ -59,6 +68,7 @@ object AppIconUtil {
             context.packageManager.getComponentEnabledSetting(ComponentName(context, it)) == PackageManager.COMPONENT_ENABLED_STATE_DISABLED
         }
         if (isTargetEnabled && areOthersDisabled) {
+            SharedPreferencesUtil.put(context, SharedPreferencesUtil.SP_APP_DATA, KEY_APPLIED_ICON, expectedState)
             return
         }
 
@@ -75,6 +85,7 @@ object AppIconUtil {
                 LauncherIcons.OLD_LAUNCHER_ICON
             )
         )
+        SharedPreferencesUtil.put(context, SharedPreferencesUtil.SP_APP_DATA, KEY_APPLIED_ICON, expectedState)
     }
 
     /**

@@ -3,6 +3,7 @@ package com.huanchengfly.tieba.post
 import com.huanchengfly.tieba.post.models.database.Account
 import com.huanchengfly.tieba.post.utils.AccountCookieUtil
 import com.huanchengfly.tieba.post.utils.AccountSecurityUtil
+import com.huanchengfly.tieba.post.utils.AccountUtil
 import com.huanchengfly.tieba.post.utils.decryptSensitiveFields
 import com.huanchengfly.tieba.post.utils.toEncryptedCopy
 import org.junit.Assert.assertEquals
@@ -78,5 +79,40 @@ class AccountUtilTest {
         assertEquals("raw_bduss_secret_123", decrypted.bduss)
         assertEquals("raw_stoken_secret_456", decrypted.sToken)
         assertEquals("BDUSS=raw_bduss_secret_123; STOKEN=raw_stoken_secret_456", decrypted.cookie)
+    }
+
+    @Test
+    fun isLoggedIn_validatesAccountFields() {
+        AccountUtil.updateCurrentAccount(null)
+        assertFalse(AccountUtil.isLoggedIn())
+
+        AccountUtil.updateCurrentAccount(Account(uid = "", bduss = ""))
+        assertFalse(AccountUtil.isLoggedIn())
+
+        AccountUtil.updateCurrentAccount(Account(uid = "12345", bduss = ""))
+        assertFalse(AccountUtil.isLoggedIn())
+
+        AccountUtil.updateCurrentAccount(Account(uid = "12345", bduss = "valid_bduss"))
+        assertTrue(AccountUtil.isLoggedIn())
+        assertEquals("12345", AccountUtil.getUid())
+        assertEquals("valid_bduss", AccountUtil.getBduss())
+
+        AccountUtil.updateCurrentAccount(null)
+    }
+
+    @Test
+    fun updateAllAccounts_and_multiAccountFiltering() {
+        val acc1 = Account(uid = "1", name = "User1", bduss = "b1")
+        val acc2 = Account(uid = "2", name = "User2", bduss = "b2")
+
+        AccountUtil.updateAllAccounts(listOf(acc1, acc2))
+        assertEquals(2, AccountUtil.allAccounts.size)
+
+        val remaining = AccountUtil.allAccounts.filter { it.uid != acc1.uid }
+        AccountUtil.updateAllAccounts(remaining)
+        assertEquals(1, AccountUtil.allAccounts.size)
+        assertEquals("User2", AccountUtil.allAccounts[0].name)
+
+        AccountUtil.updateAllAccounts(emptyList())
     }
 }

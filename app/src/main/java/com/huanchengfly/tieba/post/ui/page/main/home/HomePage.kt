@@ -125,6 +125,10 @@ fun HomePage(
         viewModel.send(HomeUiIntent.Refresh)
     }
 
+    onGlobalEvent<GlobalEvent.AccountSwitched> {
+        viewModel.send(HomeUiIntent.Refresh)
+    }
+
     var unfollowForum by remember { mutableStateOf<HomeUiState.Forum?>(null) }
     val confirmUnfollowDialog = rememberDialogState()
     ConfirmDialog(

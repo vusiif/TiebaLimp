@@ -45,7 +45,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.huanchengfly.tieba.post.ui.widgets.compose.placeholder
 import com.huanchengfly.tieba.post.R
+import com.huanchengfly.tieba.post.arch.GlobalEvent
 import com.huanchengfly.tieba.post.arch.collectPartialAsState
+import com.huanchengfly.tieba.post.arch.onGlobalEvent
 import com.huanchengfly.tieba.post.arch.pageViewModel
 import com.huanchengfly.tieba.post.models.database.Account
 import com.huanchengfly.tieba.post.ui.common.theme.compose.BebasFontFamily
@@ -248,6 +250,10 @@ fun UserPage(
         prop1 = UserUiState::account,
         initial = null
     )
+
+    onGlobalEvent<GlobalEvent.AccountSwitched> {
+        viewModel.send(UserUiIntent.Refresh)
+    }
 
     val switchToNightDialogState = rememberDialogState()
     ConfirmDialog(

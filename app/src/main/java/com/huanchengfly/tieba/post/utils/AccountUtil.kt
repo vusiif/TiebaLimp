@@ -13,10 +13,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import com.huanchengfly.tieba.post.R
 import com.huanchengfly.tieba.post.arch.GlobalEvent
-import com.huanchengfly.tieba.post.arch.emitGlobalEvent
+import com.huanchengfly.tieba.post.arch.emitGlobalEventSuspend
 import com.huanchengfly.tieba.post.models.database.Account
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import org.litepal.LitePal.findAll
@@ -50,6 +51,10 @@ object AccountUtil {
 
     internal fun updateAllAccounts(accounts: List<Account>) {
         mutableAllAccountsState.value = accounts
+    }
+
+    internal fun updateCurrentAccount(account: Account?) {
+        mutableCurrentAccountState.value = account
     }
 
     val currentAccount
@@ -101,10 +106,9 @@ object AccountUtil {
         }
     }
 
-    private fun getAccountInfo(accountId: Int): Account {
+    private fun getAccountInfo(accountId: Int): Account? {
         return allAccounts.firstOrNull { it.id == accountId }
             ?: where("id = ?", accountId.toString()).findFirst(Account::class.java)?.decryptSensitiveFields()
-            ?: Account()
     }
 
     @JvmStatic
@@ -125,19 +129,36 @@ object AccountUtil {
 
     @JvmStatic
     fun isLoggedIn(): Boolean {
-        return getLoginInfo() != null
+        val account = getLoginInfo()
+        return account != null && account.uid.isNotBlank() && account.bduss.isNotBlank()
     }
 
     @JvmStatic
     fun switchAccount(context: Context, id: Int): Boolean {
-        context.sendBroadcast(Intent().setAction(ACTION_SWITCH_ACCOUNT))
         val account = runCatching { getAccountInfo(id) }.getOrNull() ?: return false
+        if (account.uid.isBlank() && account.bduss.isBlank()) return false
+
         mutableCurrentAccountState.value = account
-        GlobalScope.launch {
-            emitGlobalEvent(GlobalEvent.AccountSwitched)
+        context.getSharedPreferences("accountData", Context.MODE_PRIVATE).edit()
+            .putInt("now", id)
+            .apply()
+
+        runCatching {
+            val cookieManager = CookieManager.getInstance()
+            cookieManager.setAcceptCookie(true)
+            if (account.bduss.isNotBlank()) {
+                val bdussCookie = AccountCookieUtil.getBdussCookie(account.bduss)
+                cookieManager.setCookie("https://tieba.baidu.com", bdussCookie)
+                cookieManager.setCookie("https://baidu.com", bdussCookie)
+                cookieManager.flush()
+            }
         }
-        return context.getSharedPreferences("accountData", Context.MODE_PRIVATE).edit()
-            .putInt("now", id).commit()
+
+        context.sendBroadcast(Intent().setAction(ACTION_SWITCH_ACCOUNT))
+        CoroutineScope(Dispatchers.Main.immediate).launch {
+            emitGlobalEventSuspend(GlobalEvent.AccountSwitched)
+        }
+        return true
     }
 
     fun fetchAccountFlow(account: Account = getLoginInfo()!!): Flow<Account> =
@@ -165,25 +186,39 @@ object AccountUtil {
             }
             account.toEncryptedCopy().update(account.id.toLong())
             mutableAllAccountsState.value = allAccounts.map { if (it.id == account.id) account else it }
+            if (currentAccount?.id == account.id) {
+                mutableCurrentAccountState.value = account
+            }
             return true
         }
         return false
     }
 
     fun exit(context: Context) {
-        var accounts = allAccounts
-        var account = getLoginInfo() ?: return
+        val account = getLoginInfo() ?: return
         account.delete()
-        CookieManager.getInstance().removeAllCookies(null)
-        if (accounts.size > 1) {
-            accounts = allAccounts
-            account = accounts[0]
-            switchAccount(context, account.id)
-            Toast.makeText(context, "退出登录成功，已切换至账号 " + account.nameShow, Toast.LENGTH_SHORT).show()
+        val remaining = allAccounts.filter { it.id != account.id }
+        mutableAllAccountsState.value = remaining
+
+        if (remaining.isNotEmpty()) {
+            val nextAccount = remaining.first()
+            switchAccount(context, nextAccount.id)
+            val displayName = nextAccount.nameShow?.takeIf { it.isNotBlank() } ?: nextAccount.name
+            Toast.makeText(context, "退出登录成功，已切换至账号 $displayName", Toast.LENGTH_SHORT).show()
             return
         }
+
         mutableCurrentAccountState.value = null
-        context.getSharedPreferences("accountData", Context.MODE_PRIVATE).edit().clear().commit()
+        context.getSharedPreferences("accountData", Context.MODE_PRIVATE).edit().clear().apply()
+        runCatching {
+            val cookieManager = CookieManager.getInstance()
+            cookieManager.removeAllCookies(null)
+            cookieManager.flush()
+        }
+        context.sendBroadcast(Intent().setAction(ACTION_SWITCH_ACCOUNT))
+        CoroutineScope(Dispatchers.Main.immediate).launch {
+            emitGlobalEventSuspend(GlobalEvent.AccountSwitched)
+        }
         Toast.makeText(context, R.string.toast_exit_account_success, Toast.LENGTH_SHORT).show()
     }
 

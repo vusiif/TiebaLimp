@@ -78,6 +78,10 @@ fun ConcernPage(
         viewModel.send(ConcernUiIntent.Refresh)
     }
 
+    onGlobalEvent<GlobalEvent.AccountSwitched> {
+        viewModel.send(ConcernUiIntent.Refresh)
+    }
+
     val lazyListState = rememberLazyListState()
     viewModel.bindScrollToTopEvent(lazyListState = lazyListState)
 

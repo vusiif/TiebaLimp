@@ -83,7 +83,11 @@ object AccountSyncHelper {
                     .listen {
                         LitePal.findAllAsync<Account>()
                             .listen { list ->
-                                AccountUtil.updateAllAccounts(list.map { it.decryptSensitiveFields() })
+                                val decrypted = list.map { it.decryptSensitiveFields() }
+                                AccountUtil.updateAllAccounts(decrypted)
+                                if (AccountUtil.currentAccount?.uid == account.uid) {
+                                    AccountUtil.updateCurrentAccount(account)
+                                }
                             }
                     }
             }

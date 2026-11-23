@@ -26,7 +26,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.huanchengfly.tieba.post.R
+import com.huanchengfly.tieba.post.arch.GlobalEvent
 import com.huanchengfly.tieba.post.arch.collectPartialAsState
+import com.huanchengfly.tieba.post.arch.onGlobalEvent
 import com.huanchengfly.tieba.post.arch.pageViewModel
 import com.huanchengfly.tieba.post.ui.common.theme.compose.ExtendedTheme
 import com.huanchengfly.tieba.post.ui.common.theme.compose.pullRefreshIndicator
@@ -87,6 +89,10 @@ fun NotificationsListPage(
         refreshing = isRefreshing,
         onRefresh = { viewModel.send(NotificationsListUiIntent.Refresh) }
     )
+
+    onGlobalEvent<GlobalEvent.AccountSwitched> {
+        viewModel.send(NotificationsListUiIntent.Refresh)
+    }
     val lazyListState = rememberLazyListState()
     Box(
         modifier = Modifier.pullRefresh(pullRefreshState)

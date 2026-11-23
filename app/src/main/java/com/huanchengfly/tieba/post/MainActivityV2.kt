@@ -281,6 +281,9 @@ class MainActivityV2 : BaseComposeActivity() {
                 )
             )
         }
+        onGlobalEvent<GlobalEvent.AccountSwitched> {
+            fetchAccount()
+        }
         TiebaLiteLocalProvider {
             TranslucentThemeBackground {
                 val navController = rememberNavController()

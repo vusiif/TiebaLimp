@@ -82,11 +82,22 @@ fun String.toMD5(): String = MD5Util.toMd5(this)
 fun ByteArray.toMD5(): String = MD5Util.toMd5(this)
 
 fun Context.getColorCompat(@ColorRes id: Int): Int {
-    return ContextCompat.getColor(this, id)
+    if (id == 0) return android.graphics.Color.TRANSPARENT
+    return try {
+        ContextCompat.getColor(this, id)
+    } catch (_: Throwable) {
+        android.graphics.Color.TRANSPARENT
+    }
 }
 
 fun Context.getColorStateListCompat(id: Int): ColorStateList {
-    return AppCompatResources.getColorStateList(this, id)
+    if (id == 0) return ColorStateList.valueOf(android.graphics.Color.TRANSPARENT)
+    return try {
+        AppCompatResources.getColorStateList(this, id)
+            ?: ColorStateList.valueOf(android.graphics.Color.TRANSPARENT)
+    } catch (_: Throwable) {
+        ColorStateList.valueOf(android.graphics.Color.TRANSPARENT)
+    }
 }
 
 inline fun <reified T : Activity> Context.goToActivity() {

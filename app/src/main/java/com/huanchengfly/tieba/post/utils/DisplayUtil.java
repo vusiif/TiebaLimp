@@ -40,18 +40,44 @@ public class DisplayUtil {
     /**
      * 获取屏幕宽度
      */
+    @SuppressWarnings("deprecation")
     public static int getScreenWidthPixels(Activity context) {
+        if (context == null) return 0;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            try {
+                android.view.WindowMetrics metrics = context.getWindowManager().getCurrentWindowMetrics();
+                return metrics.getBounds().width();
+            } catch (Throwable ignored) {
+            }
+        }
         DisplayMetrics metric = new DisplayMetrics();
-        context.getWindowManager().getDefaultDisplay().getMetrics(metric);
-        return metric.widthPixels;
+        try {
+            context.getWindowManager().getDefaultDisplay().getMetrics(metric);
+            return metric.widthPixels;
+        } catch (Throwable ignored) {
+            return 0;
+        }
     }
 
     /**
      * 获取屏幕高度
      */
+    @SuppressWarnings("deprecation")
     public static int getScreenHeightPixels(Activity context) {
+        if (context == null) return 0;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            try {
+                android.view.WindowMetrics metrics = context.getWindowManager().getCurrentWindowMetrics();
+                return metrics.getBounds().height();
+            } catch (Throwable ignored) {
+            }
+        }
         DisplayMetrics metric = new DisplayMetrics();
-        context.getWindowManager().getDefaultDisplay().getMetrics(metric);
-        return metric.heightPixels;
+        try {
+            context.getWindowManager().getDefaultDisplay().getMetrics(metric);
+            return metric.heightPixels;
+        } catch (Throwable ignored) {
+            return 0;
+        }
     }
 }

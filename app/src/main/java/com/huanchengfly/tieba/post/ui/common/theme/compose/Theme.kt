@@ -106,7 +106,7 @@ private fun getDynamicColor(
 ): ExtendedColors {
     val isDarkColorPalette = ThemeUtil.isNightMode(theme)
     return if (isDarkColorPalette) {
-        if (theme == ThemeUtil.THEME_AMOLED_DARK) {
+        if (theme.contains(ThemeUtil.THEME_AMOLED_DARK, ignoreCase = true)) {
             getBlackDarkDynamicColor(tonalPalette)
         } else {
             getDarkDynamicColor(tonalPalette)
@@ -457,8 +457,9 @@ fun TiebaLiteTheme(
         defaultValue = false
     )
     val isDarkColorPalette = remember(theme) {
-        ThemeUtil.isNightMode(theme)
-                || (ThemeUtil.isTranslucentTheme(theme) && theme.contains("light"))
+        val effectiveTheme = ThemeUtil.getCurrentTheme(theme)
+        ThemeUtil.isNightMode(effectiveTheme) ||
+                (ThemeUtil.isTranslucentTheme(effectiveTheme) && effectiveTheme.contains("light", ignoreCase = true))
     }
 
     val useDynamicTheme = isDynamicTheme && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S

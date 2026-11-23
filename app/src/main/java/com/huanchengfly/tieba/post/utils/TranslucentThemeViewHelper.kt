@@ -69,7 +69,7 @@ object TranslucentThemeViewHelper {
         if (!ThemeUtil.isTranslucentTheme()) {
             return
         }
-        webView.setBackgroundColor(Color.WHITE)
+        webView.setBackgroundColor(Color.TRANSPARENT)
     }
 
     fun setTranslucentThemeBackground(

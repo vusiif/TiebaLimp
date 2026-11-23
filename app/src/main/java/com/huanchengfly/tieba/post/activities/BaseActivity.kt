@@ -34,6 +34,7 @@ import com.huanchengfly.tieba.post.ui.widgets.VoicePlayerView
 import com.huanchengfly.tieba.post.ui.widgets.theme.TintToolbar
 import com.huanchengfly.tieba.post.utils.AppPreferencesUtils
 import com.huanchengfly.tieba.post.utils.DialogUtil
+import com.huanchengfly.tieba.post.utils.DisplayModeUtil
 import com.huanchengfly.tieba.post.utils.ThemeUtil
 import com.huanchengfly.tieba.post.utils.calcStatusBarColorInt
 import kotlinx.coroutines.CoroutineScope
@@ -103,6 +104,7 @@ abstract class BaseActivity : AppCompatActivity(), ExtraRefreshable, CoroutineSc
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        DisplayModeUtil.adaptHighRefreshRate(this)
         if (isNeedFixBg) fixBackground()
         getDeviceDensity()
         INSTANCE.addActivity(this)
@@ -122,9 +124,15 @@ abstract class BaseActivity : AppCompatActivity(), ExtraRefreshable, CoroutineSc
     }
 
     private fun fixBackground() {
-        val decor = window.decorView as ViewGroup
-        val decorChild = decor.getChildAt(0) as ViewGroup
-        decorChild.setBackgroundColor(Color.BLACK)
+        try {
+            val decor = window.decorView as? ViewGroup ?: return
+            if (decor.childCount > 0) {
+                val decorChild = decor.getChildAt(0) as? ViewGroup
+                decorChild?.setBackgroundColor(Color.BLACK)
+            }
+        } catch (_: Throwable) {
+            // Ignored: fallback gracefully if decor hierarchy differs on custom OEM skins
+        }
     }
 
     open fun refreshUIIfNeed() {

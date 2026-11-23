@@ -77,14 +77,17 @@ import com.huanchengfly.tieba.post.utils.NetworkUtil
 import com.huanchengfly.tieba.post.utils.appPreferences
 
 fun shouldLoadImage(context: Context, skipNetworkCheck: Boolean): Boolean {
+    if (skipNetworkCheck) return true
     val imageLoadSettings =
         context.appPreferences.imageLoadType?.toIntOrNull() ?: ImageUtil.SETTINGS_SMART_ORIGIN
-    return skipNetworkCheck
-            || imageLoadSettings == ImageUtil.SETTINGS_SMART_ORIGIN
-            || imageLoadSettings == ImageUtil.SETTINGS_ALL_ORIGIN
-            || (imageLoadSettings == ImageUtil.SETTINGS_SMART_LOAD && NetworkUtil.isWifiConnected(
-        context
-    ))
+    if (imageLoadSettings == ImageUtil.SETTINGS_ALL_NO) return false
+    if (imageLoadSettings == ImageUtil.SETTINGS_ALL_ORIGIN) return true
+    // If system Data Saver is enabled and network is metered, avoid auto-loading
+    if (NetworkUtil.isDataSaverEnabled(context) && !NetworkUtil.isUnmeteredWifi(context)) {
+        return false
+    }
+    return imageLoadSettings == ImageUtil.SETTINGS_SMART_ORIGIN ||
+            (imageLoadSettings == ImageUtil.SETTINGS_SMART_LOAD && NetworkUtil.isUnmeteredWifi(context))
 }
 
 @Composable

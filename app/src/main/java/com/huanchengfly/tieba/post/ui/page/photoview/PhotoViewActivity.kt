@@ -76,6 +76,7 @@ import com.huanchengfly.tieba.post.ui.widgets.compose.LazyLoad
 import com.huanchengfly.tieba.post.ui.widgets.compose.ProvideContentColor
 import com.huanchengfly.tieba.post.utils.ImagePreloader
 import com.huanchengfly.tieba.post.utils.ImageUtil
+import com.huanchengfly.tieba.post.utils.NetworkUtil
 import com.huanchengfly.tieba.post.utils.TiebaUtil
 import com.huanchengfly.tieba.post.utils.download
 import kotlin.math.roundToInt
@@ -258,11 +259,16 @@ class PhotoViewActivity : BaseComposeActivityWithParcelable<PhotoViewData>() {
                 LaunchedEffect(pagerState.currentPage, items) {
                     val context = this@PhotoViewActivity
                     val curr = pagerState.currentPage
+                    val isUnmetered = NetworkUtil.isUnmeteredWifi(context)
                     if (curr + 1 in items.indices) {
-                        ImagePreloader.preload(context, items[curr + 1].originUrl)
+                        val nextItem = items[curr + 1]
+                        val preloadUrl = if (isUnmetered) nextItem.originUrl else (nextItem.url ?: nextItem.originUrl)
+                        ImagePreloader.preload(context, preloadUrl)
                     }
                     if (curr - 1 in items.indices) {
-                        ImagePreloader.preload(context, items[curr - 1].originUrl)
+                        val prevItem = items[curr - 1]
+                        val preloadUrl = if (isUnmetered) prevItem.originUrl else (prevItem.url ?: prevItem.originUrl)
+                        ImagePreloader.preload(context, preloadUrl)
                     }
                 }
 

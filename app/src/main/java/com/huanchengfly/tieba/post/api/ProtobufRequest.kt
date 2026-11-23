@@ -16,6 +16,7 @@ import com.huanchengfly.tieba.post.utils.ClientUtils
 import com.huanchengfly.tieba.post.utils.CuidUtils
 import com.huanchengfly.tieba.post.utils.DeviceUtils
 import com.huanchengfly.tieba.post.utils.MobileInfoUtil
+import com.huanchengfly.tieba.post.utils.NetworkUtil
 import com.huanchengfly.tieba.post.utils.UIDUtil
 import com.squareup.wire.Message
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -92,7 +93,7 @@ fun buildCommonRequest(
             is_teenager = 0,
             lego_lib_version = "3.0.0",
             model = Build.MODEL,
-            net_type = 1,
+            net_type = NetworkUtil.getNetTypeInt(context),
             oaid = OAID().toJson(),
             pversion = "1.0.3",
             sample_id = ClientUtils.sampleId,
@@ -130,7 +131,7 @@ fun buildCommonRequest(
             last_update_time = App.Config.appLastUpdateTime,
             lego_lib_version = "3.0.0",
             model = Build.MODEL,
-            net_type = 1,
+            net_type = NetworkUtil.getNetTypeInt(context),
             oaid = "",
             personalized_rec_switch = 1,
             pversion = "1.0.3",
@@ -181,7 +182,7 @@ fun buildCommonRequest(
             last_update_time = App.Config.appLastUpdateTime,
             lego_lib_version = "3.0.0",
             model = Build.MODEL,
-            net_type = 1,
+            net_type = NetworkUtil.getNetTypeInt(context),
             oaid = App.Config.encodedOAID,
             personalized_rec_switch = 1,
             pversion = "1.0.3",

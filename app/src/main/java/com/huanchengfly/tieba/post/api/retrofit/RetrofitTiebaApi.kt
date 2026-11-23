@@ -37,6 +37,7 @@ import com.huanchengfly.tieba.post.utils.ClientUtils
 import com.huanchengfly.tieba.post.utils.CuidUtils
 import com.huanchengfly.tieba.post.utils.DeviceUtils
 import com.huanchengfly.tieba.post.utils.MobileInfoUtil
+import com.huanchengfly.tieba.post.utils.NetworkUtil
 import com.huanchengfly.tieba.post.utils.UIDUtil
 import kotlinx.serialization.json.Json
 import okhttp3.ConnectionPool
@@ -77,7 +78,7 @@ object RetrofitTiebaApi {
         Param.CLIENT_TYPE to { "2" },
         Param.OS_VERSION to { Build.VERSION.SDK_INT.toString() },
         Param.MODEL to { Build.MODEL },
-        Param.NET_TYPE to { "1" },
+        Param.NET_TYPE to { NetworkUtil.getNetTypeString(App.INSTANCE) },
         Param.PHONE_IMEI to { MobileInfoUtil.getIMEI(App.INSTANCE) },
         Param.TIMESTAMP to { System.currentTimeMillis().toString() }
     )

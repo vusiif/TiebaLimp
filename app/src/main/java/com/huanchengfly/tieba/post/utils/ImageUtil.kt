@@ -202,7 +202,7 @@ object ImageUtil {
                 type == LOAD_TYPE_AVATAR ||
                 imageLoadSettings == SETTINGS_ALL_ORIGIN ||
                 imageLoadSettings == SETTINGS_SMART_ORIGIN ||
-                (imageLoadSettings == SETTINGS_SMART_LOAD && NetworkUtil.isWifiConnected(imageView.context))
+                (imageLoadSettings == SETTINGS_SMART_LOAD && NetworkUtil.isUnmeteredWifi(imageView.context))
             ) {
                 imageView.setTag(R.id.image_load_tag, true)
                 DisplayRequest.Builder(imageView.context, url)
@@ -260,16 +260,16 @@ object ImageUtil {
         return originUrl
     }
 
-    private fun needReverse(context: Context): Boolean {
+    fun needReverse(context: Context): Boolean {
         return if (imageLoadSettings == SETTINGS_SMART_ORIGIN &&
-            NetworkUtil.isWifiConnected(context)
+            NetworkUtil.isUnmeteredWifi(context)
         ) false
         else imageLoadSettings != SETTINGS_ALL_ORIGIN
     }
 
     @get:ImageLoadSettings
-    private val imageLoadSettings: Int
-        get() = INSTANCE.appPreferences.imageLoadType!!.toInt()
+    val imageLoadSettings: Int
+        get() = INSTANCE.appPreferences.imageLoadType?.toIntOrNull() ?: SETTINGS_SMART_ORIGIN
 }
 
 fun ImageUtil.download(

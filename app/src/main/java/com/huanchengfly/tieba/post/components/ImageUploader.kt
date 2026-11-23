@@ -12,6 +12,7 @@ import com.huanchengfly.tieba.post.api.retrofit.body.buildMultipartBody
 import com.huanchengfly.tieba.post.api.retrofit.exception.TiebaException
 import com.huanchengfly.tieba.post.api.retrofit.exception.getErrorCode
 import com.huanchengfly.tieba.post.api.retrofit.exception.getErrorMessage
+import com.huanchengfly.tieba.post.utils.ExifUtil
 import com.huanchengfly.tieba.post.utils.ImageUtil
 import com.huanchengfly.tieba.post.utils.MD5Util
 import com.huanchengfly.tieba.post.utils.appPreferences
@@ -74,6 +75,7 @@ class ImageUploader(
         withContext<Unit>(Dispatchers.IO) {
             if (isOriginImage && fileLength <= maxSize) {
                 originFile.copyTo(tempFile, true)
+                ExifUtil.sanitizeExif(tempFile)
             } else {
                 val bitmap = BitmapFactory.decodeFile(filePath)
                 val firstCompressResult = ImageUtil.compressImage(bitmap, quality = 95)

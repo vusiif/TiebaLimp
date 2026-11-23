@@ -27,6 +27,17 @@ import java.io.File
 import java.io.FileOutputStream
 
 object ImageDownloader {
+    private fun pruneShareCache(folder: File) {
+        runCatching {
+            val oneDayAgo = System.currentTimeMillis() - 24 * 60 * 60 * 1000L
+            folder.listFiles()?.forEach { file ->
+                if (file.isFile && (file.lastModified() < oneDayAgo || file.length() == 0L)) {
+                    file.delete()
+                }
+            }
+        }
+    }
+
     fun downloadForShare(context: Context, url: String?, taskCallback: ShareTaskCallback) {
         if (url == null) return
         CoroutineScope(Dispatchers.IO).launch {
@@ -35,6 +46,7 @@ object ImageDownloader {
                 val inputStream = downloadResult.data.data.newInputStream()
                 val pictureFolder = File(context.cacheDir, ".shareTemp")
                 if (pictureFolder.exists() || pictureFolder.mkdirs()) {
+                    pruneShareCache(pictureFolder)
                     val fileName = "share_" + System.currentTimeMillis()
                     val destFile = File(pictureFolder, fileName)
                     if (!destFile.exists()) {
@@ -49,6 +61,7 @@ object ImageDownloader {
                             }
                         }
                     }
+                    ExifUtil.sanitizeExif(destFile)
                     val shareUri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                         FileProvider.getUriForFile(
                             context,

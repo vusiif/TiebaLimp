@@ -27,6 +27,7 @@ import com.huanchengfly.tieba.post.ui.widgets.compose.MyScaffold
 import com.huanchengfly.tieba.post.ui.widgets.compose.WebView
 import com.huanchengfly.tieba.post.ui.widgets.compose.rememberSaveableWebViewState
 import com.huanchengfly.tieba.post.ui.widgets.compose.rememberWebViewNavigator
+import com.huanchengfly.tieba.post.utils.WebViewHelper
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import kotlinx.coroutines.flow.cancellable
@@ -129,13 +130,10 @@ fun WebViewPage(
                     .padding(paddingValues),
                 navigator = webViewNavigator,
                 onCreated = {
-                    it.settings.apply {
-                        javaScriptEnabled = true
-                        domStorageEnabled = true
-                        setSupportZoom(true)
-                        builtInZoomControls = true
-                        displayZoomControls = false
-                    }
+                    WebViewHelper.applyDefaultSettings(it, context)
+                },
+                onDispose = {
+                    WebViewHelper.destroyWebView(it)
                 },
                 client = remember(navigator) { MyWebViewClient(navigator) },
                 chromeClient = remember { MyWebChromeClient(context, coroutineScope) }

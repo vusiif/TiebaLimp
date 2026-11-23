@@ -2,6 +2,7 @@ package com.huanchengfly.tieba.post.utils;
 
 import android.content.Context;
 import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
@@ -10,7 +11,7 @@ import android.widget.Toast;
 public class TiebaLiteJavaScript {
     public static final String TAG = "JsBridge";
 
-    private static final Handler handler = new Handler();
+    private static final Handler handler = new Handler(Looper.getMainLooper());
     public Context context;
     public WebView webView;
 

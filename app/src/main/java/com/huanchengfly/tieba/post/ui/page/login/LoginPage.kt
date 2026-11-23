@@ -64,6 +64,7 @@ import com.huanchengfly.tieba.post.ui.widgets.compose.WebView
 import com.huanchengfly.tieba.post.ui.widgets.compose.rememberMenuState
 import com.huanchengfly.tieba.post.ui.widgets.compose.rememberSaveableWebViewState
 import com.huanchengfly.tieba.post.ui.widgets.compose.rememberWebViewNavigator
+import com.huanchengfly.tieba.post.utils.WebViewHelper
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import kotlinx.coroutines.flow.cancellable
@@ -290,13 +291,10 @@ fun LoginPage(
                             modifier = Modifier.fillMaxSize(),
                             navigator = webViewNavigator,
                             onCreated = {
-                                it.settings.apply {
-                                    javaScriptEnabled = true
-                                    domStorageEnabled = true
-                                    setSupportZoom(true)
-                                    builtInZoomControls = true
-                                    displayZoomControls = false
-                                }
+                                WebViewHelper.applyDefaultSettings(it, context, enableZoom = false)
+                            },
+                            onDispose = {
+                                WebViewHelper.destroyWebView(it)
                             },
                             client = remember(navigator) {
                                 LoginWebViewClient(

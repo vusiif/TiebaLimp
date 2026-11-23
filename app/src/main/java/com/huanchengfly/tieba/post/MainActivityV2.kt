@@ -48,6 +48,7 @@ import com.huanchengfly.tieba.post.ui.utils.DevicePosture
 import com.huanchengfly.tieba.post.ui.utils.isBookPosture
 import com.huanchengfly.tieba.post.ui.utils.isSeparating
 import com.huanchengfly.tieba.post.utils.AccountUtil
+import com.huanchengfly.tieba.post.utils.AppStartupProfiler
 import com.huanchengfly.tieba.post.utils.ClientUtils
 import com.huanchengfly.tieba.post.utils.JobServiceUtil
 import com.huanchengfly.tieba.post.utils.PermissionUtils
@@ -232,6 +233,7 @@ class MainActivityV2 : BaseComposeActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        AppStartupProfiler.markFirstActivityCreated()
         installSplashScreen()
         super.onCreate(savedInstanceState)
         window.decorView.setBackgroundColor(0)
@@ -240,6 +242,9 @@ class MainActivityV2 : BaseComposeActivity() {
             ClientUtils.setActiveTimestamp()
         }
         intent?.let { checkIntent(it) }
+        window.decorView.post {
+            AppStartupProfiler.markFirstFrameRendered()
+        }
     }
 
     override fun onCreateContent(systemUiController: SystemUiController) {

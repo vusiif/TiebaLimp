@@ -29,6 +29,7 @@ import com.huanchengfly.tieba.post.ui.common.theme.utils.ThemeUtils
 import com.huanchengfly.tieba.post.utils.AccountUtil
 import com.huanchengfly.tieba.post.utils.ActivityStackManager
 import com.huanchengfly.tieba.post.utils.AppIconUtil
+import com.huanchengfly.tieba.post.utils.AppStartupProfiler
 import com.huanchengfly.tieba.post.utils.BlockManager
 import com.huanchengfly.tieba.post.utils.BlockRuleMatcher
 import com.huanchengfly.tieba.post.utils.ClientUtils
@@ -61,6 +62,11 @@ class App : Application(), SketchFactory {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             return Application.getProcessName()
         }
+        try {
+            val cmdline = java.io.File("/proc/self/cmdline").readText().trim().trimEnd('\u0000')
+            if (cmdline.isNotEmpty()) return cmdline
+        } catch (_: Throwable) {
+        }
         val manager = context.getSystemService(ACTIVITY_SERVICE) as? ActivityManager ?: return null
         for (processInfo in manager.runningAppProcesses ?: emptyList()) {
             if (processInfo.pid == Process.myPid()) {
@@ -71,18 +77,28 @@ class App : Application(), SketchFactory {
     }
 
     override fun onCreate() {
+        AppStartupProfiler.markAppCreateStart()
         INSTANCE = this
         super.onCreate()
-        ClientUtils.init(this)
+        AppStartupProfiler.traceStage("ClientUtils") {
+            ClientUtils.init(this)
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             setWebViewPath(this)
         }
-        LitePal.initialize(this)
-        AccountUtil.init(this)
-        Config.init(this)
-        AppIconUtil.setIcon()
+        AppStartupProfiler.traceStage("LitePal") {
+            LitePal.initialize(this)
+        }
+        AppStartupProfiler.traceStage("AccountUtil") {
+            AccountUtil.init(this)
+        }
+        AppStartupProfiler.traceStage("Config") {
+            Config.init(this)
+        }
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
-        ThemeUtils.init(ThemeDelegate)
+        AppStartupProfiler.traceStage("ThemeUtils") {
+            ThemeUtils.init(ThemeDelegate)
+        }
         registerActivityLifecycleCallbacks(ClipBoardLinkDetector)
         registerActivityLifecycleCallbacks(OAIDGetter)
         val cachedUa = SharedPreferencesUtil.get(this, SharedPreferencesUtil.SP_WEBVIEW_INFO)
@@ -104,10 +120,12 @@ class App : Application(), SketchFactory {
             }
         }
         CoroutineScope(Dispatchers.IO).launch {
+            AppIconUtil.setIcon()
             TiebaDns.prewarm()
             BlockManager.init()
             EmoticonManager.init(this@App)
         }
+        AppStartupProfiler.markAppCreateEnd()
     }
 
     override fun onTrimMemory(level: Int) {

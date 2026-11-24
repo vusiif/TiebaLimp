@@ -99,6 +99,10 @@ fun getColorPalette(
 
 private val themeColorsCache = java.util.concurrent.ConcurrentHashMap<String, ExtendedColors>()
 
+fun clearThemeColorsCache() {
+    themeColorsCache.clear()
+}
+
 private fun getDynamicColor(
     theme: String,
     tonalPalette: TonalPalette,

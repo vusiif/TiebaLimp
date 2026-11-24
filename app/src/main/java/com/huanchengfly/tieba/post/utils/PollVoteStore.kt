@@ -16,4 +16,8 @@ object PollVoteStore {
             cache[threadId] = newPoll
         }
     }
+
+    fun clearCache() {
+        cache.clear()
+    }
 }

@@ -20,6 +20,11 @@ object AppThemeDelegate : ThemeSwitcher {
     private val identifierCache = ConcurrentHashMap<String, Int>()
     private val staticColorCache = ConcurrentHashMap<Long, Int>()
 
+    fun clearCache() {
+        identifierCache.clear()
+        staticColorCache.clear()
+    }
+
     private fun getIdentifierCached(
         resources: android.content.res.Resources,
         name: String,

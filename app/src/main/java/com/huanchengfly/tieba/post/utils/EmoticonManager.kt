@@ -348,4 +348,12 @@ object EmoticonManager {
             }
         }
     }
+
+    fun clearCache() {
+        resIdCache.clear()
+        inlineContentCache.clear()
+        synchronized(drawableCache) {
+            drawableCache.clear()
+        }
+    }
 }

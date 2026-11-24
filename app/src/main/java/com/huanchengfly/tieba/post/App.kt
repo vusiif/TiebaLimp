@@ -29,6 +29,7 @@ import com.huanchengfly.tieba.post.ui.common.theme.utils.ThemeUtils
 import com.huanchengfly.tieba.post.utils.AccountUtil
 import com.huanchengfly.tieba.post.utils.ActivityStackManager
 import com.huanchengfly.tieba.post.utils.AppIconUtil
+import com.huanchengfly.tieba.post.utils.AppMemoryManager
 import com.huanchengfly.tieba.post.utils.AppStartupProfiler
 import com.huanchengfly.tieba.post.utils.BlockManager
 import com.huanchengfly.tieba.post.utils.BlockRuleMatcher
@@ -130,28 +131,12 @@ class App : Application(), SketchFactory {
 
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
-        try {
-            sketch.memoryCache.trim(level)
-            sketch.bitmapPool.trim(level)
-            if (level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN) {
-                EmoticonUtil.clearCache()
-                BlockRuleMatcher.clearCache()
-                DateTimeUtils.clearCache()
-            }
-        } catch (_: Throwable) {
-        }
+        AppMemoryManager.trimMemory(this, level)
     }
 
     override fun onLowMemory() {
         super.onLowMemory()
-        try {
-            sketch.memoryCache.clear()
-            sketch.bitmapPool.clear()
-            EmoticonUtil.clearCache()
-            BlockRuleMatcher.clearCache()
-            DateTimeUtils.clearCache()
-        } catch (_: Throwable) {
-        }
+        AppMemoryManager.onLowMemory(this)
     }
 
     @Keep

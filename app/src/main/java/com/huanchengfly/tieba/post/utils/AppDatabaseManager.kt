@@ -1,12 +1,15 @@
 package com.huanchengfly.tieba.post.utils
 
+import android.app.ActivityManager
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.util.Log
 import androidx.annotation.WorkerThread
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.litepal.LitePal
 
@@ -16,10 +19,38 @@ object AppDatabaseManager {
     const val KEY_LAST_OPTIMIZED_VERSION = "last_optimized_db_version"
     const val CURRENT_DB_VERSION = 41 // Matches litepal.xml version 41
 
+    enum class CheckpointMode {
+        PASSIVE,
+        FULL,
+        RESTART,
+        TRUNCATE
+    }
+
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     @Volatile
     private var isInitialized = false
+
+    @Volatile
+    private var pendingCheckpointJob: Job? = null
+
+    private inline fun logDebug(message: () -> String) {
+        runCatching { Log.d(TAG, message()) }
+    }
+
+    private inline fun logWarn(throwable: Throwable? = null, message: () -> String) {
+        runCatching {
+            if (throwable != null) Log.w(TAG, message(), throwable)
+            else Log.w(TAG, message())
+        }
+    }
+
+    private inline fun logError(throwable: Throwable? = null, message: () -> String) {
+        runCatching {
+            if (throwable != null) Log.e(TAG, message(), throwable)
+            else Log.e(TAG, message())
+        }
+    }
 
     /**
      * All index statements required to optimize SQLite queries across LitePal models.
@@ -66,7 +97,7 @@ object AppDatabaseManager {
             runCatching {
                 val cleaned = DraftHelper.cleanExpiredDrafts(30)
                 if (cleaned > 0) {
-                    Log.d(TAG, "Purged $cleaned expired drafts older than 30 days.")
+                    logDebug { "Purged $cleaned expired drafts older than 30 days." }
                 }
             }
         }
@@ -83,27 +114,29 @@ object AppDatabaseManager {
             if (isInitialized) return
             runCatching {
                 val db = LitePal.getDatabase() ?: return
-                configurePragmas(db)
+                configurePragmas(db, context)
                 ensureIndexes(context, db)
                 optimize(db)
                 isInitialized = true
-                Log.d(TAG, "Database optimization and indexing completed successfully.")
+                logDebug { "Database optimization and indexing completed successfully." }
             }.onFailure { e ->
-                Log.e(TAG, "Failed to optimize database", e)
+                logError(e) { "Failed to optimize database" }
             }
         }
     }
 
     /**
-     * Enable WAL (Write-Ahead Logging) and high-performance in-memory temp store.
+     * Enable WAL (Write-Ahead Logging), high-performance in-memory temp store,
+     * busy timeout, and memory-mapped I/O.
      */
     @JvmStatic
-    fun configurePragmas(db: SQLiteDatabase) {
+    @JvmOverloads
+    fun configurePragmas(db: SQLiteDatabase, context: Context? = null) {
         runCatching {
             // Enable WAL mode: readers never block writers, writers never block readers
             if (!db.isWriteAheadLoggingEnabled) {
                 val walEnabled = db.enableWriteAheadLogging()
-                Log.d(TAG, "enableWriteAheadLogging result: $walEnabled")
+                logDebug { "enableWriteAheadLogging result: $walEnabled" }
             }
 
             // In WAL mode, synchronous = NORMAL is crash-safe and avoids flushing to disk on every single transaction
@@ -114,8 +147,23 @@ object AppDatabaseManager {
 
             // 2MB page cache (negative number means KiB in SQLite)
             db.execSQL("PRAGMA cache_size = -2000;")
+
+            // Avoid transient SQLiteDatabaseLockedException on concurrent background writes
+            db.execSQL("PRAGMA busy_timeout = 3000;")
+
+            // Standardize auto-checkpoint page count
+            db.execSQL("PRAGMA wal_autocheckpoint = 1000;")
+
+            // Memory-mapped I/O (up to 64MB on normal devices; disabled on low-RAM devices)
+            val isLowRam = context?.let { ctx ->
+                runCatching {
+                    (ctx.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager)?.isLowRamDevice
+                }.getOrNull()
+            } == true
+            val mmapSize = if (isLowRam) 0L else 64L * 1024L * 1024L
+            db.execSQL("PRAGMA mmap_size = $mmapSize;")
         }.onFailure { e ->
-            Log.e(TAG, "Failed to configure database pragmas", e)
+            logError(e) { "Failed to configure database pragmas" }
         }
     }
 
@@ -136,14 +184,14 @@ object AppDatabaseManager {
                 runCatching {
                     db.execSQL(sql)
                 }.onFailure { e ->
-                    Log.w(TAG, "Failed to execute index statement: $sql", e)
+                    logWarn(e) { "Failed to execute index statement: $sql" }
                 }
             }
 
             sp.edit().putInt(KEY_LAST_OPTIMIZED_VERSION, CURRENT_DB_VERSION).apply()
-            Log.d(TAG, "All secondary indexes created/verified for DB version $CURRENT_DB_VERSION.")
+            logDebug { "All secondary indexes created/verified for DB version $CURRENT_DB_VERSION." }
         }.onFailure { e ->
-            Log.e(TAG, "Failed to ensure indexes", e)
+            logError(e) { "Failed to ensure indexes" }
         }
     }
 
@@ -155,26 +203,44 @@ object AppDatabaseManager {
         runCatching {
             db.execSQL("PRAGMA optimize;")
         }.onFailure { e ->
-            Log.w(TAG, "Failed to run PRAGMA optimize", e)
+            logWarn(e) { "Failed to run PRAGMA optimize" }
         }
     }
 
     /**
-     * Explicit WAL checkpoint to flush log pages back to the database file if needed.
+     * Explicit WAL checkpoint to flush log pages back to the database file.
+     * When [mode] is [CheckpointMode.TRUNCATE], the WAL file is shrunk to 0 bytes.
      */
     @WorkerThread
     @JvmStatic
-    fun checkpoint(db: SQLiteDatabase? = null) {
+    @JvmOverloads
+    fun checkpoint(db: SQLiteDatabase? = null, mode: CheckpointMode = CheckpointMode.PASSIVE) {
         runCatching {
             val targetDb = db ?: runCatching { LitePal.getDatabase() }.getOrNull() ?: return
             if (targetDb.isWriteAheadLoggingEnabled) {
-                targetDb.rawQuery("PRAGMA wal_checkpoint(PASSIVE);", null).use { cursor ->
+                targetDb.rawQuery("PRAGMA wal_checkpoint(${mode.name});", null).use { cursor ->
                     cursor.moveToFirst()
                 }
-                Log.d(TAG, "WAL checkpoint completed.")
+                logDebug { "WAL checkpoint(${mode.name}) completed." }
             }
         }.onFailure { e ->
-            Log.e(TAG, "Failed to perform WAL checkpoint", e)
+            logError(e) { "Failed to perform WAL checkpoint(${mode.name})" }
+        }
+    }
+
+    /**
+     * Asynchronously schedules a debounced WAL checkpoint on Dispatchers.IO.
+     * Consolidates burst write checkpoints into a single low-overhead background operation.
+     */
+    @JvmStatic
+    @JvmOverloads
+    fun scheduleCheckpoint(delayMillis: Long = 5000L, mode: CheckpointMode = CheckpointMode.PASSIVE) {
+        synchronized(this) {
+            pendingCheckpointJob?.cancel()
+            pendingCheckpointJob = scope.launch {
+                delay(delayMillis)
+                checkpoint(mode = mode)
+            }
         }
     }
 

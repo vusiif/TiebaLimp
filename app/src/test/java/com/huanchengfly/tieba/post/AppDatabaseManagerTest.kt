@@ -64,4 +64,26 @@ class AppDatabaseManagerTest {
         // Checkpoint on null should not throw
         AppDatabaseManager.checkpoint(null)
     }
+
+    @Test
+    fun testCheckpointModes() {
+        val modes = AppDatabaseManager.CheckpointMode.values()
+        assertEquals(4, modes.size)
+        assertTrue(modes.any { it.name == "PASSIVE" })
+        assertTrue(modes.any { it.name == "FULL" })
+        assertTrue(modes.any { it.name == "RESTART" })
+        assertTrue(modes.any { it.name == "TRUNCATE" })
+
+        // Ensure all checkpoint modes handle null database gracefully
+        for (mode in modes) {
+            AppDatabaseManager.checkpoint(null, mode)
+        }
+    }
+
+    @Test
+    fun testScheduleCheckpoint() {
+        // Asynchronous scheduled checkpoint must not throw on null database
+        AppDatabaseManager.scheduleCheckpoint(delayMillis = 10L, mode = AppDatabaseManager.CheckpointMode.TRUNCATE)
+        AppDatabaseManager.scheduleCheckpoint(delayMillis = 10L, mode = AppDatabaseManager.CheckpointMode.PASSIVE)
+    }
 }

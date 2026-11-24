@@ -51,11 +51,11 @@ object AppMemoryManager {
                 }
                 level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN ||
                 level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND -> {
-                    // UI moved to background: evict drawables, transient caches, pause media and checkpoint WAL to avoid LMK kill
+                    // UI moved to background: evict drawables, transient caches, pause media and truncate WAL to avoid LMK kill
                     trimImageCaches(context, level)
                     purgeTransientCaches()
                     runCatching { MediaPlaybackCoordinator.pauseAll() }
-                    runCatching { AppDatabaseManager.checkpoint() }
+                    runCatching { AppDatabaseManager.checkpoint(mode = AppDatabaseManager.CheckpointMode.TRUNCATE) }
                 }
                 else -> {
                     // Running moderate or running low
@@ -107,7 +107,7 @@ object AppMemoryManager {
         runCatching { AppThemeDelegate.clearCache() }
         runCatching { clearThemeColorsCache() }
         runCatching { TiebaDns.clear() }
-        runCatching { AppDatabaseManager.checkpoint() }
+        runCatching { AppDatabaseManager.checkpoint(mode = AppDatabaseManager.CheckpointMode.TRUNCATE) }
         runCatching { AppNetworkManager.evictIdleConnections() }
         runCatching { WebResourceInterceptor.clearCache() }
     }

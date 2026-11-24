@@ -101,6 +101,7 @@ object AppMemoryManager {
         runCatching { clearThemeColorsCache() }
         runCatching { TiebaDns.clear() }
         runCatching { AppDatabaseManager.checkpoint() }
+        runCatching { AppNetworkManager.evictIdleConnections() }
     }
 
     /**

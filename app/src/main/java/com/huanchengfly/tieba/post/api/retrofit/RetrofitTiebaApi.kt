@@ -39,12 +39,22 @@ import com.huanchengfly.tieba.post.utils.DeviceUtils
 import com.huanchengfly.tieba.post.utils.MobileInfoUtil
 import com.huanchengfly.tieba.post.utils.NetworkUtil
 import com.huanchengfly.tieba.post.utils.UIDUtil
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.ConnectionPool
+import okhttp3.Dispatcher
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Request
+import okhttp3.Response
 import retrofit2.Retrofit
 import retrofit2.converter.wire.WireConverterFactory
+import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -62,14 +72,49 @@ object RetrofitTiebaApi {
     private val stParamInterceptor = StParamInterceptor()
     val connectionPool = ConnectionPool(32, 5, TimeUnit.MINUTES)
 
+    val dispatcher: Dispatcher = Dispatcher().apply {
+        maxRequests = 128
+        maxRequestsPerHost = 24
+    }
+
     val baseOkHttpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
             .readTimeout(READ_TIMEOUT, TimeUnit.SECONDS)
             .connectTimeout(CONNECT_TIMEOUT, TimeUnit.SECONDS)
             .writeTimeout(WRITE_TIMEOUT, TimeUnit.SECONDS)
             .connectionPool(connectionPool)
+            .dispatcher(dispatcher)
+            .protocols(listOf(Protocol.HTTP_2, Protocol.HTTP_1_1))
+            .retryOnConnectionFailure(true)
             .dns(TiebaDns)
             .build()
+    }
+
+    @JvmStatic
+    fun warmupConnections() {
+        CoroutineScope(Dispatchers.IO).launch {
+            runCatching {
+                TiebaDns.prewarm()
+                val coreHosts = listOf(
+                    "https://tiebac.baidu.com/favicon.ico",
+                    "https://c.tieba.baidu.com/favicon.ico"
+                )
+                for (url in coreHosts) {
+                    runCatching {
+                        val request = Request.Builder()
+                            .url(url)
+                            .head()
+                            .build()
+                        baseOkHttpClient.newCall(request).enqueue(object : Callback {
+                            override fun onFailure(call: Call, e: IOException) {}
+                            override fun onResponse(call: Call, response: Response) {
+                                response.close()
+                            }
+                        })
+                    }
+                }
+            }
+        }
     }
 
     private val defaultCommonParamInterceptor = CommonParamInterceptor(

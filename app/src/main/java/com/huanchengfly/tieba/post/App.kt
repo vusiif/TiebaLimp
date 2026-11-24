@@ -31,6 +31,7 @@ import com.huanchengfly.tieba.post.utils.ActivityStackManager
 import com.huanchengfly.tieba.post.utils.AppDatabaseManager
 import com.huanchengfly.tieba.post.utils.AppIconUtil
 import com.huanchengfly.tieba.post.utils.AppMemoryManager
+import com.huanchengfly.tieba.post.utils.AppNetworkManager
 import com.huanchengfly.tieba.post.utils.AppStartupProfiler
 import com.huanchengfly.tieba.post.utils.BlockManager
 import com.huanchengfly.tieba.post.utils.BlockRuleMatcher
@@ -124,7 +125,7 @@ class App : Application(), SketchFactory {
         }
         CoroutineScope(Dispatchers.IO).launch {
             AppIconUtil.setIcon()
-            TiebaDns.prewarm()
+            AppNetworkManager.init(this@App)
             BlockManager.init()
             EmoticonManager.init(this@App)
         }

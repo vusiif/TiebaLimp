@@ -343,6 +343,8 @@ internal fun SubPostsContent(
                     confirmDeleteDialogState.show()
                 }
             }
+            val accountUid = remember(account) { account?.uid?.toLongOrNull() }
+            val threadAuthorId = thread?.get { author?.id }
 
             LoadMoreLayout(
                 modifier = Modifier.padding(paddingValues),
@@ -401,61 +403,93 @@ internal fun SubPostsContent(
                     itemsIndexed(
                         items = subPosts,
                         key = { _, subPost -> subPost.id }
-                    ) { index, item ->
-                        val canDelete = remember(item, account) {
-                            item.subPost.get { author_id } == account?.uid?.toLongOrNull()
-                        }
-                        val onAgree = remember(item, forumId, threadId, postId, viewModel) {
-                            { sp: SubPostList ->
-                                val hasAgreed = sp.agree?.hasAgree != 0
-                                viewModel.send(
-                                    SubPostsUiIntent.Agree(
-                                        forumId,
-                                        threadId,
-                                        postId,
-                                        subPostId = sp.id,
-                                        agree = !hasAgreed
-                                    )
-                                )
-                            }
-                        }
-                        val forumName = forum?.get { name } ?: ""
-                        val onReplyClick = remember(item, forumId, forumName, threadId, postId) {
-                            { sp: SubPostList ->
-                                showReplyDialog(
-                                    ReplyArgs(
-                                        forumId = forumId,
-                                        forumName = forumName,
-                                        threadId = threadId,
-                                        postId = postId,
-                                        subPostId = sp.id,
-                                        replyUserId = sp.author?.id ?: sp.author_id,
-                                        replyUserName = sp.author?.nameShow.takeIf { name -> !name.isNullOrEmpty() }
-                                            ?: sp.author?.name,
-                                        replyUserPortrait = sp.author?.portrait,
-                                    )
-                                )
-                            }
-                        }
-                        val onMenuDeleteClick = remember(item) {
-                            { sp: SubPostList ->
+                    ) { _, item ->
+                        RenderSubPostItemRow(
+                            item = item,
+                            accountUid = accountUid,
+                            threadAuthorId = threadAuthorId,
+                            forumId = forumId,
+                            forumName = currentForumName,
+                            threadId = threadId,
+                            postId = postId,
+                            viewModel = viewModel,
+                            onUserNavigate = onUserNavigate,
+                            onCopyNavigate = onCopyNavigate,
+                            onShowReplyDialog = ::showReplyDialog,
+                            onRequestDelete = { sp ->
                                 deleteSubPost = sp.wrapImmutable()
                                 confirmDeleteDialogState.show()
                             }
-                        }
-                        SubPostItem(
-                            item = item,
-                            canDelete = canDelete,
-                            threadAuthorId = thread?.get { author?.id },
-                            onUserClick = onUserNavigate,
-                            onAgree = onAgree,
-                            onReplyClick = onReplyClick,
-                            onMenuCopyClick = onCopyNavigate,
-                            onMenuDeleteClick = onMenuDeleteClick,
                         )
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun RenderSubPostItemRow(
+    item: SubPostItemData,
+    accountUid: Long?,
+    threadAuthorId: Long?,
+    forumId: Long,
+    forumName: String,
+    threadId: Long,
+    postId: Long,
+    viewModel: SubPostsViewModel,
+    onUserNavigate: (User) -> Unit,
+    onCopyNavigate: (String) -> Unit,
+    onShowReplyDialog: (ReplyArgs) -> Unit,
+    onRequestDelete: (SubPostList) -> Unit,
+) {
+    val canDelete = remember(item, accountUid) {
+        item.subPost.get { author_id } == accountUid
+    }
+    val onAgree = remember(item, forumId, threadId, postId, viewModel) {
+        { sp: SubPostList ->
+            val hasAgreed = sp.agree?.hasAgree != 0
+            viewModel.send(
+                SubPostsUiIntent.Agree(
+                    forumId,
+                    threadId,
+                    postId,
+                    subPostId = sp.id,
+                    agree = !hasAgreed
+                )
+            )
+        }
+    }
+    val onReplyClick = remember(item, forumId, forumName, threadId, postId) {
+        { sp: SubPostList ->
+            onShowReplyDialog(
+                ReplyArgs(
+                    forumId = forumId,
+                    forumName = forumName,
+                    threadId = threadId,
+                    postId = postId,
+                    subPostId = sp.id,
+                    replyUserId = sp.author?.id ?: sp.author_id,
+                    replyUserName = sp.author?.nameShow.takeIf { name -> !name.isNullOrEmpty() }
+                        ?: sp.author?.name,
+                    replyUserPortrait = sp.author?.portrait,
+                )
+            )
+        }
+    }
+    val onMenuDeleteClick = remember(item) {
+        { sp: SubPostList ->
+            onRequestDelete(sp)
+        }
+    }
+    SubPostItem(
+        item = item,
+        canDelete = canDelete,
+        threadAuthorId = threadAuthorId,
+        onUserClick = onUserNavigate,
+        onAgree = onAgree,
+        onReplyClick = onReplyClick,
+        onMenuCopyClick = onCopyNavigate,
+        onMenuDeleteClick = onMenuDeleteClick,
+    )
 }

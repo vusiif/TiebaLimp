@@ -400,6 +400,7 @@ data class SubPostItemData(
 private fun SubPostItemData.updateAgreeStatus(hasAgreed: Int): SubPostItemData =
     copy(subPost = subPost.getImmutable { updateAgreeStatus(hasAgreed) })
 
+@Immutable
 data class SubPostsUiState(
     val isLoading: Boolean = false,
     val isLoadMoreError: Boolean = false,

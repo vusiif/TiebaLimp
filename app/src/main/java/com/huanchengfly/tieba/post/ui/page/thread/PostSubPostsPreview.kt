@@ -65,51 +65,13 @@ fun PostSubPostsPreview(
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         subPosts.fastForEach { item ->
-            var subPostRevealed by rememberSaveable(item.id) {
-                mutableStateOf(false)
-            }
-            val subReason = (item.blockResult as? FilterResult.Blocked)?.reason
-            BlockableContent(
-                blocked = item.blocked && !subPostRevealed,
-                blockedTip = {
-                    val subTip = if (!subReason.isNullOrBlank()) {
-                        stringResource(id = R.string.tip_blocked_sub_reason_format, subReason)
-                    } else {
-                        stringResource(id = R.string.tip_blocked_sub_post)
-                    }
-                    Text(
-                        text = "$subTip · ${stringResource(id = R.string.tip_click_to_unhide)}",
-                        style = MaterialTheme.typography.body2.copy(
-                            color = ExtendedTheme.colors.textDisabled,
-                            fontSize = 13.sp
-                        ),
-                        modifier = Modifier
-                            .padding(horizontal = 12.dp)
-                            .clickable { subPostRevealed = true }
-                    )
-                },
-            ) {
-                val onReplyClick = remember(item, post, onSubPostReplyClick) {
-                    if (onSubPostReplyClick != null) {
-                        { it: SubPostList -> onSubPostReplyClick(post, it) }
-                    } else null
-                }
-                val onCopyClick = remember(item, onMenuCopyClick) {
-                    if (onMenuCopyClick != null) {
-                        { it: SubPostList -> onMenuCopyClick(it.content.plainText) }
-                    } else null
-                }
-                SubPostItem(
-                    subPostList = item.subPost,
-                    subPostContent = item.subPostContent,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp),
-                    onReplyClick = onReplyClick,
-                    onOpenSubPosts = onOpenSubPosts,
-                    onMenuCopyClick = onCopyClick
-                )
-            }
+            PreviewSubPostRow(
+                item = item,
+                post = post,
+                onSubPostReplyClick = onSubPostReplyClick,
+                onOpenSubPosts = onOpenSubPosts,
+                onMenuCopyClick = onMenuCopyClick,
+            )
         }
 
         if (post.sub_post_number > subPosts.size) {
@@ -130,6 +92,61 @@ fun PostSubPostsPreview(
                     .padding(horizontal = 12.dp)
             )
         }
+    }
+}
+
+@Composable
+private fun PreviewSubPostRow(
+    item: SubPostItemData,
+    post: Post,
+    onSubPostReplyClick: ((Post, SubPostList) -> Unit)?,
+    onOpenSubPosts: (subPostId: Long) -> Unit,
+    onMenuCopyClick: ((String) -> Unit)?,
+) {
+    var subPostRevealed by rememberSaveable(item.id) {
+        mutableStateOf(false)
+    }
+    val subReason = (item.blockResult as? FilterResult.Blocked)?.reason
+    BlockableContent(
+        blocked = item.blocked && !subPostRevealed,
+        blockedTip = {
+            val subTip = if (!subReason.isNullOrBlank()) {
+                stringResource(id = R.string.tip_blocked_sub_reason_format, subReason)
+            } else {
+                stringResource(id = R.string.tip_blocked_sub_post)
+            }
+            Text(
+                text = "$subTip · ${stringResource(id = R.string.tip_click_to_unhide)}",
+                style = MaterialTheme.typography.body2.copy(
+                    color = ExtendedTheme.colors.textDisabled,
+                    fontSize = 13.sp
+                ),
+                modifier = Modifier
+                    .padding(horizontal = 12.dp)
+                    .clickable { subPostRevealed = true }
+            )
+        },
+    ) {
+        val onReplyClick = remember(item, post, onSubPostReplyClick) {
+            if (onSubPostReplyClick != null) {
+                { it: SubPostList -> onSubPostReplyClick(post, it) }
+            } else null
+        }
+        val onCopyClick = remember(item, onMenuCopyClick) {
+            if (onMenuCopyClick != null) {
+                { it: SubPostList -> onMenuCopyClick(it.content.plainText) }
+            } else null
+        }
+        SubPostItem(
+            subPostList = item.subPost,
+            subPostContent = item.subPostContent,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp),
+            onReplyClick = onReplyClick,
+            onOpenSubPosts = onOpenSubPosts,
+            onMenuCopyClick = onCopyClick
+        )
     }
 }
 

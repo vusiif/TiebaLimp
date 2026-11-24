@@ -42,6 +42,8 @@ import androidx.compose.ui.unit.sp
 import com.huanchengfly.tieba.post.R
 import com.huanchengfly.tieba.post.models.database.FloorBookmark
 import com.huanchengfly.tieba.post.ui.common.theme.compose.ExtendedTheme
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.toImmutableList
 
 @Composable
 fun FloorBookmarkEditDialog(
@@ -142,7 +144,7 @@ fun FloorBookmarkEditDialog(
 @Composable
 fun FloorBookmarksDialog(
     dialogState: DialogState,
-    bookmarks: List<FloorBookmark>,
+    bookmarks: ImmutableList<FloorBookmark>,
     onSelectBookmark: (FloorBookmark) -> Unit,
     onDeleteBookmark: (FloorBookmark) -> Unit,
     modifier: Modifier = Modifier
@@ -287,4 +289,25 @@ fun FloorBookmarksDialog(
             Spacer(modifier = Modifier.height(12.dp))
         }
     }
+}
+
+@Deprecated(
+    message = "Use ImmutableList for Compose recomposition optimization",
+    level = DeprecationLevel.HIDDEN
+)
+@Composable
+fun FloorBookmarksDialog(
+    dialogState: DialogState,
+    bookmarks: List<FloorBookmark>,
+    onSelectBookmark: (FloorBookmark) -> Unit,
+    onDeleteBookmark: (FloorBookmark) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    FloorBookmarksDialog(
+        dialogState = dialogState,
+        bookmarks = bookmarks.toImmutableList(),
+        onSelectBookmark = onSelectBookmark,
+        onDeleteBookmark = onDeleteBookmark,
+        modifier = modifier
+    )
 }

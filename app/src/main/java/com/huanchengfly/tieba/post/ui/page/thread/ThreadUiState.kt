@@ -1,5 +1,6 @@
 package com.huanchengfly.tieba.post.ui.page.thread
 
+import androidx.compose.runtime.Immutable
 import com.huanchengfly.tieba.post.api.models.protos.Anti
 import com.huanchengfly.tieba.post.api.models.protos.Post
 import com.huanchengfly.tieba.post.api.models.protos.SimpleForum
@@ -13,6 +14,7 @@ import com.huanchengfly.tieba.post.ui.common.PbContentRender
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 
+@Immutable
 data class ThreadUiState(
     val isRefreshing: Boolean = false,
     val isLoadingMore: Boolean = false,

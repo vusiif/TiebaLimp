@@ -1,1 +1,2 @@
 com.huanchengfly.tieba.post.api.models.protos.**
+com.huanchengfly.tieba.post.models.database.FloorBookmark

@@ -1,6 +1,7 @@
 package com.huanchengfly.tieba.post.ui.page.thread
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import com.huanchengfly.tieba.post.R
@@ -12,6 +13,7 @@ import com.huanchengfly.tieba.post.ui.widgets.compose.DialogState
 import com.huanchengfly.tieba.post.ui.widgets.compose.FloorBookmarkEditDialog
 import com.huanchengfly.tieba.post.ui.widgets.compose.FloorBookmarksDialog
 import com.huanchengfly.tieba.post.utils.FloorBookmarkUtil
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.launch
 
 @Composable
@@ -65,9 +67,10 @@ fun ThreadBookmarkDialogs(
         }
     )
 
+    val immutableBookmarks = remember(threadBookmarks) { threadBookmarks.toImmutableList() }
     FloorBookmarksDialog(
         dialogState = bookmarksDialogState,
-        bookmarks = threadBookmarks,
+        bookmarks = immutableBookmarks,
         onSelectBookmark = onSelectBookmark,
         onDeleteBookmark = { bookmark ->
             coroutineScope.launch {

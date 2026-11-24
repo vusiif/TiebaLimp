@@ -10,6 +10,7 @@ import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.PullRefreshState
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -18,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import com.huanchengfly.tieba.post.R
 import com.huanchengfly.tieba.post.api.models.protos.Post
 import com.huanchengfly.tieba.post.api.models.protos.SimpleForum
+import com.huanchengfly.tieba.post.api.models.protos.SubPostList
 import com.huanchengfly.tieba.post.api.models.protos.ThreadInfo
 import com.huanchengfly.tieba.post.api.models.protos.User
 import com.huanchengfly.tieba.post.arch.ImmutableHolder
@@ -160,32 +162,178 @@ fun ThreadReadingLayout(
                 modifier = Modifier.fillMaxSize()
             )
         } else {
-            val performLoadMore = {
-                if (hasMore) {
-                    viewModel.send(
-                        ThreadUiIntent.LoadMore(
-                            threadId = threadId,
-                            page = if (curSortType == ThreadSortType.SORT_TYPE_DESC) totalPage - currentPageMax
-                            else currentPageMax + 1,
-                            forumId = forumId,
-                            postId = nextPagePostId,
-                            seeLz = isSeeLz,
-                            sortType = curSortType,
-                            postIds = data.map { it.post.get { id } }
+            val performLoadMore = remember(hasMore, curSortType, totalPage, currentPageMax, threadId, forumId, nextPagePostId, isSeeLz, data, curForumId, viewModel) {
+                {
+                    if (hasMore) {
+                        viewModel.send(
+                            ThreadUiIntent.LoadMore(
+                                threadId = threadId,
+                                page = if (curSortType == ThreadSortType.SORT_TYPE_DESC) totalPage - currentPageMax
+                                else currentPageMax + 1,
+                                forumId = forumId,
+                                postId = nextPagePostId,
+                                seeLz = isSeeLz,
+                                sortType = curSortType,
+                                postIds = data.map { it.post.get { id } }
+                            )
                         )
-                    )
-                } else if (data.isNotEmpty() && curSortType != ThreadSortType.SORT_TYPE_DESC) {
+                    } else if (data.isNotEmpty() && curSortType != ThreadSortType.SORT_TYPE_DESC) {
+                        viewModel.send(
+                            ThreadUiIntent.LoadLatestPosts(
+                                threadId = threadId,
+                                curLatestPostId = data.last().post.get { id },
+                                forumId = curForumId,
+                                seeLz = isSeeLz,
+                                sortType = curSortType
+                            )
+                        )
+                    }
+                }
+            }
+
+            val onToggleSeeLzAction = remember(threadId, forumId, curSortType, viewModel) {
+                { seeLz: Boolean ->
                     viewModel.send(
-                        ThreadUiIntent.LoadLatestPosts(
+                        ThreadUiIntent.LoadFirstPage(
                             threadId = threadId,
-                            curLatestPostId = data.last().post.get { id },
-                            forumId = curForumId,
-                            seeLz = isSeeLz,
+                            forumId = forumId,
+                            seeLz = seeLz,
                             sortType = curSortType
                         )
                     )
                 }
             }
+            val onLoadPreviousAction = remember(threadId, forumId, isSeeLz, curSortType, viewModel) {
+                { page: Int, firstPostId: Long, postIds: List<Long> ->
+                    viewModel.send(
+                        ThreadUiIntent.LoadPrevious(
+                            threadId,
+                            page,
+                            forumId,
+                            postId = firstPostId,
+                            seeLz = isSeeLz,
+                            sortType = curSortType,
+                            postIds = postIds
+                        )
+                    )
+                }
+            }
+            val onAddFavoriteAction = remember(threadId, viewModel) {
+                { p: Post ->
+                    viewModel.send(
+                        ThreadUiIntent.AddFavorite(
+                            threadId,
+                            p.id,
+                            p.floor
+                        )
+                    )
+                }
+            }
+            val onDeleteFirstPostAction = remember(onDeletePost) {
+                { _: Post -> onDeletePost(null) }
+            }
+            val onUserClickAction = remember(navigator) {
+                { id: Long -> navigator.navigate(UserProfilePageDestination(id)) }
+            }
+            val onAgreePostAction = remember(threadId, viewModel) {
+                { post: ImmutableHolder<Post>, agree: Boolean ->
+                    viewModel.send(
+                        ThreadUiIntent.AgreePost(
+                            threadId = threadId,
+                            postId = post.get { id },
+                            agree = agree
+                        )
+                    )
+                }
+            }
+            val curForumName = forum?.get { name }.orEmpty()
+            val onReplyClickAction = remember(curForumId, curForumName, threadId, navigator) {
+                { p: Post ->
+                    navigator.navigate(
+                        ReplyPageDestination(
+                            forumId = curForumId ?: 0,
+                            forumName = curForumName,
+                            threadId = threadId,
+                            postId = p.id,
+                            replyUserId = p.author?.id ?: p.author_id,
+                            replyUserName = p.author?.nameShow.takeIf { name -> !name.isNullOrEmpty() }
+                                ?: p.author?.name,
+                            replyUserPortrait = p.author?.portrait,
+                        )
+                    )
+                }
+            }
+            val onSubPostReplyClickAction = remember(curForumId, curForumName, threadId, navigator) {
+                { post: Post, subPost: SubPostList ->
+                    navigator.navigate(
+                        ReplyPageDestination(
+                            forumId = curForumId ?: 0,
+                            forumName = curForumName,
+                            threadId = threadId,
+                            postId = post.id,
+                            subPostId = subPost.id,
+                            replyUserId = subPost.author?.id ?: subPost.author_id,
+                            replyUserName = subPost.author?.nameShow.takeIf { name -> !name.isNullOrEmpty() }
+                                ?: subPost.author?.name,
+                            replyUserPortrait = subPost.author?.portrait,
+                        )
+                    )
+                }
+            }
+            val onOpenSubPostsAction = remember(curForumId, threadId, navigator) {
+                { postId: Long, subPostId: Long ->
+                    if (curForumId != null) {
+                        navigator.navigate(
+                            SubPostsSheetPageDestination(
+                                forumId = curForumId,
+                                threadId = threadId,
+                                postId = postId,
+                                subPostId = subPostId,
+                                loadFromSubPost = false
+                            )
+                        )
+                    }
+                }
+            }
+            val onMenuCopyClickAction = remember(navigator) {
+                { text: String ->
+                    navigator.navigate(
+                        CopyTextDialogPageDestination(text)
+                    )
+                }
+            }
+            val onMenuFavoriteClickAction = remember(thread, forum, forumId, threadId, antiTbs, viewModel) {
+                { p: Post ->
+                    val isPostCollected =
+                        p.id == thread?.get { collectMarkPid.toLongOrNull() }
+                    val fid = forum?.get { id } ?: forumId
+                    if (fid != null) {
+                        if (isPostCollected) {
+                            viewModel.send(
+                                ThreadUiIntent.RemoveFavorite(
+                                    threadId = threadId,
+                                    forumId = fid,
+                                    tbs = antiTbs
+                                )
+                            )
+                        } else {
+                            viewModel.send(
+                                ThreadUiIntent.AddFavorite(
+                                    threadId = threadId,
+                                    postId = p.id,
+                                    floor = p.floor
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+            val onMenuDeleteClickAction = remember(onDeletePost) {
+                { p: Post ->
+                    onDeletePost(p.wrapImmutable())
+                }
+            }
+
             LoadMoreLayout(
                 isLoading = isLoadingMore,
                 isError = isLoadMoreError,
@@ -226,129 +374,20 @@ fun ThreadReadingLayout(
                     isRefreshing = isRefreshing,
                     data = data,
                     navigator = navigator,
-                    onToggleSeeLz = { seeLz ->
-                        viewModel.send(
-                            ThreadUiIntent.LoadFirstPage(
-                                threadId = threadId,
-                                forumId = forumId,
-                                seeLz = seeLz,
-                                sortType = curSortType
-                            )
-                        )
-                    },
-                    onLoadPrevious = { page, firstPostId, postIds ->
-                        viewModel.send(
-                            ThreadUiIntent.LoadPrevious(
-                                threadId,
-                                page,
-                                forumId,
-                                postId = firstPostId,
-                                seeLz = isSeeLz,
-                                sortType = curSortType,
-                                postIds = postIds
-                            )
-                        )
-                    },
+                    onToggleSeeLz = onToggleSeeLzAction,
+                    onLoadPrevious = onLoadPreviousAction,
                     onReload = onReload,
-                    onAddFavorite = {
-                        viewModel.send(
-                            ThreadUiIntent.AddFavorite(
-                                threadId,
-                                it.id,
-                                it.floor
-                            )
-                        )
-                    },
+                    onAddFavorite = onAddFavoriteAction,
                     onOpenBookmarkEdit = onOpenBookmarkEdit,
-                    onDeleteFirstPost = {
-                        onDeletePost(null)
-                    },
-                    onUserClick = {
-                        navigator.navigate(UserProfilePageDestination(it))
-                    },
-                    onAgreePost = { post, agree ->
-                        viewModel.send(
-                            ThreadUiIntent.AgreePost(
-                                threadId = threadId,
-                                postId = post.get { id },
-                                agree = agree
-                            )
-                        )
-                    },
-                    onReplyClick = {
-                        navigator.navigate(
-                            ReplyPageDestination(
-                                forumId = curForumId ?: 0,
-                                forumName = forum?.get { name } ?: "",
-                                threadId = threadId,
-                                postId = it.id,
-                                replyUserId = it.author?.id ?: it.author_id,
-                                replyUserName = it.author?.nameShow.takeIf { name -> !name.isNullOrEmpty() }
-                                    ?: it.author?.name,
-                                replyUserPortrait = it.author?.portrait,
-                            )
-                        )
-                    },
-                    onSubPostReplyClick = { post, subPost ->
-                        navigator.navigate(
-                            ReplyPageDestination(
-                                forumId = curForumId ?: 0,
-                                forumName = forum?.get { name } ?: "",
-                                threadId = threadId,
-                                postId = post.id,
-                                subPostId = subPost.id,
-                                replyUserId = subPost.author?.id ?: subPost.author_id,
-                                replyUserName = subPost.author?.nameShow.takeIf { name -> !name.isNullOrEmpty() }
-                                    ?: subPost.author?.name,
-                                replyUserPortrait = subPost.author?.portrait,
-                            )
-                        )
-                    },
-                    onOpenSubPosts = { postId, subPostId ->
-                        if (curForumId != null) {
-                            navigator.navigate(
-                                SubPostsSheetPageDestination(
-                                    forumId = curForumId,
-                                    threadId = threadId,
-                                    postId = postId,
-                                    subPostId = subPostId,
-                                    loadFromSubPost = false
-                                )
-                            )
-                        }
-                    },
-                    onMenuCopyClick = {
-                        navigator.navigate(
-                            CopyTextDialogPageDestination(it)
-                        )
-                    },
-                    onMenuFavoriteClick = {
-                        val isPostCollected =
-                            it.id == thread?.get { collectMarkPid.toLongOrNull() }
-                        val fid = forum?.get { id } ?: forumId
-                        if (fid != null) {
-                            if (isPostCollected) {
-                                viewModel.send(
-                                    ThreadUiIntent.RemoveFavorite(
-                                        threadId = threadId,
-                                        forumId = fid,
-                                        tbs = antiTbs
-                                    )
-                                )
-                            } else {
-                                viewModel.send(
-                                    ThreadUiIntent.AddFavorite(
-                                        threadId = threadId,
-                                        postId = it.id,
-                                        floor = it.floor
-                                    )
-                                )
-                            }
-                        }
-                    },
-                    onMenuDeleteClick = {
-                        onDeletePost(it.wrapImmutable())
-                    }
+                    onDeleteFirstPost = onDeleteFirstPostAction,
+                    onUserClick = onUserClickAction,
+                    onAgreePost = onAgreePostAction,
+                    onReplyClick = onReplyClickAction,
+                    onSubPostReplyClick = onSubPostReplyClickAction,
+                    onOpenSubPosts = onOpenSubPostsAction,
+                    onMenuCopyClick = onMenuCopyClickAction,
+                    onMenuFavoriteClick = onMenuFavoriteClickAction,
+                    onMenuDeleteClick = onMenuDeleteClickAction
                 )
             }
         }

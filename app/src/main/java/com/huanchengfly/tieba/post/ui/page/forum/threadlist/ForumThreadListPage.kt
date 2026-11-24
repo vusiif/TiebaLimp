@@ -232,19 +232,16 @@ private fun ThreadList(
         }
         itemsIndexed(
             items = items,
-            key = { _, (holder) ->
-                val (item) = holder
-                if (item.isTop == 1) "Top_${item.id}" else "Thread_${item.id}"
+            key = { _, itemData ->
+                if (itemData.isTop) "Top_${itemData.id}" else itemData.id
             },
-            contentType = { _, (holder) ->
-                val (item) = holder
-                if (item.isTop == 1) ItemType.Top
-                else {
-                    if (item.media.isNotEmpty())
-                        if (item.media.size == 1) ItemType.SingleMedia else ItemType.MultiMedia
-                    else if (item.videoInfo != null)
-                        ItemType.Video
-                    else ItemType.PlainText
+            contentType = { _, itemData ->
+                if (itemData.isTop) ItemType.Top
+                else when {
+                    itemData.hasVideo -> ItemType.Video
+                    itemData.mediaCount == 1 -> ItemType.SingleMedia
+                    itemData.mediaCount > 1 -> ItemType.MultiMedia
+                    else -> ItemType.PlainText
                 }
             }
         ) { index, (holder, blocked) ->

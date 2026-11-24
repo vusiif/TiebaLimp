@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -211,8 +212,9 @@ fun Card(
     onClick: (() -> Unit)? = null,
     contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp),
 ) {
-    val baseModifier = remember(onClick, action != null, contentPadding) {
-        (if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+    val currentOnClick by rememberUpdatedState(onClick)
+    val baseModifier = remember(onClick != null, action != null, contentPadding) {
+        (if (onClick != null) Modifier.clickable { currentOnClick?.invoke() } else Modifier)
             .then(if (action != null) Modifier.padding(top = 16.dp) else Modifier.padding(vertical = 16.dp))
             .padding(contentPadding)
     }
@@ -414,9 +416,16 @@ fun FeedCard(
     dislikeAction: @Composable () -> Unit = {},
 ) {
     val context = LocalContext.current
-    val onCardClick = remember(item, onClick) { { onClick(item.get()) } }
-    val onCardReply = remember(item, onClickReply) { { onClickReply(item.get()) } }
-    val onCardAgree = remember(item, onAgree) { { onAgree(item.get()) } }
+    val currentOnClick by rememberUpdatedState(onClick)
+    val currentOnAgree by rememberUpdatedState(onAgree)
+    val currentOnClickReply by rememberUpdatedState(onClickReply)
+    val currentOnClickUser by rememberUpdatedState(onClickUser)
+    val currentOnClickForum by rememberUpdatedState(onClickForum)
+    val currentOnClickOriginThread by rememberUpdatedState(onClickOriginThread)
+
+    val onCardClick = remember(item) { { currentOnClick(item.get()) } }
+    val onCardReply = remember(item) { { currentOnClickReply(item.get()) } }
+    val onCardAgree = remember(item) { { currentOnAgree(item.get()) } }
     val onCardShare = remember(item, context) {
         {
             val threadId = item.get { if (threadId != 0L) threadId else id }
@@ -424,64 +433,85 @@ fun FeedCard(
             TiebaUtil.shareText(context, "https://tieba.baidu.com/p/$threadId", title)
         }
     }
-    val onCardOriginThread = remember(item, onClickOriginThread) {
-        { info: OriginThreadInfo -> onClickOriginThread(info) }
+    val onCardOriginThread = remember(item) {
+        { info: OriginThreadInfo -> currentOnClickOriginThread(info) }
     }
-    val onCardForum = remember(item, onClickForum) {
-        { forum: SimpleForum -> onClickForum(forum) }
+    val onCardForum = remember(item) {
+        { forum: SimpleForum -> currentOnClickForum(forum) }
+    }
+
+    val author = remember(item) { item.getNullableImmutable { author } }
+    val onHeaderUserClick = remember(author) {
+        author?.let { auth -> { currentOnClickUser(auth.get()) } } ?: {}
+    }
+
+    val threadTitle = remember(item) { item.get { title } }
+    val threadAbstract = remember(item) { item.get { abstractText } }
+    val threadTabName = remember(item) { item.get { tabName } }
+    val showTitle = remember(item, threadTitle) { item.get { isNoTitle != 1 } && threadTitle.isNotBlank() }
+    val showAbstract = remember(threadAbstract) { threadAbstract.isNotBlank() }
+    val isGood = remember(item) { item.get { isGood == 1 } }
+
+    val originThreadInfo = remember(item) {
+        if (item.get { is_share_thread } == 1) item.getNullableImmutable { origin_thread_info } else null
+    }
+
+    val cardThreadId = remember(item) { item.get { if (threadId != 0L) threadId else id } }
+    val forumId = remember(item) { item.get { forumId } }
+    val lastTimeInt = remember(item) { item.get { lastTimeInt } }
+
+    val shareNum = remember(item) { item.get { shareNum } }
+    val replyNum = remember(item) { item.get { replyNum } }
+    val hasAgree = remember(item) { item.get { agree?.hasAgree == 1 } }
+    val agreeNum = remember(item) { item.get { agreeNum } }
+
+    var localPollInfo by remember(item) {
+        mutableStateOf(PollVoteStore.get(cardThreadId, item.get { poll_info }))
     }
 
     Card(
         header = {
-            val author = remember(item) { item.getNullableImmutable { author } }
             author?.let {
-                val onHeaderUserClick = remember(it, onClickUser) {
-                    { onClickUser(it.get()) }
-                }
                 UserHeader(
                     user = it,
-                    time = item.get { lastTimeInt },
+                    time = lastTimeInt,
                     onClick = onHeaderUserClick,
                 ) { dislikeAction() }
             }
         },
         content = {
             ThreadContent(
-                title = item.get { title },
-                abstractText = item.get { abstractText },
-                tabName = item.get { tabName },
-                showTitle = item.get { isNoTitle != 1 && title.isNotBlank() },
-                showAbstract = item.get { abstractText.isNotBlank() },
-                isGood = item.get { isGood == 1 },
+                title = threadTitle,
+                abstractText = threadAbstract,
+                tabName = threadTabName,
+                showTitle = showTitle,
+                showAbstract = showAbstract,
+                isGood = isGood,
             )
 
             ThreadMedia(
                 item = item,
             )
 
-            item.getNullableImmutable { origin_thread_info }
-                .takeIf { item.get { is_share_thread } == 1 }?.let {
-                    OriginThreadCard(
-                        originThreadInfo = it,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape6)
-                            .background(ExtendedTheme.colors.floorCard)
-                            .clickable {
-                                onCardOriginThread(it.get())
-                            }
-                            .padding(16.dp)
-                    )
+            originThreadInfo?.let {
+                val onOriginCardClick = remember(it) {
+                    { onCardOriginThread(it.get()) }
                 }
-
-            val cardThreadId = item.get { if (threadId != 0L) threadId else id }
-            var localPollInfo by remember(item) {
-                mutableStateOf(PollVoteStore.get(cardThreadId, item.get { poll_info }))
+                OriginThreadCard(
+                    originThreadInfo = it,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape6)
+                        .background(ExtendedTheme.colors.floorCard)
+                        .clickable(onClick = onOriginCardClick)
+                        .padding(16.dp)
+                )
             }
+
             localPollInfo?.takeIf { it.options.isNotEmpty() }?.let { poll ->
                 VoteCard(
                     pollInfo = poll,
                     threadId = cardThreadId,
-                    forumId = item.get { forumId },
+                    forumId = forumId,
                     onVoteSuccess = { newPoll -> localPollInfo = newPoll },
                 )
             }
@@ -491,20 +521,20 @@ fun FeedCard(
         action = {
             Row(modifier = Modifier.fillMaxWidth()) {
                 ThreadShareBtn(
-                    shareNum = item.get { shareNum },
+                    shareNum = shareNum,
                     onClick = onCardShare,
                     modifier = Modifier.weight(1f)
                 )
 
                 ThreadReplyBtn(
-                    replyNum = item.get { replyNum },
+                    replyNum = replyNum,
                     onClick = onCardReply,
                     modifier = Modifier.weight(1f)
                 )
 
                 ThreadAgreeBtn(
-                    hasAgree = item.get { agree?.hasAgree == 1 },
-                    agreeNum = item.get { agreeNum },
+                    hasAgree = hasAgree,
+                    agreeNum = agreeNum,
                     onClick = onCardAgree,
                     modifier = Modifier.weight(1f)
                 )
@@ -527,11 +557,18 @@ fun FeedCard(
     onClickOriginThread: (OriginThreadInfo) -> Unit = {},
 ) {
     val context = LocalContext.current
-    val onCardClick = remember(item, onClick) { { onClick(item.get()) } }
-    val onCardReply = remember(item, onClickReply) { { onClickReply(item.get()) } }
-    val onCardAgree = remember(item, onAgree) { { onAgree(item.get()) } }
-    val onCardUser = remember(item, onClickUser) { { onClickUser(item.get { user_id }) } }
-    val onCardForum = remember(item, onClickForum) { { onClickForum(item.get { forum_name }) } }
+    val currentOnClick by rememberUpdatedState(onClick)
+    val currentOnAgree by rememberUpdatedState(onAgree)
+    val currentOnClickReply by rememberUpdatedState(onClickReply)
+    val currentOnClickUser by rememberUpdatedState(onClickUser)
+    val currentOnClickForum by rememberUpdatedState(onClickForum)
+    val currentOnClickOriginThread by rememberUpdatedState(onClickOriginThread)
+
+    val onCardClick = remember(item) { { currentOnClick(item.get()) } }
+    val onCardReply = remember(item) { { currentOnClickReply(item.get()) } }
+    val onCardAgree = remember(item) { { currentOnAgree(item.get()) } }
+    val onCardUser = remember(item) { { currentOnClickUser(item.get { user_id }) } }
+    val onCardForum = remember(item) { { currentOnClickForum(item.get { forum_name }) } }
     val onCardShare = remember(item, context) {
         {
             val threadId = item.get { thread_id }
@@ -539,71 +576,92 @@ fun FeedCard(
             TiebaUtil.shareText(context, "https://tieba.baidu.com/p/$threadId", title)
         }
     }
-    val onCardOriginThread = remember(item, onClickOriginThread) {
-        { it: OriginThreadInfo -> onClickOriginThread(it) }
+    val onCardOriginThread = remember(item) {
+        { it: OriginThreadInfo -> currentOnClickOriginThread(it) }
+    }
+
+    val userName = remember(item) { item.get { user_name } }
+    val nameShow = remember(item) { item.get { name_show } }
+    val userPortrait = remember(item) { item.get { user_portrait } }
+    val createTime = remember(item) { item.get { create_time } }
+    val ip = remember(item) { item.get { ip } }
+
+    val threadTitle = remember(item) { item.get { title } }
+    val threadAbstract = remember(item) { item.get { abstractText } }
+    val showTitle = remember(item, threadTitle) { item.get { is_ntitle != 1 } && threadTitle.isNotBlank() }
+    val showAbstract = remember(threadAbstract) { threadAbstract.isNotBlank() }
+
+    val forumId = remember(item) { item.get { forum_id } }
+    val forumName = remember(item) { item.get { forum_name } }
+    val pfcThreadId = remember(item) { item.get { thread_id } }
+    val medias = remember(item) { item.getImmutableList { media } }
+    val videoInfo = remember(item) { item.getNullableImmutable { video_info } }
+
+    val originThreadInfo = remember(item) {
+        if (item.get { is_share_thread } == 1) item.getNullableImmutable { origin_thread_info } else null
+    }
+
+    val shareNum = remember(item) { item.get { share_num }.toLong() }
+    val replyNum = remember(item) { item.get { reply_num } }
+    val hasAgree = remember(item) { item.get { agree?.hasAgree == 1 } }
+    val agreeNum = remember(item) { item.get { agree_num } }
+
+    var localPollInfo by remember(item) {
+        mutableStateOf(PollVoteStore.get(pfcThreadId, item.get { poll_info }))
     }
 
     Card(
         header = {
             UserHeader(
-                name = item.get { user_name },
-                nameShow = item.get { name_show },
-                portrait = item.get { user_portrait },
-                time = item.get { create_time },
-                ip = item.get { ip },
+                name = userName,
+                nameShow = nameShow,
+                portrait = userPortrait,
+                time = createTime,
+                ip = ip,
                 onClick = onCardUser,
             )
         },
         content = {
             ThreadContent(
-                title = item.get { title },
-                abstractText = item.get { abstractText },
-                showTitle = item.get { is_ntitle != 1 && title.isNotBlank() },
-                showAbstract = item.get { abstractText.isNotBlank() },
+                title = threadTitle,
+                abstractText = threadAbstract,
+                showTitle = showTitle,
+                showAbstract = showAbstract,
             )
 
-            val forumId = remember(item) { item.get { forum_id } }
-            val forumName = remember(item) { item.get { forum_name } }
-            val threadId = remember(item) { item.get { thread_id } }
-            val medias = remember(item) { item.getImmutableList { media } }
-            val videoInfo = remember(item) { item.getNullableImmutable { video_info } }
             ThreadMedia(
                 forumId = forumId,
                 forumName = forumName,
-                threadId = threadId,
+                threadId = pfcThreadId,
                 medias = medias,
                 videoInfo = videoInfo
             )
 
-            item.getNullableImmutable { origin_thread_info }
-                .takeIf { item.get { is_share_thread } == 1 }?.let {
-                    OriginThreadCard(
-                        originThreadInfo = it,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape6)
-                            .background(ExtendedTheme.colors.floorCard)
-                            .clickable {
-                                onCardOriginThread(it.get())
-                            }
-                            .padding(16.dp)
-                    )
+            originThreadInfo?.let {
+                val onOriginCardClick = remember(it) {
+                    { onCardOriginThread(it.get()) }
                 }
-
-            val pfcThreadId = item.get { thread_id }
-            var localPollInfo by remember(item) {
-                mutableStateOf(PollVoteStore.get(pfcThreadId, item.get { poll_info }))
+                OriginThreadCard(
+                    originThreadInfo = it,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape6)
+                        .background(ExtendedTheme.colors.floorCard)
+                        .clickable(onClick = onOriginCardClick)
+                        .padding(16.dp)
+                )
             }
+
             localPollInfo?.takeIf { it.options.isNotEmpty() }?.let { poll ->
                 VoteCard(
                     pollInfo = poll,
                     threadId = pfcThreadId,
-                    forumId = item.get { forum_id },
+                    forumId = forumId,
                     onVoteSuccess = { newPoll -> localPollInfo = newPoll },
                 )
             }
 
             ThreadForumInfo(
-                forumName = item.get { forum_name },
+                forumName = forumName,
                 forumAvatar = null,
                 onClick = onCardForum
             )
@@ -611,20 +669,20 @@ fun FeedCard(
         action = {
             Row(modifier = Modifier.fillMaxWidth()) {
                 ThreadShareBtn(
-                    shareNum = item.get { share_num }.toLong(),
+                    shareNum = shareNum,
                     onClick = onCardShare,
                     modifier = Modifier.weight(1f)
                 )
 
                 ThreadReplyBtn(
-                    replyNum = item.get { reply_num },
+                    replyNum = replyNum,
                     onClick = onCardReply,
                     modifier = Modifier.weight(1f)
                 )
 
                 ThreadAgreeBtn(
-                    hasAgree = item.get { agree?.hasAgree == 1 },
-                    agreeNum = item.get { agree_num },
+                    hasAgree = hasAgree,
+                    agreeNum = agreeNum,
                     onClick = onCardAgree,
                     modifier = Modifier.weight(1f)
                 )

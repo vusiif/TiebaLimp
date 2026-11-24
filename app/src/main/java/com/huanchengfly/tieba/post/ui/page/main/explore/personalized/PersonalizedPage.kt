@@ -317,22 +317,23 @@ private fun FeedList(
     ) {
         itemsIndexed(
             items = data,
-            key = { _, (item) -> "${item.get { id }}" },
-            contentType = { _, (item) ->
+            key = { _, itemData -> itemData.id },
+            contentType = { _, itemData ->
                 when {
-                    item.get { videoInfo } != null -> "Video"
-                    item.get { media }.size == 1 -> "SingleMedia"
-                    item.get { media }.size > 1 -> "MultiMedia"
+                    itemData.hasVideo -> "Video"
+                    itemData.mediaCount == 1 -> "SingleMedia"
+                    itemData.mediaCount > 1 -> "MultiMedia"
                     else -> "PlainText"
                 }
             }
-        ) { index, (item, blocked, personalized, hidden) ->
+        ) { index, itemData ->
+            val (item, blocked, personalized, hidden) = itemData
             val isHidden =
                 remember(
                     hiddenThreadIds,
-                    item,
+                    itemData.id,
                     hidden
-                ) { hiddenThreadIds.contains(item.get { threadId }) || hidden }
+                ) { hiddenThreadIds.contains(itemData.id) || hidden }
             val isRefreshPosition =
                 remember(index, refreshPosition) { index + 1 == refreshPosition }
             val isNotLast = remember(index, data.size) { index < data.size - 1 }

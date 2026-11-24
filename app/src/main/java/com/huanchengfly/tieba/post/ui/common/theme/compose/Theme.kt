@@ -65,8 +65,28 @@ val LocalExtendedColors = staticCompositionLocalOf {
 }
 
 
+private val themeColorsCache = java.util.concurrent.ConcurrentHashMap<String, ExtendedColors>()
+private val materialColorsCache = java.util.concurrent.ConcurrentHashMap<String, Colors>()
+
+fun clearThemeColorsCache() {
+    themeColorsCache.clear()
+    materialColorsCache.clear()
+    clearDynamicTonalPaletteCache()
+}
+
 @SuppressLint("ConflictingOnColor")
 fun getColorPalette(
+    darkTheme: Boolean,
+    extendedColors: ExtendedColors
+): Colors {
+    val cacheKey = "${extendedColors.theme}:$darkTheme:${extendedColors.primary.value}:${extendedColors.accent.value}:${extendedColors.card.value}:${extendedColors.background.value}"
+    return materialColorsCache.getOrPut(cacheKey) {
+        buildColorPalette(darkTheme, extendedColors)
+    }
+}
+
+@SuppressLint("ConflictingOnColor")
+private fun buildColorPalette(
     darkTheme: Boolean,
     extendedColors: ExtendedColors
 ): Colors {
@@ -95,12 +115,6 @@ fun getColorPalette(
             surface = extendedColors.card,
         )
     }
-}
-
-private val themeColorsCache = java.util.concurrent.ConcurrentHashMap<String, ExtendedColors>()
-
-fun clearThemeColorsCache() {
-    themeColorsCache.clear()
 }
 
 private fun getDynamicColor(
@@ -473,7 +487,10 @@ fun TiebaLiteTheme(
         if (!useDynamicTheme || ThemeUtil.isTranslucentTheme(theme)) {
             getThemeColorForTheme(context, theme)
         } else {
-            getDynamicColor(theme, dynamicTonalPalette(context), isToolbarPrimaryColor)
+            val cacheKey = "dynamic:$theme:toolbarPrimary=$isToolbarPrimaryColor"
+            themeColorsCache.getOrPut(cacheKey) {
+                getDynamicColor(theme, dynamicTonalPalette(context), isToolbarPrimaryColor)
+            }
         }
     }
 

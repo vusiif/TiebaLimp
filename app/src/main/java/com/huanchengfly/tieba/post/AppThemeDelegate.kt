@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Color
 import android.os.Build
 import androidx.compose.ui.graphics.toArgb
+import com.huanchengfly.tieba.post.ui.common.theme.compose.clearThemeColorsCache
 import com.huanchengfly.tieba.post.ui.common.theme.compose.dynamicTonalPalette
 import com.huanchengfly.tieba.post.ui.common.theme.interfaces.ThemeSwitcher
 import com.huanchengfly.tieba.post.utils.ThemeUtil
@@ -23,6 +24,7 @@ object AppThemeDelegate : ThemeSwitcher {
     fun clearCache() {
         identifierCache.clear()
         staticColorCache.clear()
+        clearThemeColorsCache()
     }
 
     private fun getIdentifierCached(
@@ -93,8 +95,7 @@ object AppThemeDelegate : ThemeSwitcher {
     @SuppressLint("DiscouragedApi")
     fun getColorByAttr(context: Context, attrId: Int, theme: String): Int {
         if (!App.isInitialized) return context.getColorCompat(getDefaultColorResId(attrId))
-        val isStatic = !ThemeUtil.isDynamicTheme(theme) &&
-                ThemeUtil.THEME_CUSTOM != theme &&
+        val isStatic = ThemeUtil.THEME_CUSTOM != theme &&
                 !ThemeUtil.isTranslucentTheme(theme) &&
                 attrId != R.attr.colorToolbar &&
                 attrId != R.attr.colorToolbarItem &&

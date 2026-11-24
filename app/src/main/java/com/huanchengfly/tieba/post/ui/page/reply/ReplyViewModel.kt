@@ -95,6 +95,8 @@ class ReplyViewModel @Inject constructor() :
                     .flatMapConcat { it.producePartialChange() },
                 intentFlow.filterIsInstance<ReplyUiIntent.ToggleIsOriginImage>()
                     .flatMapConcat { it.producePartialChange() },
+                intentFlow.filterIsInstance<ReplyUiIntent.RestoreDraft>()
+                    .flatMapConcat { it.producePartialChange() },
             )
 
         private fun ReplyUiIntent.Send.producePartialChange(): Flow<ReplyPartialChange.Send> {
@@ -161,6 +163,9 @@ class ReplyViewModel @Inject constructor() :
 
         private fun ReplyUiIntent.ToggleIsOriginImage.producePartialChange() =
             flowOf(ReplyPartialChange.ToggleIsOriginImage(isOriginImage))
+
+        private fun ReplyUiIntent.RestoreDraft.producePartialChange() =
+            flowOf(ReplyPartialChange.RestoreDraft(imageUris, isOriginImage))
     }
 }
 
@@ -189,6 +194,11 @@ sealed interface ReplyUiIntent : UiIntent {
     data class RemoveImage(val imageIndex: Int) : ReplyUiIntent
 
     data class ToggleIsOriginImage(val isOriginImage: Boolean) : ReplyUiIntent
+
+    data class RestoreDraft(
+        val imageUris: List<String>,
+        val isOriginImage: Boolean
+    ) : ReplyUiIntent
 }
 
 sealed interface ReplyPartialChange : PartialChange<ReplyUiState> {
@@ -254,6 +264,17 @@ sealed interface ReplyPartialChange : PartialChange<ReplyUiState> {
     data class ToggleIsOriginImage(val isOriginImage: Boolean) : ReplyPartialChange {
         override fun reduce(oldState: ReplyUiState): ReplyUiState =
             oldState.copy(isOriginImage = isOriginImage)
+    }
+
+    data class RestoreDraft(
+        val imageUris: List<String>,
+        val isOriginImage: Boolean
+    ) : ReplyPartialChange {
+        override fun reduce(oldState: ReplyUiState): ReplyUiState =
+            oldState.copy(
+                selectedImageList = imageUris.toImmutableList(),
+                isOriginImage = isOriginImage
+            )
     }
 }
 

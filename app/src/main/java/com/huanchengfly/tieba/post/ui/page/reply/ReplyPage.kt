@@ -53,6 +53,7 @@ import com.huanchengfly.tieba.post.arch.CommonUiEvent
 import com.huanchengfly.tieba.post.arch.collectPartialAsState
 import com.huanchengfly.tieba.post.arch.onEvent
 import com.huanchengfly.tieba.post.arch.pageViewModel
+import com.huanchengfly.tieba.post.models.DraftModel
 import com.huanchengfly.tieba.post.pxToDpFloat
 import com.huanchengfly.tieba.post.toastShort
 import com.huanchengfly.tieba.post.ui.common.theme.compose.ExtendedTheme
@@ -173,12 +174,18 @@ internal fun ReplyPageContent(
     val curText by curTextFlow.collectAsState()
     LaunchedEffect(isDraftLoaded) {
         if (!isDraftLoaded) return@LaunchedEffect
-        curTextFlow
+        snapshotFlow {
+            DraftModel(
+                text = curText,
+                imageUris = selectedImageList,
+                isOriginImage = isOriginImage
+            )
+        }
             .debounce(500)
             .distinctUntilChanged()
-            .collect { text ->
+            .collect { draft ->
                 if (!replySuccess) {
-                    DraftHelper.saveDraft(accountUid, threadId, postId, subPostId, text)
+                    DraftHelper.saveDraft(accountUid, threadId, postId, subPostId, draft)
                 }
             }
     }
@@ -186,17 +193,30 @@ internal fun ReplyPageContent(
     DisposableEffect(Unit) {
         onDispose {
             if (isDraftLoaded && !replySuccess) {
-                val latestText = curTextFlow.value
+                val latestText = editTextView?.text?.toString() ?: curTextFlow.value
+                val latestImages = selectedImageList
+                val latestOrigin = isOriginImage
                 CoroutineScope(Dispatchers.IO).launch {
-                    DraftHelper.saveDraft(accountUid, threadId, postId, subPostId, latestText)
+                    DraftHelper.saveDraft(
+                        accountUid,
+                        threadId,
+                        postId,
+                        subPostId,
+                        DraftModel(latestText, latestImages, latestOrigin)
+                    )
                 }
             }
         }
     }
     LaunchedEffect(Unit) {
-        val draftContent = DraftHelper.loadDraft(accountUid, threadId, postId, subPostId)
-        if (!draftContent.isNullOrBlank()) {
-            setText(draftContent)
+        val draft = DraftHelper.loadDraftModel(accountUid, threadId, postId, subPostId)
+        if (draft != null && !draft.isBlank()) {
+            if (draft.text.isNotEmpty()) {
+                setText(draft.text)
+            }
+            if (draft.imageUris.isNotEmpty() || draft.isOriginImage) {
+                viewModel.send(ReplyUiIntent.RestoreDraft(draft.imageUris, draft.isOriginImage))
+            }
         }
         isDraftLoaded = true
     }
@@ -408,9 +428,7 @@ internal fun ReplyPageContent(
                             }
                             addTextChangedListener(
                                 afterTextChanged = {
-                                    coroutineScope.launch {
-                                        curTextFlow.emit(it?.toString() ?: "")
-                                    }
+                                    curTextFlow.value = it?.toString().orEmpty()
                                 }
                             )
                             if (waitEditTextToSet) {

@@ -1,7 +1,9 @@
 package com.huanchengfly.tieba.post
 
+import com.huanchengfly.tieba.post.models.DraftModel
 import com.huanchengfly.tieba.post.utils.DraftHelper
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -55,5 +57,56 @@ class DraftHelperTest {
         val legacyHash = DraftHelper.getLegacyDraftHash(threadId, postId, subPostId)
 
         assertEquals(expectedLegacy, legacyHash)
+    }
+
+    @Test
+    fun testDraftModel_serializationAndDeserialization() {
+        val original = DraftModel(
+            text = "图文混排草稿测试\n第二行内容",
+            imageUris = listOf("content://media/external/images/media/1001", "file:///sdcard/test.jpg"),
+            isOriginImage = true,
+            updateTimestamp = 1700000000123L
+        )
+
+        val serialized = original.serialize()
+        assertTrue(serialized.contains("图文混排草稿测试"))
+        assertTrue(serialized.contains("1001"))
+
+        val deserialized = DraftModel.deserialize(serialized)
+        assertEquals(original.text, deserialized.text)
+        assertEquals(original.imageUris, deserialized.imageUris)
+        assertEquals(original.isOriginImage, deserialized.isOriginImage)
+        assertEquals(original.updateTimestamp, deserialized.updateTimestamp)
+        assertFalse(deserialized.isBlank())
+    }
+
+    @Test
+    fun testDraftModel_legacyPlainTextCompatibility() {
+        val legacyPlainText = "这是一条来自老版本存储在数据库中的纯文本草稿"
+        val model = DraftModel.deserialize(legacyPlainText)
+
+        assertEquals(legacyPlainText, model.text)
+        assertTrue(model.imageUris.isEmpty())
+        assertFalse(model.isOriginImage)
+        assertFalse(model.isBlank())
+    }
+
+    @Test
+    fun testDraftModel_corruptedJsonFallback() {
+        val corruptedJson = "{\"text\": \"unclosed json string..."
+        val model = DraftModel.deserialize(corruptedJson)
+
+        assertEquals(corruptedJson, model.text)
+        assertTrue(model.imageUris.isEmpty())
+    }
+
+    @Test
+    fun testDraftModel_isBlank() {
+        assertTrue(DraftModel().isBlank())
+        assertTrue(DraftModel("", emptyList(), false).isBlank())
+        assertTrue(DraftModel("   ", emptyList(), true).isBlank())
+
+        assertFalse(DraftModel("有内容", emptyList()).isBlank())
+        assertFalse(DraftModel("", listOf("content://image/1")).isBlank())
     }
 }

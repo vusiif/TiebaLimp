@@ -63,6 +63,12 @@ object AppDatabaseManager {
     fun initAsync(context: Context) {
         scope.launch {
             init(context)
+            runCatching {
+                val cleaned = DraftHelper.cleanExpiredDrafts(30)
+                if (cleaned > 0) {
+                    Log.d(TAG, "Purged $cleaned expired drafts older than 30 days.")
+                }
+            }
         }
     }
 

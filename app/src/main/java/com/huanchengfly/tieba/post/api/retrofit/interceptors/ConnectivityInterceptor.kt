@@ -11,24 +11,55 @@ import java.net.SocketException
 import java.net.SocketTimeoutException
 import javax.net.ssl.SSLHandshakeException
 
-object ConnectivityInterceptor : Interceptor {
+open class ConnectivityInterceptor(
+    private val networkConnectedProvider: () -> Boolean = {
+        runCatching { isNetworkConnected() }.getOrDefault(false)
+    }
+) : Interceptor {
+
     override fun intercept(chain: Interceptor.Chain): Response {
-        val response = runCatching { chain.proceed(chain.request()) }
+        val request = chain.request()
+        val isIdempotent = request.method.equals("GET", ignoreCase = true) ||
+                request.method.equals("HEAD", ignoreCase = true) ||
+                request.method.equals("OPTIONS", ignoreCase = true)
 
-        val exception = response.exceptionOrNull()
+        var attempt = 0
+        while (true) {
+            val response = runCatching { chain.proceed(request) }
+            val exception = response.exceptionOrNull()
 
-        return when {
-            (exception is SocketTimeoutException || exception is SocketException || exception is SSLHandshakeException) && isNetworkConnected() -> throw NoConnectivityException(
-                App.INSTANCE.getString(R.string.connectivity_timeout)
-            )
+            if (exception == null) {
+                return response.getOrThrow()
+            }
 
-            exception is IOException && !isNetworkConnected() -> throw NoConnectivityException(
-                App.INSTANCE.getString(
-                    R.string.no_internet_connectivity
-                )
-            )
+            val connected = networkConnectedProvider()
+            val isTransientSocketError = exception is SocketTimeoutException || exception is SocketException
+            val canRetry = isIdempotent && isTransientSocketError && attempt < MAX_IDEMPOTENT_RETRIES && connected
 
-            else -> response.getOrThrow()
+            if (canRetry) {
+                attempt++
+                continue
+            }
+
+            return when {
+                (exception is SocketTimeoutException || exception is SocketException || exception is SSLHandshakeException) && connected -> {
+                    val timeoutMsg = runCatching { App.INSTANCE.getString(R.string.connectivity_timeout) }
+                        .getOrDefault("Connection timed out")
+                    throw NoConnectivityException(timeoutMsg)
+                }
+
+                exception is IOException && !connected -> {
+                    val noConnMsg = runCatching { App.INSTANCE.getString(R.string.no_internet_connectivity) }
+                        .getOrDefault("No network connectivity")
+                    throw NoConnectivityException(noConnMsg)
+                }
+
+                else -> response.getOrThrow()
+            }
         }
+    }
+
+    companion object : ConnectivityInterceptor() {
+        const val MAX_IDEMPOTENT_RETRIES = 1
     }
 }

@@ -97,7 +97,8 @@ object RetrofitTiebaApi {
                 TiebaDns.prewarm()
                 val coreHosts = listOf(
                     "https://tiebac.baidu.com/favicon.ico",
-                    "https://c.tieba.baidu.com/favicon.ico"
+                    "https://c.tieba.baidu.com/favicon.ico",
+                    "https://tiebapic.baidu.com/favicon.ico"
                 )
                 for (url in coreHosts) {
                     runCatching {

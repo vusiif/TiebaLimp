@@ -88,4 +88,96 @@ class TiebaDnsTest {
         val testDns = TiebaDns(delegate = mockDns, ttlMillis = 5000L)
         testDns.lookup("unknown.host.com")
     }
+
+    @Test
+    fun testStaleWhileRevalidateAsyncUpdate() {
+        val address1 = InetAddress.getByName("1.1.1.1")
+        val address2 = InetAddress.getByName("2.2.2.2")
+        var currentAddress = address1
+
+        val mockDns = object : Dns {
+            override fun lookup(hostname: String): List<InetAddress> = listOf(currentAddress)
+        }
+
+        val testDns = TiebaDns(
+            delegate = mockDns,
+            ttlMillis = 300L,
+            maxStaleMillis = 10000L
+        )
+
+        // 1. Initial resolution (fresh)
+        val initial = testDns.lookup("tieba.baidu.com")
+        assertEquals(listOf(address1), initial)
+        assertTrue(testDns.isCached("tieba.baidu.com"))
+        assertFalse(testDns.isStale("tieba.baidu.com"))
+
+        // 2. Wait for TTL to expire so it enters SWR window
+        Thread.sleep(350)
+        assertTrue(testDns.isStale("tieba.baidu.com"))
+
+        // Mock DNS now provides new IP
+        currentAddress = address2
+
+        // SWR: lookup should return stale address1 immediately without waiting
+        val swrResult = testDns.lookup("tieba.baidu.com")
+        assertEquals(listOf(address1), swrResult)
+
+        // 3. Wait for async revalidation to complete
+        val deadline = System.currentTimeMillis() + 2000
+        while (testDns.getCachedAddresses("tieba.baidu.com")?.firstOrNull() != address2 && System.currentTimeMillis() < deadline) {
+            Thread.sleep(10)
+        }
+
+        // Cache should now be refreshed with address2 and fresh (< ttlMillis)
+        val refreshed = testDns.lookup("tieba.baidu.com")
+        assertEquals(listOf(address2), refreshed)
+        assertFalse(testDns.isStale("tieba.baidu.com"))
+        assertTrue(testDns.isCached("tieba.baidu.com"))
+    }
+
+    @Test
+    fun testFallbackPastMaxStaleOnError() {
+        var shouldThrow = false
+        val mockAddress = InetAddress.getByName("127.0.0.1")
+        val mockDns = object : Dns {
+            override fun lookup(hostname: String): List<InetAddress> {
+                if (shouldThrow) {
+                    throw UnknownHostException("DNS totally down")
+                }
+                return listOf(mockAddress)
+            }
+        }
+
+        // 10ms TTL, 20ms MaxStale
+        val testDns = TiebaDns(
+            delegate = mockDns,
+            ttlMillis = 10L,
+            maxStaleMillis = 20L
+        )
+
+        val initial = testDns.lookup("c.tieba.baidu.com")
+        assertEquals(listOf(mockAddress), initial)
+
+        // Wait past maxStaleMillis
+        Thread.sleep(40)
+        shouldThrow = true
+
+        // Synchronous lookup fails, but disaster recovery preserves stale record
+        val recovered = testDns.lookup("c.tieba.baidu.com")
+        assertEquals(listOf(mockAddress), recovered)
+    }
+
+    @Test
+    fun testCachedAddressesAndSize() {
+        val mockAddress = InetAddress.getByName("127.0.0.1")
+        val mockDns = object : Dns {
+            override fun lookup(hostname: String): List<InetAddress> = listOf(mockAddress)
+        }
+        val testDns = TiebaDns(delegate = mockDns, ttlMillis = 5000L)
+
+        assertEquals(0, testDns.getCacheSize())
+        testDns.lookup("tiebac.baidu.com")
+        assertEquals(1, testDns.getCacheSize())
+        assertEquals(listOf(mockAddress), testDns.getCachedAddresses("tiebac.baidu.com"))
+    }
 }

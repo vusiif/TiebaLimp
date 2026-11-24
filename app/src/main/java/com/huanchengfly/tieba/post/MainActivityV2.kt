@@ -1,10 +1,7 @@
 package com.huanchengfly.tieba.post
 
 import android.annotation.SuppressLint
-import android.app.job.JobInfo
-import android.app.job.JobScheduler
 import android.content.BroadcastReceiver
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.drawable.ColorDrawable
@@ -214,17 +211,7 @@ class MainActivityV2 : BaseComposeActivity() {
                 ContextCompat.RECEIVER_NOT_EXPORTED
             )
             lifecycleScope.launch(Dispatchers.IO) {
-                runCatching {
-                    val builder = JobInfo.Builder(
-                        JobServiceUtil.getJobId(this@MainActivityV2),
-                        ComponentName(this@MainActivityV2, NotifyJobService::class.java)
-                    )
-                        .setPersisted(true)
-                        .setPeriodic(30 * 60 * 1000L)
-                        .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
-                    val jobScheduler = getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
-                    jobScheduler.schedule(builder.build())
-                }
+                JobServiceUtil.scheduleNotifyJob(this@MainActivityV2)
             }
         }
         handler.postDelayed({

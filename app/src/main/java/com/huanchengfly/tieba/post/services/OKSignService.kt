@@ -15,6 +15,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
+import androidx.core.content.ContextCompat
 import com.huanchengfly.tieba.post.R
 import com.huanchengfly.tieba.post.api.models.SignResultBean
 import com.huanchengfly.tieba.post.models.SignDataBean
@@ -49,15 +50,25 @@ class OKSignService : IntentService(TAG), CoroutineScope, ProgressListener {
                 getString(R.string.title_loading_data),
                 getString(R.string.text_please_wait)
             ).build()
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                ServiceCompat.startForeground(
-                    this,
-                    NOTIFICATION_ID,
-                    notification,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
-                )
-            } else {
-                startForeground(NOTIFICATION_ID, notification)
+            val started = runCatching {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    ServiceCompat.startForeground(
+                        this,
+                        NOTIFICATION_ID,
+                        notification,
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                    )
+                } else {
+                    startForeground(NOTIFICATION_ID, notification)
+                }
+                true
+            }.getOrElse { e ->
+                Log.e(TAG, "Failed to startForeground: ${e.message}", e)
+                false
+            }
+            if (!started) {
+                stopSelf()
+                return START_NOT_STICKY
             }
         }
         return super.onStartCommand(intent, flags, startId)
@@ -71,7 +82,7 @@ class OKSignService : IntentService(TAG), CoroutineScope, ProgressListener {
                 runBlocking {
                     SingleAccountSigner(
                         this@OKSignService,
-                        AccountUtil.getLoginInfo()!!
+                        loginInfo
                     )
                         .apply {
                             setProgressListener(this@OKSignService)
@@ -83,28 +94,54 @@ class OKSignService : IntentService(TAG), CoroutineScope, ProgressListener {
                     getString(R.string.title_oksign_fail),
                     getString(R.string.text_login_first)
                 )
-                ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_DETACH)
+                runCatching {
+                    ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_DETACH)
+                }
             }
         } else {
-            ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+            runCatching {
+                ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+            }
         }
     }
 
+    private fun hasNotificationPermission(): Boolean {
+        if (!notificationManager.areNotificationsEnabled()) {
+            return false
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            return ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        }
+        return true
+    }
+
     private fun createNotificationChannel() {
-        notificationManager.createNotificationChannel(
-            NotificationChannelCompat.Builder(
-                NOTIFICATION_CHANNEL_ID,
-                NotificationManagerCompat.IMPORTANCE_LOW
-            )
-                .setName(getString(R.string.title_oksign))
-                .setLightsEnabled(false)
-                .setShowBadge(false)
-                .build()
-        )
+        runCatching {
+            if (notificationManager.getNotificationChannelCompat(NOTIFICATION_CHANNEL_ID) == null) {
+                notificationManager.createNotificationChannel(
+                    NotificationChannelCompat.Builder(
+                        NOTIFICATION_CHANNEL_ID,
+                        NotificationManagerCompat.IMPORTANCE_LOW
+                    )
+                        .setName(getString(R.string.title_oksign))
+                        .setLightsEnabled(false)
+                        .setShowBadge(false)
+                        .build()
+                )
+            }
+        }
     }
 
     private fun buildNotification(title: String, text: String?): NotificationCompat.Builder {
         createNotificationChannel()
+        val color = runCatching {
+            ThemeUtils.getColorByAttr(this, R.attr.colorPrimary)
+        }.getOrElse {
+            ContextCompat.getColor(this, R.color.default_color_primary)
+        }
         return NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
             .setForegroundServiceBehavior(FOREGROUND_SERVICE_IMMEDIATE)
             .setContentText(text)
@@ -113,57 +150,52 @@ class OKSignService : IntentService(TAG), CoroutineScope, ProgressListener {
             .setSmallIcon(R.drawable.ic_oksign)
             .setAutoCancel(true)
             .setStyle(NotificationCompat.BigTextStyle())
-            .setColor(ThemeUtils.getColorByAttr(this, R.attr.colorPrimary))
+            .setColor(color)
     }
 
     private fun updateNotification(title: String, text: String, intent: Intent?) {
-        if (ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.POST_NOTIFICATIONS
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
+        if (!hasNotificationPermission()) {
             return
         }
-        notificationManager.notify(
-            NOTIFICATION_ID,
-            buildNotification(title, text)
-                .apply {
-                    if (intent != null) {
-                        setContentIntent(
-                            PendingIntent.getActivity(
-                                this@OKSignService,
-                                0,
-                                intent,
-                                pendingIntentFlagImmutable()
+        runCatching {
+            notificationManager.notify(
+                NOTIFICATION_ID,
+                buildNotification(title, text)
+                    .apply {
+                        if (intent != null) {
+                            setContentIntent(
+                                PendingIntent.getActivity(
+                                    this@OKSignService,
+                                    0,
+                                    intent,
+                                    pendingIntentFlagImmutable()
+                                )
                             )
-                        )
-
+                        }
                     }
-                }
-                .build()
-        )
+                    .build()
+            )
+        }
     }
 
     private fun updateNotification(title: String, text: String?, isOngoing: Boolean = true) {
-        if (ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.POST_NOTIFICATIONS
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
+        if (!hasNotificationPermission()) {
             return
         }
-        val notification = buildNotification(title, text)
-            .build()
-        if (isOngoing) {
-            notification.flags = notification.flags.addFlag(NotificationCompat.FLAG_ONGOING_EVENT)
+        runCatching {
+            val notification = buildNotification(title, text).build()
+            if (isOngoing) {
+                notification.flags = notification.flags.addFlag(NotificationCompat.FLAG_ONGOING_EVENT)
+            }
+            notificationManager.notify(NOTIFICATION_ID, notification)
         }
-        notificationManager.notify(NOTIFICATION_ID, notification)
     }
 
     private fun clearNotification() {
-        notificationManager.cancel(NOTIFICATION_ID)
+        runCatching {
+            notificationManager.cancel(NOTIFICATION_ID)
+        }
     }
-
 
     override fun onStart(total: Int) {
         updateNotification(getString(R.string.title_start_sign), null)
@@ -231,13 +263,17 @@ class OKSignService : IntentService(TAG), CoroutineScope, ProgressListener {
             }
         )
         sendBroadcast(Intent(ACTION_SIGN_SUCCESS_ALL))
-        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_DETACH)
+        runCatching {
+            ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_DETACH)
+        }
     }
 
     override fun onFailure(current: Int, total: Int, errorCode: Int, errorMsg: String) {
         lastSignData.let {
             if (it == null) {
-                ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_DETACH)
+                runCatching {
+                    ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_DETACH)
+                }
                 updateNotification(getString(R.string.title_oksign_fail), errorMsg, isOngoing = false)
             } else {
                 updateNotification(

@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.PersistableBundle
+import android.util.Log
 import androidx.core.content.ContextCompat
 import com.huanchengfly.tieba.post.R
 import com.huanchengfly.tieba.post.api.TiebaApi
@@ -90,18 +91,25 @@ object TiebaUtil {
     }
 
     @JvmStatic
-    fun startSign(context: Context) {
+    fun startSign(context: Context): Boolean {
         context.appPreferences.signDay = Calendar.getInstance()[Calendar.DAY_OF_MONTH]
-        ContextCompat.startForegroundService(
-            context,
-            Intent()
-                .setClassName(
-                    context.packageName,
-                    "${context.packageName}.services.OKSignService"
-                )
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                .setAction(OKSignService.ACTION_START_SIGN)
-        )
+        val intent = Intent()
+            .setClassName(
+                context.packageName,
+                "${context.packageName}.services.OKSignService"
+            )
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            .setAction(OKSignService.ACTION_START_SIGN)
+        return runCatching {
+            ContextCompat.startForegroundService(context, intent)
+            true
+        }.getOrElse { e ->
+            Log.e("TiebaUtil", "startForegroundService failed: ${e.message}", e)
+            runCatching {
+                context.startService(intent)
+                true
+            }.getOrDefault(false)
+        }
     }
 
     @JvmStatic

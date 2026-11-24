@@ -9,6 +9,7 @@ import com.huanchengfly.tieba.post.AppThemeDelegate
 import com.huanchengfly.tieba.post.api.retrofit.TiebaDns
 import com.huanchengfly.tieba.post.ui.common.theme.compose.clearThemeColorsCache
 import com.huanchengfly.tieba.post.ui.page.webview.WebResourceInterceptor
+import com.huanchengfly.tieba.post.ui.widgets.compose.video.MediaPlaybackCoordinator
 
 /**
  * Centralized memory coordinator and OOM defense manager for TiebaLimp.
@@ -46,12 +47,14 @@ object AppMemoryManager {
                     // Severe pressure: trim image caches and clear transient text/date pools
                     trimImageCaches(context, level)
                     purgeTransientCaches()
+                    runCatching { MediaPlaybackCoordinator.pauseAll() }
                 }
                 level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN ||
                 level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND -> {
-                    // UI moved to background: evict drawables, transient caches and checkpoint WAL to avoid LMK kill
+                    // UI moved to background: evict drawables, transient caches, pause media and checkpoint WAL to avoid LMK kill
                     trimImageCaches(context, level)
                     purgeTransientCaches()
+                    runCatching { MediaPlaybackCoordinator.pauseAll() }
                     runCatching { AppDatabaseManager.checkpoint() }
                 }
                 else -> {
@@ -99,6 +102,7 @@ object AppMemoryManager {
         runCatching { context.sketch.memoryCache.clear() }
         runCatching { context.sketch.bitmapPool.clear() }
         purgeTransientCaches()
+        runCatching { MediaPlaybackCoordinator.releaseAll() }
         runCatching { AppThemeDelegate.clearCache() }
         runCatching { clearThemeColorsCache() }
         runCatching { TiebaDns.clear() }

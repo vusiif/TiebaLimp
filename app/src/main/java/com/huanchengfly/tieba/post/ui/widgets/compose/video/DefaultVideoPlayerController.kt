@@ -167,13 +167,20 @@ internal class DefaultVideoPlayerController(
         }
 
     private val previewSeekDebouncer = FlowDebouncer<Long>(200L)
+    private var isPrepared = false
+    private var isPreviewPrepared = false
 
     init {
-        exoPlayer.playWhenReady = initialState.isPlaying
+        MediaPlaybackCoordinator.register(this)
+        if (initialState.isPlaying) {
+            exoPlayer.playWhenReady = true
+        }
 
         coroutineScope.launch {
             previewSeekDebouncer.collect { position ->
-                previewExoPlayer.seekTo(position)
+                if (_previewExoPlayer != null) {
+                    previewExoPlayer.seekTo(position)
+                }
             }
         }
     }
@@ -181,15 +188,17 @@ internal class DefaultVideoPlayerController(
     fun initialize() {
         Log.i("VideoPlayerController", "$this initialize")
         val currentState = _state.value
-        exoPlayer.playWhenReady = currentState.isPlaying
-        initialStateRunner = {
-            exoPlayer.seekTo(currentState.currentPosition)
-        }
-        if (this::source.isInitialized) {
-            setSource(source)
-        }
-        if (playerView != null) {
-            playerViewAvailable(playerView!!)
+        if (currentState.startedPlay || currentState.isPlaying) {
+            exoPlayer.playWhenReady = currentState.isPlaying
+            initialStateRunner = {
+                exoPlayer.seekTo(currentState.currentPosition)
+            }
+            if (this::source.isInitialized) {
+                setSource(source)
+            }
+            if (playerView != null) {
+                playerViewAvailable(playerView!!)
+            }
         }
     }
 
@@ -200,7 +209,11 @@ internal class DefaultVideoPlayerController(
     private val waitPlayerViewToPrepare = AtomicBoolean(false)
 
     override fun play() {
+        MediaPlaybackCoordinator.requestPlayback(this)
         _state.set { copy(startedPlay = true) }
+        if (waitPlayerViewToPrepare.compareAndSet(true, false) || !isPrepared) {
+            prepare()
+        }
         if (exoPlayer.playbackState == STATE_ENDED) {
             exoPlayer.seekTo(0)
         }
@@ -209,7 +222,7 @@ internal class DefaultVideoPlayerController(
     }
 
     override fun pause() {
-        exoPlayer.playWhenReady = false
+        _exoPlayer?.playWhenReady = false
     }
 
     override fun togglePlaying() {
@@ -246,7 +259,7 @@ internal class DefaultVideoPlayerController(
 
     override fun setSource(source: VideoPlayerSource) {
         this.source = source
-        if (playerView == null) {
+        if (playerView == null || (!_state.value.startedPlay && !_state.value.isPlaying)) {
             waitPlayerViewToPrepare.set(true)
         } else {
             prepare()
@@ -297,47 +310,57 @@ internal class DefaultVideoPlayerController(
     }
 
     private fun updateDurationAndPosition() {
-        if (exoPlayer.playbackState == STATE_READY || exoPlayer.playbackState == STATE_ENDED) {
+        val player = _exoPlayer ?: return
+        if (player.playbackState == STATE_READY || player.playbackState == STATE_ENDED) {
             _state.set {
                 copy(
-                    duration = exoPlayer.duration.coerceAtLeast(0),
-                    currentPosition = exoPlayer.currentPosition.coerceAtLeast(0),
-                    secondaryProgress = exoPlayer.bufferedPosition.coerceAtLeast(0),
-                    isPlaying = exoPlayer.isPlaying
+                    duration = player.duration.coerceAtLeast(0),
+                    currentPosition = player.currentPosition.coerceAtLeast(0),
+                    secondaryProgress = player.bufferedPosition.coerceAtLeast(0),
+                    isPlaying = player.isPlaying
                 )
             }
         }
     }
 
     @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
-    private fun prepare() {
-        fun createVideoSource(): MediaSource {
-            val dataSourceFactory: DataSource.Factory = DefaultDataSource.Factory(context)
+    private fun createVideoSource(): MediaSource {
+        val dataSourceFactory: DataSource.Factory = DefaultDataSource.Factory(context)
 
-            return when (val source = source) {
-                is VideoPlayerSource.Raw -> {
-                    ProgressiveMediaSource.Factory(dataSourceFactory)
-                        .createMediaSource(
-                            MediaItem.fromUri(
-                                RawResourceDataSource.buildRawResourceUri(
-                                    source.resId
-                                )
+        return when (val source = source) {
+            is VideoPlayerSource.Raw -> {
+                ProgressiveMediaSource.Factory(dataSourceFactory)
+                    .createMediaSource(
+                        MediaItem.fromUri(
+                            RawResourceDataSource.buildRawResourceUri(
+                                source.resId
                             )
                         )
-                }
+                    )
+            }
 
-                is VideoPlayerSource.Network -> {
-                    ProgressiveMediaSource.Factory(dataSourceFactory)
-                        .createMediaSource(MediaItem.fromUri(source.url))
-                }
+            is VideoPlayerSource.Network -> {
+                ProgressiveMediaSource.Factory(dataSourceFactory)
+                    .createMediaSource(MediaItem.fromUri(source.url))
             }
         }
+    }
 
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+    private fun prepare() {
+        if (isPrepared || !this::source.isInitialized) return
+        isPrepared = true
         exoPlayer.setMediaSource(createVideoSource())
-        previewExoPlayer.setMediaSource(createVideoSource())
-
         exoPlayer.prepare()
-        previewExoPlayer.prepare()
+    }
+
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+    private fun preparePreviewIfNeeded() {
+        if (_previewExoPlayer != null && !isPreviewPrepared && this::source.isInitialized) {
+            isPreviewPrepared = true
+            _previewExoPlayer?.setMediaSource(createVideoSource())
+            _previewExoPlayer?.prepare()
+        }
     }
 
     fun playerViewAvailable(playerView: PlayerView) {
@@ -345,16 +368,20 @@ internal class DefaultVideoPlayerController(
         playerView.player = exoPlayer
         playerView.setBackgroundColor(videoPlayerBackgroundColor)
 
-        if (waitPlayerViewToPrepare.compareAndSet(true, false)) {
-            prepare()
+        if (_state.value.startedPlay || _state.value.isPlaying) {
+            if (waitPlayerViewToPrepare.compareAndSet(true, false) || !isPrepared) {
+                prepare()
+            }
         }
     }
 
     fun previewPlayerViewAvailable(playerView: PlayerView) {
         playerView.player = previewExoPlayer
+        preparePreviewIfNeeded()
     }
 
     fun previewSeekTo(position: Long) {
+        preparePreviewIfNeeded()
         // position is very accurate. Thumbnail doesn't have to be.
         // Roll to the nearest "even" integer.
         val seconds = position.toInt() / 1000
@@ -365,15 +392,16 @@ internal class DefaultVideoPlayerController(
     }
 
     override fun reset() {
-        exoPlayer.stop()
-        previewExoPlayer.stop()
+        _exoPlayer?.stop()
+        _previewExoPlayer?.stop()
     }
 
     override fun release() {
+        MediaPlaybackCoordinator.unregister(this)
         Log.i("VideoPlayerController", "$this release")
         if (released.compareAndSet(false, true)) {
-            exoPlayer.release()
-            previewExoPlayer.release()
+            _exoPlayer?.release()
+            _previewExoPlayer?.release()
             _exoPlayer = null
             _previewExoPlayer = null
         }

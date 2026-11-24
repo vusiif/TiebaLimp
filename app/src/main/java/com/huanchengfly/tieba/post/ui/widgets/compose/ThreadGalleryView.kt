@@ -107,16 +107,16 @@ fun extractGalleryImages(
             ?: post.author?.name
             ?: ""
         val authorAvatar = post.author?.portrait
-        item.contentRenders.filterIsInstance<PicContentRender>().forEachIndexed { index, render ->
+        item.picRenders.forEachIndexed { index, render ->
             list.add(
                 ThreadGalleryImage(
-                    id = "p_${post.id}_$index",
+                    id = "p_${item.id}_$index",
                     picUrl = render.picUrl,
                     originUrl = render.originUrl,
                     width = render.width,
                     height = render.height,
-                    floor = post.floor.toLong(),
-                    postId = post.id.toLong(),
+                    floor = item.floor.toLong(),
+                    postId = item.id,
                     authorName = authorName,
                     authorAvatar = authorAvatar,
                     photoViewData = render.photoViewData,

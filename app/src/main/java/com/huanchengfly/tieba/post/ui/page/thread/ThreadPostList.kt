@@ -153,7 +153,7 @@ fun ThreadPostList(
         preloadAhead = 5,
         itemOffset = headerOffset,
         extractUrls = { postItem ->
-            postItem.contentRenders.filterIsInstance<PicContentRender>().map { it.picUrl }
+            postItem.picUrls
         }
     )
 

@@ -63,7 +63,9 @@ interface PbContentRender {
 
 @Stable
 data class TextContentRender(
-    val text: AnnotatedString
+    val text: AnnotatedString,
+    val hasClickableAnnotations: Boolean = text.getStringAnnotations("url", 0, text.length).isNotEmpty() ||
+            text.getStringAnnotations("user", 0, text.length).isNotEmpty(),
 ) : PbContentRender {
     constructor(text: String) : this(AnnotatedString(text))
 
@@ -128,6 +130,7 @@ data class PicContentRender(
     val height: Int,
     val picId: String,
     val photoViewData: PhotoViewData? = null,
+    val aspectRatio: Float = if (width > 0 && height > 0) (width.toFloat() / height).coerceIn(0.1f, 10f) else 1f,
 ) : PbContentRender {
     @Composable
     override fun Render() {
@@ -136,9 +139,6 @@ data class PicContentRender(
         val context = LocalContext.current
         val radius = context.appPreferences.radius
         val cornerShape = remember(radius) { RoundedCornerShape(radius.dp) }
-        val aspectRatio = remember(width, height) {
-            if (width > 0 && height > 0) (width.toFloat() / height).coerceIn(0.1f, 10f) else 1f
-        }
 
         NetworkImage(
             imageUri = picUrl,
@@ -160,18 +160,16 @@ data class PicContentRender(
 @Stable
 data class VoiceContentRender(
     val voiceMd5: String,
-    val duration: Int
+    val duration: Int,
+    val voiceUrl: String = "https://tiebac.baidu.com/c/p/voice?voice_md5=$voiceMd5&play_from=pb_voice_play",
 ) : PbContentRender {
     @Composable
     override fun Render() {
-        val voiceUrl = remember(voiceMd5) {
-            "https://tiebac.baidu.com/c/p/voice?voice_md5=$voiceMd5&play_from=pb_voice_play"
-        }
         VoicePlayer(url = voiceUrl, duration = duration)
     }
 
     override fun toString(): String {
-        return "[视频]"
+        return "[语音]"
     }
 }
 
@@ -181,7 +179,8 @@ data class VideoContentRender(
     val picUrl: String,
     val webUrl: String,
     val width: Int,
-    val height: Int
+    val height: Int,
+    val aspectRatio: Float = if (width > 0 && height > 0) (width.toFloat() / height).coerceIn(0.1f, 10f) else 1f,
 ) : PbContentRender {
     @Composable
     override fun Render() {
@@ -191,10 +190,12 @@ data class VideoContentRender(
         val navigator = LocalNavigator.current
 
         if (picUrl.isNotBlank()) {
+            val radius = context.appPreferences.radius
+            val cornerShape = remember(radius) { RoundedCornerShape(radius.dp) }
             val picModifier = Modifier
-                .clip(RoundedCornerShape(context.appPreferences.radius.dp))
+                .clip(cornerShape)
                 .fillMaxWidth(widthFraction)
-                .aspectRatio(width * 1f / height)
+                .aspectRatio(aspectRatio)
 
             if (videoUrl.isNotBlank()) {
                 Box(
@@ -227,7 +228,7 @@ data class VideoContentRender(
     }
 
     override fun toString(): String {
-        return "[语音]"
+        return "[视频]"
     }
 }
 
@@ -303,10 +304,14 @@ fun PbContentText(
     val context = LocalContext.current
     val navigator = LocalNavigator.current
 
+    val hasAnnotations = remember(text) {
+        text.getStringAnnotations(start = 0, end = text.length)
+            .any { it.tag == "url" || it.tag == "user" }
+    }
+
     val layoutResult = remember { mutableStateOf<TextLayoutResult?>(null) }
-    EmoticonText(
-        text = text,
-        modifier = modifier.pointerInput(text) {
+    val gestureModifier = if (hasAnnotations) {
+        modifier.pointerInput(text) {
             awaitEachGesture {
                 val change = awaitFirstDown()
                 val annotation =
@@ -333,7 +338,14 @@ fun PbContentText(
                     }
                 }
             }
-        },
+        }
+    } else {
+        modifier
+    }
+
+    EmoticonText(
+        text = text,
+        modifier = gestureModifier,
         color = color,
         fontSize = fontSize,
         fontStyle = fontStyle,

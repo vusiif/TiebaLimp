@@ -31,9 +31,11 @@ import kotlinx.collections.immutable.toImmutableList
 private val MULTI_SPACE_REGEX = Regex(" {2,}")
 
 private fun parseBSize(bsize: String): Pair<Int, Int> {
-    val parts = bsize.split(",")
-    val w = parts.getOrNull(0)?.toIntOrNull() ?: 0
-    val h = parts.getOrNull(1)?.toIntOrNull() ?: 0
+    if (bsize.isEmpty()) return Pair(0, 0)
+    val commaIdx = bsize.indexOf(',')
+    if (commaIdx <= 0) return Pair(0, 0)
+    val w = bsize.substring(0, commaIdx).toIntOrNull() ?: 0
+    val h = bsize.substring(commaIdx + 1).toIntOrNull() ?: 0
     return Pair(w, h)
 }
 

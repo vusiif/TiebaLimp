@@ -10,6 +10,7 @@ import com.huanchengfly.tieba.post.api.models.protos.getContentText
 import com.huanchengfly.tieba.post.arch.ImmutableHolder
 import com.huanchengfly.tieba.post.arch.wrapImmutable
 import com.huanchengfly.tieba.post.ui.common.PbContentRender
+import com.huanchengfly.tieba.post.ui.common.PicContentRender
 import com.huanchengfly.tieba.post.utils.BlockManager.FilterResult
 import com.huanchengfly.tieba.post.utils.BlockManager.checkBlock
 import kotlinx.collections.immutable.ImmutableList
@@ -28,6 +29,8 @@ data class PostItemData(
     val authorId: Long = post.item.author_id,
     val isFolded: Boolean = post.item.is_fold == 1 || post.item.fold_comment_status != 0,
     val subPostCount: Int = post.item.sub_post_number,
+    val picRenders: ImmutableList<PicContentRender> = contentRenders.filterIsInstance<PicContentRender>().toImmutableList(),
+    val picUrls: ImmutableList<String> = picRenders.map { it.picUrl }.toImmutableList(),
 ) {
     constructor(
         post: ImmutableHolder<Post>,

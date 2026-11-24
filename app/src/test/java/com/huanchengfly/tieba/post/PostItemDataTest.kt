@@ -96,4 +96,43 @@ class PostItemDataTest {
         assertFalse(subPostItem.blocked)
         assertEquals("hello world", subPostItem.subPostContent.text)
     }
+
+    @Test
+    fun testPostItemDataPicRendersAndUrls() {
+        val picRender1 = com.huanchengfly.tieba.post.ui.common.PicContentRender(
+            picUrl = "https://img.test/pic1.jpg",
+            originUrl = "https://img.test/origin1.jpg",
+            showOriginBtn = false,
+            originSize = 100,
+            width = 800,
+            height = 600,
+            picId = "pic1"
+        )
+        val picRender2 = com.huanchengfly.tieba.post.ui.common.PicContentRender(
+            picUrl = "https://img.test/pic2.jpg",
+            originUrl = "https://img.test/origin2.jpg",
+            showOriginBtn = true,
+            originSize = 200,
+            width = 1200,
+            height = 800,
+            picId = "pic2"
+        )
+        val textRender = com.huanchengfly.tieba.post.ui.common.TextContentRender("sample text")
+
+        val post = Post(id = 5555L, floor = 1)
+        val postItem = PostItemData(
+            post = wrapImmutable(post),
+            blocked = false,
+            contentRenders = persistentListOf(textRender, picRender1, picRender2),
+            subPosts = persistentListOf()
+        )
+
+        assertEquals(2, postItem.picRenders.size)
+        assertEquals("pic1", postItem.picRenders[0].picId)
+        assertEquals("pic2", postItem.picRenders[1].picId)
+
+        assertEquals(2, postItem.picUrls.size)
+        assertEquals("https://img.test/pic1.jpg", postItem.picUrls[0])
+        assertEquals("https://img.test/pic2.jpg", postItem.picUrls[1])
+    }
 }

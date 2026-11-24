@@ -57,10 +57,10 @@ suspend fun saveThreadSnapshot(
     for (item in data) {
         if (item.blocked) continue
         val post = item.post.get()
-        if (post.floor == 1) continue
+        if (item.floor == 1) continue
         val postAuthor = post.author?.nameShow?.ifBlank { post.author?.name } ?: post.author?.name ?: ""
         val postAvatar = post.author?.portrait
-        val postImages = item.contentRenders.filterIsInstance<PicContentRender>().map {
+        val postImages = item.picRenders.map {
             ThreadSnapshotUtil.SnapshotImage(
                 picUrl = it.picUrl,
                 originUrl = it.originUrl,

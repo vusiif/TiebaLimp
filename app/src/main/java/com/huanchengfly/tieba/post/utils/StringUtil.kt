@@ -36,13 +36,15 @@ object StringUtil {
             if (source == null) {
                 return SpannableString("")
             }
+            if (!source.contains("#(")) {
+                return if (source is SpannableString) source else SpannableString(source)
+            }
             val spannableString: SpannableString = if (source is SpannableString) {
                 source
             } else {
                 SpannableString(source)
             }
-            val regexEmoticon = EmoticonUtil.getRegex(emoticonType)
-            val patternEmoticon = Pattern.compile(regexEmoticon)
+            val patternEmoticon = EmoticonUtil.getPattern(emoticonType)
             val matcherEmoticon = patternEmoticon.matcher(spannableString)
             while (matcherEmoticon.find()) {
                 val key = matcherEmoticon.group()
@@ -67,7 +69,7 @@ object StringUtil {
             val spannableString: SpannableString = if (source is SpannableString) {
                 source
             } else {
-                SpannableString(source)
+                SpannableString(source ?: "")
             }
             spannableString
         }

@@ -26,6 +26,7 @@ object EmoticonUtil {
     @RegExp
     private val REGEX = "#\\((([一-龥\\w~])+)\\)"
     private val PATTERN_EMOTICON_ALL: Pattern = Pattern.compile(REGEX)
+    private val PATTERN_EMOTICON_WEB: Pattern = Pattern.compile(REGEX_WEB)
     private val EMOTICON_STRING_CACHE: MutableMap<String, AnnotatedString> =
         Collections.synchronizedMap(object : LinkedHashMap<String, AnnotatedString>(512, 0.75f, true) {
             override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, AnnotatedString>?): Boolean {
@@ -107,6 +108,14 @@ object EmoticonUtil {
     }
 
     @JvmStatic
+    fun getPattern(type: Int): Pattern {
+        return when (type) {
+            EMOTICON_ALL_WEB_TYPE, EMOTICON_CLASSIC_WEB_TYPE, EMOTICON_EMOJI_WEB_TYPE -> PATTERN_EMOTICON_WEB
+            else -> PATTERN_EMOTICON_ALL
+        }
+    }
+
+    @JvmStatic
     @DrawableRes
     fun getImgByName(EmoticonType: Int, imgName: String): Int {
         var integer: Int? = null
@@ -179,8 +188,12 @@ object EmoticonUtil {
                     }
                 }
             }
+            val canCache = length <= 500 && spanStyles.isEmpty() && paragraphStyles.isEmpty()
+            if (canCache) {
+                EMOTICON_STRING_CACHE[this.text]?.let { return it }
+            }
             val matcher = PATTERN_EMOTICON_ALL.matcher(this.text)
-            return buildAnnotatedString {
+            val result = buildAnnotatedString {
                 withAnnotation("Emoticon", "true") {
                     append(this@emoticonString)
                 }
@@ -198,5 +211,9 @@ object EmoticonUtil {
                     }
                 }
             }
+            if (canCache) {
+                EMOTICON_STRING_CACHE[this.text] = result
+            }
+            return result
         }
 }

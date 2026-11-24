@@ -266,21 +266,26 @@ object EmoticonManager {
         if (id == null) {
             return null
         }
-        if (drawableCache.containsKey(id)) {
-            return drawableCache[id]
+        val cached = drawableCache[id]
+        if (cached != null) {
+            return cached.constantState?.newDrawable()?.mutate() ?: cached
         }
         val resId = getEmoticonResId(context, id)
         if (resId != 0) {
-            return AppCompatResources.getDrawable(context, resId).also { drawableCache[id] = it!! }
+            val drawable = AppCompatResources.getDrawable(context, resId) ?: return null
+            drawableCache[id] = drawable
+            return drawable.constantState?.newDrawable()?.mutate() ?: drawable
         }
         val emoticonFile = getEmoticonFile(id)
         if (!emoticonFile.exists()) {
             return null
         }
-        return BitmapDrawable(
+        val drawable = BitmapDrawable(
             getContext().resources,
             emoticonFile.inputStream()
-        ).also { drawableCache[id] = it }
+        )
+        drawableCache[id] = drawable
+        return drawable.constantState?.newDrawable()?.mutate() ?: drawable
     }
 
     fun getEmoticonUri(context: Context, id: String?): String {

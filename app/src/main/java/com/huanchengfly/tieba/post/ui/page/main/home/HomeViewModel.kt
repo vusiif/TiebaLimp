@@ -4,6 +4,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import com.huanchengfly.tieba.post.api.TiebaApi
 import com.huanchengfly.tieba.post.api.models.CommonResponse
+import com.huanchengfly.tieba.post.api.models.protos.forumRecommend.ForumRecommendResponse
 import com.huanchengfly.tieba.post.api.retrofit.exception.getErrorMessage
 import com.huanchengfly.tieba.post.arch.BaseViewModel
 import com.huanchengfly.tieba.post.arch.CommonUiEvent
@@ -16,6 +17,7 @@ import com.huanchengfly.tieba.post.models.database.History
 import com.huanchengfly.tieba.post.models.database.TopForum
 import com.huanchengfly.tieba.post.utils.AccountUtil
 import com.huanchengfly.tieba.post.utils.HistoryUtil
+import com.huanchengfly.tieba.post.utils.SwrCacheManager
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
@@ -23,6 +25,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.flatMapConcat
 import kotlinx.coroutines.flow.flow
@@ -68,11 +71,24 @@ class HomeViewModel : BaseViewModel<HomeUiIntent, HomePartialChange, HomeUiState
             )
         }
 
+        private fun forumRecommendSwrFlow(): Flow<ForumRecommendResponse> {
+            val uid = AccountUtil.getLoginInfo()?.uid ?: "guest"
+            return SwrCacheManager.flowWithSwr(
+                key = "home_forum_recommend_$uid",
+                fetcher = { TiebaApi.getInstance().forumRecommendNewFlow() },
+                serializer = { it.encode() },
+                deserializer = { ForumRecommendResponse.ADAPTER.decode(it) },
+                ttlMillis = 10 * 60 * 1000L,
+                staleTolerateMillis = 14 * 24 * 60 * 60 * 1000L,
+                forceRefresh = true
+            )
+        }
+
         @Suppress("USELESS_CAST")
         private fun produceRefreshPartialChangeFlow(): Flow<HomePartialChange.Refresh> =
             HistoryUtil.getFlow(HistoryUtil.TYPE_FORUM, 0)
-                .zip(
-                    TiebaApi.getInstance().forumRecommendNewFlow()
+                .combine(
+                    forumRecommendSwrFlow()
                 ) { historyForums, forumRecommend ->
                     val forums = forumRecommend.data_?.like_forum?.map {
                         HomeUiState.Forum(
@@ -127,6 +143,8 @@ class HomeViewModel : BaseViewModel<HomeUiIntent, HomePartialChange, HomeUiState
             TiebaApi.getInstance()
                 .unlikeForumFlow(forumId, forumName, AccountUtil.getLoginInfo()!!.tbs)
                 .map<CommonResponse, HomePartialChange.Unfollow> {
+                    val uid = AccountUtil.getLoginInfo()?.uid ?: "guest"
+                    SwrCacheManager.evict("home_forum_recommend_$uid")
                     HomePartialChange.Unfollow.Success(forumId)
                 }
                 .catch { emit(HomePartialChange.Unfollow.Failure(it.getErrorMessage())) }

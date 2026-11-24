@@ -92,6 +92,7 @@ object AppMemoryManager {
         runCatching { BlockRuleMatcher.clearCache() }
         runCatching { DateTimeUtils.clearCache() }
         runCatching { PollVoteStore.clearCache() }
+        runCatching { SwrCacheManager.clearMemoryCache() }
     }
 
     private fun purgeAllCaches(context: Context) {

@@ -96,6 +96,7 @@ object AppMemoryManager {
         runCatching { DateTimeUtils.clearCache() }
         runCatching { PollVoteStore.clearCache() }
         runCatching { SwrCacheManager.clearMemoryCache() }
+        runCatching { ImagePreloader.clearCache() }
     }
 
     private fun purgeAllCaches(context: Context) {

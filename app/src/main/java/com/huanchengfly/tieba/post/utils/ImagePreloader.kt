@@ -6,13 +6,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.platform.LocalContext
-import com.github.panpf.sketch.request.DisplayRequest
+import com.github.panpf.sketch.request.DownloadRequest
 import com.github.panpf.sketch.request.enqueue
 import com.huanchengfly.tieba.post.App
 import com.huanchengfly.tieba.post.api.models.protos.Media
 import com.huanchengfly.tieba.post.arch.ImmutableHolder
 import com.huanchengfly.tieba.post.ui.widgets.compose.shouldLoadImage
 import kotlinx.coroutines.flow.distinctUntilChanged
+import java.util.Collections
+import java.util.LinkedHashSet
 
 val Media.url: String
     get() = ImageUtil.getUrl(
@@ -28,18 +30,45 @@ val ImmutableHolder<Media>.url: String
     get() = get { url }
 
 object ImagePreloader {
+    private const val MAX_PRELOAD_DEDUP_SIZE = 128
+
+    private val preloadedUrls: MutableSet<String> = Collections.synchronizedSet(
+        object : LinkedHashSet<String>(MAX_PRELOAD_DEDUP_SIZE, 0.75f) {
+            override fun add(element: String): Boolean {
+                if (size >= MAX_PRELOAD_DEDUP_SIZE) {
+                    val it = iterator()
+                    if (it.hasNext()) {
+                        it.next()
+                        it.remove()
+                    }
+                }
+                return super.add(element)
+            }
+        }
+    )
+
     fun preload(context: Context, url: String?) {
         if (url.isNullOrBlank()) return
         if (!shouldLoadImage(context, false)) return
+        if (!preloadedUrls.add(url)) {
+            // Already preloaded recently, avoid redundant network/disk dispatch
+            return
+        }
         runCatching {
-            DisplayRequest(context, url) {
-                crossfade()
-            }.enqueue()
+            DownloadRequest(context, url).enqueue()
         }
     }
 
     fun preload(context: Context, urls: Collection<String?>) {
         urls.forEach { preload(context, it) }
+    }
+
+    fun isUrlPreloaded(url: String): Boolean = preloadedUrls.contains(url)
+
+    fun getPreloadedCount(): Int = preloadedUrls.size
+
+    fun clearCache() {
+        preloadedUrls.clear()
     }
 }
 

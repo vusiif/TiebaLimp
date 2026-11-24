@@ -19,12 +19,14 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.github.panpf.sketch.compose.AsyncImage
 import com.github.panpf.sketch.fetch.newResourceUri
 import com.github.panpf.sketch.request.DisplayRequest
+import com.github.panpf.sketch.resize.Precision
 import com.google.accompanist.drawablepainter.rememberDrawablePainter
 import com.huanchengfly.tieba.post.utils.ImageUtil
 
@@ -112,6 +114,7 @@ fun Avatar(
         contentDescription = contentDescription,
         modifier = modifier.size(size),
         shape = shape,
+        targetSize = size,
     )
 }
 
@@ -121,13 +124,24 @@ fun Avatar(
     contentDescription: String?,
     modifier: Modifier = Modifier,
     shape: Shape = CircleShape,
+    targetSize: Dp? = null,
 ) {
     val context = LocalContext.current
+    val density = LocalDensity.current
 
-    val request = remember(data, context) {
+    val targetPx = remember(targetSize, density) {
+        if (targetSize != null && targetSize > 0.dp) {
+            with(density) { (targetSize * 1.5f).roundToPx().coerceIn(48, 384) }
+        } else {
+            with(density) { 64.dp.roundToPx() }
+        }
+    }
+
+    val request = remember(data, context, targetPx) {
         DisplayRequest(context, data) {
             placeholder(ImageUtil.getPlaceHolder(context, 0))
             crossfade()
+            resize(targetPx, targetPx, Precision.LESS_PIXELS)
         }
     }
 

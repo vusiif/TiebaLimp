@@ -12,6 +12,7 @@ import com.github.panpf.sketch.decode.WebpAnimatedDrawableDecoder
 import com.github.panpf.sketch.http.OkHttpStack
 import com.github.panpf.sketch.request.ImageOptions
 import com.github.panpf.sketch.request.PauseLoadWhenScrollingDrawableDecodeInterceptor
+import com.github.panpf.sketch.request.pauseLoadWhenScrolling
 import com.github.panpf.sketch.resize.LongImageScaleDecider
 import com.github.panpf.sketch.resize.Precision
 import com.huanchengfly.tieba.post.api.getUserAgent
@@ -41,6 +42,7 @@ object AppSketchFactory {
                 resizeApplyToDrawable(true)
                 resizePrecision(Precision.LESS_PIXELS)
                 resizeScale(LongImageScaleDecider())
+                pauseLoadWhenScrolling(true)
                 disallowReuseBitmap(false)
                 if (isLowRam) {
                     bitmapConfig(Bitmap.Config.RGB_565)

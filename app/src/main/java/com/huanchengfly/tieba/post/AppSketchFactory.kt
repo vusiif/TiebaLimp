@@ -12,6 +12,8 @@ import com.github.panpf.sketch.decode.WebpAnimatedDrawableDecoder
 import com.github.panpf.sketch.http.OkHttpStack
 import com.github.panpf.sketch.request.ImageOptions
 import com.github.panpf.sketch.request.PauseLoadWhenScrollingDrawableDecodeInterceptor
+import com.github.panpf.sketch.resize.LongImageScaleDecider
+import com.github.panpf.sketch.resize.Precision
 import com.huanchengfly.tieba.post.api.getUserAgent
 import com.huanchengfly.tieba.post.api.retrofit.RetrofitTiebaApi
 import java.util.concurrent.TimeUnit
@@ -36,6 +38,10 @@ object AppSketchFactory {
             httpStack(OkHttpStack(sketchHttpClient))
             globalImageOptions(ImageOptions {
                 crossfade(durationMillis = 200)
+                resizeApplyToDrawable(true)
+                resizePrecision(Precision.LESS_PIXELS)
+                resizeScale(LongImageScaleDecider())
+                disallowReuseBitmap(false)
                 if (isLowRam) {
                     bitmapConfig(Bitmap.Config.RGB_565)
                 }

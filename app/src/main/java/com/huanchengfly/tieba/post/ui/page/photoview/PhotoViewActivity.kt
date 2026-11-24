@@ -66,6 +66,9 @@ import com.github.panpf.sketch.request.LoadState
 import com.github.panpf.sketch.sketch
 import com.github.panpf.sketch.stateimage.ThumbnailMemoryCacheStateImage
 import com.github.panpf.zoomimage.SketchZoomAsyncImage
+import com.github.panpf.zoomimage.compose.rememberZoomState
+import com.github.panpf.zoomimage.compose.zoom.ZoomAnimationSpec
+import com.github.panpf.zoomimage.zoom.ReadMode
 import com.google.accompanist.systemuicontroller.SystemUiController
 import com.huanchengfly.tieba.post.R
 import com.huanchengfly.tieba.post.arch.BaseComposeActivityWithParcelable
@@ -119,6 +122,15 @@ private fun ViewPhoto(
                 crossfade()
             }
         }
+        val zoomState = rememberZoomState()
+        LaunchedEffect(zoomState) {
+            zoomState.zoomable.readMode = ReadMode.Default
+            zoomState.zoomable.threeStepScale = true
+            zoomState.zoomable.rubberBandScale = true
+            zoomState.zoomable.animationSpec = ZoomAnimationSpec.Default.copy(durationMillis = 280)
+            zoomState.subsampling.disabledTileBitmapReuse = false
+            zoomState.subsampling.disabledTileBitmapCache = false
+        }
         SketchZoomAsyncImage(
             request = request,
             contentDescription = null,
@@ -126,6 +138,7 @@ private fun ViewPhoto(
             onTap = onTap,
             onLongPress = onLongPress,
             imageState = state,
+            state = zoomState,
         )
         if (showProgress) {
             Box(
@@ -380,6 +393,7 @@ class PhotoViewActivity : BaseComposeActivityWithParcelable<PhotoViewData>() {
         super.onDestroy()
         try {
             sketch.memoryCache.trim(ComponentCallbacks2.TRIM_MEMORY_BACKGROUND)
+            sketch.bitmapPool.trim(ComponentCallbacks2.TRIM_MEMORY_BACKGROUND)
         } catch (_: Throwable) {
         }
     }

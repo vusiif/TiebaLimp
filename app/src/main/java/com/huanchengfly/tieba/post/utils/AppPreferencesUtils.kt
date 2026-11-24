@@ -12,11 +12,15 @@ import java.lang.ref.WeakReference
 
 open class AppPreferencesUtils private constructor(ctx: Context) : DataStorePreferenceOwner {
     companion object {
+        @Volatile
         private var instance: AppPreferencesUtils? = null
 
         fun getInstance(context: Context): AppPreferencesUtils {
-            return instance ?: AppPreferencesUtils(context).also {
-                instance = it
+            return instance ?: synchronized(this) {
+                instance ?: AppPreferencesUtils(context.applicationContext ?: context).also {
+                    instance = it
+                    PreferenceSnapshotCoordinator.attach(it.preferencesDataStore, it.coroutineScope)
+                }
             }
         }
     }

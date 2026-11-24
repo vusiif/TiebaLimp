@@ -19,6 +19,7 @@ import androidx.datastore.preferences.SharedPreferencesMigration
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.preference.PreferenceDataStore
+import com.huanchengfly.tieba.post.utils.PreferenceSnapshotCoordinator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -140,6 +141,10 @@ fun DataStore<Preferences>.putInt(key: String, value: Int) {
 }
 
 fun DataStore<Preferences>.getInt(key: String, defaultValue: Int): Int {
+    val snapshot = PreferenceSnapshotCoordinator.getSnapshot(this)
+    if (snapshot != null) {
+        return snapshot[intPreferencesKey(key)] ?: defaultValue
+    }
     var resultValue = defaultValue
 
     runBlocking {
@@ -153,6 +158,10 @@ fun DataStore<Preferences>.getInt(key: String, defaultValue: Int): Int {
 }
 
 fun DataStore<Preferences>.getString(key: String): String? {
+    val snapshot = PreferenceSnapshotCoordinator.getSnapshot(this)
+    if (snapshot != null) {
+        return snapshot[stringPreferencesKey(key)]
+    }
     var resultValue: String? = null
 
     runBlocking {
@@ -166,6 +175,10 @@ fun DataStore<Preferences>.getString(key: String): String? {
 }
 
 fun DataStore<Preferences>.getString(key: String, defaultValue: String): String {
+    val snapshot = PreferenceSnapshotCoordinator.getSnapshot(this)
+    if (snapshot != null) {
+        return snapshot[stringPreferencesKey(key)] ?: defaultValue
+    }
     var resultValue = defaultValue
 
     runBlocking {
@@ -182,6 +195,10 @@ fun DataStore<Preferences>.getStringSet(
     key: String,
     defaultValues: MutableSet<String>? = null
 ): MutableSet<String>? {
+    val snapshot = PreferenceSnapshotCoordinator.getSnapshot(this)
+    if (snapshot != null) {
+        return snapshot[stringSetPreferencesKey(key)]?.toMutableSet() ?: defaultValues
+    }
     var resultValue = defaultValues
 
     runBlocking {
@@ -195,6 +212,10 @@ fun DataStore<Preferences>.getStringSet(
 }
 
 fun DataStore<Preferences>.getBoolean(key: String, defaultValue: Boolean): Boolean {
+    val snapshot = PreferenceSnapshotCoordinator.getSnapshot(this)
+    if (snapshot != null) {
+        return snapshot[booleanPreferencesKey(key)] ?: defaultValue
+    }
     var resultValue = defaultValue
 
     runBlocking {
@@ -208,6 +229,10 @@ fun DataStore<Preferences>.getBoolean(key: String, defaultValue: Boolean): Boole
 }
 
 fun DataStore<Preferences>.getFloat(key: String, defaultValue: Float): Float {
+    val snapshot = PreferenceSnapshotCoordinator.getSnapshot(this)
+    if (snapshot != null) {
+        return snapshot[floatPreferencesKey(key)] ?: defaultValue
+    }
     var resultValue = defaultValue
 
     runBlocking {
@@ -221,6 +246,10 @@ fun DataStore<Preferences>.getFloat(key: String, defaultValue: Float): Float {
 }
 
 fun DataStore<Preferences>.getLong(key: String, defaultValue: Long): Long {
+    val snapshot = PreferenceSnapshotCoordinator.getSnapshot(this)
+    if (snapshot != null) {
+        return snapshot[longPreferencesKey(key)] ?: defaultValue
+    }
     var resultValue = defaultValue
 
     runBlocking {

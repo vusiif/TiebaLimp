@@ -59,8 +59,40 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 private val LoadDistance = 70.dp
+const val DEFAULT_PRELOAD_COUNT = 4
+const val LOAD_MORE_THROTTLE_MS = 500L
 
-@OptIn(ExperimentalMaterialApi::class, FlowPreview::class)
+object LoadMoreHelper {
+    const val DEFAULT_PRELOAD_COUNT = 4
+    const val DEFAULT_THROTTLE_MS = 500L
+
+    fun shouldTriggerPreload(
+        isEmpty: Boolean,
+        canLoadMore: Boolean,
+        isLoading: Boolean,
+        isError: Boolean,
+        preloadCount: Int,
+        firstVisibleItemIndex: Int,
+        visibleItemCount: Int,
+        totalItemCount: Int
+    ): Boolean {
+        if (isEmpty || !canLoadMore || isLoading || isError || preloadCount <= 0 || totalItemCount <= 0) {
+            return false
+        }
+        val lastVisible = firstVisibleItemIndex + visibleItemCount - 1
+        return lastVisible >= (totalItemCount - preloadCount)
+    }
+
+    fun canTriggerWithThrottle(
+        currentTime: Long,
+        lastTriggerTime: Long,
+        throttleMs: Long = DEFAULT_THROTTLE_MS
+    ): Boolean {
+        return currentTime - lastTriggerTime >= throttleMs
+    }
+}
+
+@OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun LoadMoreLayout(
     isLoading: Boolean,
@@ -81,7 +113,7 @@ fun LoadMoreLayout(
     },
     lazyListState: LazyListState? = null,
     isEmpty: Boolean = lazyListState?.layoutInfo?.totalItemsCount == 0,
-    preloadCount: Int = 1,
+    preloadCount: Int = DEFAULT_PRELOAD_COUNT,
     content: @Composable () -> Unit,
 ) {
     val loadDistance = with(LocalDensity.current) { LoadDistance.toPx() }
@@ -89,26 +121,6 @@ fun LoadMoreLayout(
     val curOnLoadMore by rememberUpdatedState(newValue = onLoadMore)
     var lastTriggerTime by remember { mutableLongStateOf(0L) }
     var waitingStateReset by remember { mutableStateOf(false) }
-    val loadMoreFlow = remember {
-        MutableSharedFlow<Long>(
-            extraBufferCapacity = 1,
-            onBufferOverflow = BufferOverflow.DROP_LATEST
-        )
-    }
-    val coroutineScope = rememberCoroutineScope()
-    DisposableEffect(Unit) {
-        val job = coroutineScope.launch {
-            loadMoreFlow
-                .sample(500)
-                .collect {
-                    curOnLoadMore()
-                    waitingStateReset = true
-                    lastTriggerTime = it
-                }
-        }
-
-        onDispose { job.cancel() }
-    }
 
     val canLoadMore = remember(enableLoadMore, loadEnd) { enableLoadMore && !loadEnd }
     val curIsEmpty by rememberUpdatedState(newValue = isEmpty)
@@ -117,25 +129,43 @@ fun LoadMoreLayout(
     val curCanLoadMore by rememberUpdatedState(newValue = canLoadMore)
     val curPreloadCount by rememberUpdatedState(newValue = preloadCount)
 
-    // 处理列表滚动到底部时自动加载更多
+    // Immediate leading-edge trigger with throttling: fire instantly on first entry, throttle repeat calls within 500ms
+    val tryTriggerLoadMore: () -> Boolean = remember(curIsLoading, curCanLoadMore, curIsError) {
+        {
+            val curTime = System.currentTimeMillis()
+            if (LoadMoreHelper.canTriggerWithThrottle(curTime, lastTriggerTime, LOAD_MORE_THROTTLE_MS) &&
+                !curIsLoading && curCanLoadMore && !curIsError
+            ) {
+                lastTriggerTime = curTime
+                waitingStateReset = true
+                curOnLoadMore()
+                true
+            } else {
+                false
+            }
+        }
+    }
+
+    // 处理列表滚动到底部时自动预测预加载
     val curLazyListState by rememberUpdatedState(newValue = lazyListState)
     LaunchedEffect(curLazyListState) {
         curLazyListState?.let { state ->
             snapshotFlow {
-                val shouldPreload =
-                    !curIsEmpty && curCanLoadMore && !curIsLoading && !curIsError && curPreloadCount > 0
-                val isInPreloadRange =
-                    state.firstVisibleItemIndex + state.layoutInfo.visibleItemsInfo.size - 1 >= state.layoutInfo.totalItemsCount - curPreloadCount
-                shouldPreload && isInPreloadRange
+                LoadMoreHelper.shouldTriggerPreload(
+                    isEmpty = curIsEmpty,
+                    canLoadMore = curCanLoadMore,
+                    isLoading = curIsLoading,
+                    isError = curIsError,
+                    preloadCount = curPreloadCount,
+                    firstVisibleItemIndex = state.firstVisibleItemIndex,
+                    visibleItemCount = state.layoutInfo.visibleItemsInfo.size,
+                    totalItemCount = state.layoutInfo.totalItemsCount
+                )
             }
                 .distinctUntilChanged()
-                .collect {
-                    if (it) {
-                        val curTime = System.currentTimeMillis()
-                        coroutineScope.launch {
-                            loadMoreFlow.emit(curTime)
-                        }
-                        curTime - lastTriggerTime >= 500
+                .collect { shouldTrigger ->
+                    if (shouldTrigger) {
+                        tryTriggerLoadMore()
                     }
                 }
         }
@@ -143,11 +173,7 @@ fun LoadMoreLayout(
 
     val swipeableState = rememberSwipeableState(false) { newValue ->
         if (newValue && !curIsLoading && curCanLoadMore) {
-            val curTime = System.currentTimeMillis()
-            coroutineScope.launch {
-                loadMoreFlow.emit(curTime)
-            }
-            curTime - lastTriggerTime >= 500
+            tryTriggerLoadMore()
         } else !newValue
     }
 

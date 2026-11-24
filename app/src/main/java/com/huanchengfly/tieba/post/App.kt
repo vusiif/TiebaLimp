@@ -28,6 +28,7 @@ import com.huanchengfly.tieba.post.ui.common.theme.interfaces.ThemeSwitcher
 import com.huanchengfly.tieba.post.ui.common.theme.utils.ThemeUtils
 import com.huanchengfly.tieba.post.utils.AccountUtil
 import com.huanchengfly.tieba.post.utils.ActivityStackManager
+import com.huanchengfly.tieba.post.utils.AppDatabaseManager
 import com.huanchengfly.tieba.post.utils.AppIconUtil
 import com.huanchengfly.tieba.post.utils.AppMemoryManager
 import com.huanchengfly.tieba.post.utils.AppStartupProfiler
@@ -89,6 +90,7 @@ class App : Application(), SketchFactory {
         }
         AppStartupProfiler.traceStage("LitePal") {
             LitePal.initialize(this)
+            AppDatabaseManager.initAsync(this)
         }
         AppStartupProfiler.traceStage("AccountUtil") {
             AccountUtil.init(this)

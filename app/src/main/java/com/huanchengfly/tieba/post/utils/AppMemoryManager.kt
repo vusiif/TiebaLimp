@@ -48,9 +48,10 @@ object AppMemoryManager {
                 }
                 level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN ||
                 level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND -> {
-                    // UI moved to background: evict drawables and transient caches to avoid LMK kill
+                    // UI moved to background: evict drawables, transient caches and checkpoint WAL to avoid LMK kill
                     trimImageCaches(context, level)
                     purgeTransientCaches()
+                    runCatching { AppDatabaseManager.checkpoint() }
                 }
                 else -> {
                     // Running moderate or running low
@@ -99,6 +100,7 @@ object AppMemoryManager {
         runCatching { AppThemeDelegate.clearCache() }
         runCatching { clearThemeColorsCache() }
         runCatching { TiebaDns.clear() }
+        runCatching { AppDatabaseManager.checkpoint() }
     }
 
     /**

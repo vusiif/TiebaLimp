@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -70,6 +71,16 @@ fun PostCard(
     onMenuDeleteClick: ((Post) -> Unit)? = null,
 ) {
     val context = LocalContext.current
+    val currentOnUserClick by rememberUpdatedState(onUserClick)
+    val currentOnAgree by rememberUpdatedState(onAgree)
+    val currentOnReplyClick by rememberUpdatedState(onReplyClick)
+    val currentOnSubPostReplyClick by rememberUpdatedState(onSubPostReplyClick)
+    val currentOnOpenSubPosts by rememberUpdatedState(onOpenSubPosts)
+    val currentOnMenuCopyClick by rememberUpdatedState(onMenuCopyClick)
+    val currentOnMenuFavoriteClick by rememberUpdatedState(onMenuFavoriteClick)
+    val currentOnMenuBookmarkClick by rememberUpdatedState(onMenuBookmarkClick)
+    val currentOnMenuDeleteClick by rememberUpdatedState(onMenuDeleteClick)
+
     val post = remember(postHolder) { postHolder.get() }
     val isFold = remember(postHolder) {
         post.is_fold == 1 || post.fold_comment_status != 0
@@ -131,8 +142,8 @@ fun PostCard(
                 onClick = { isFoldExpanded = true }
             )
         } else {
-            val onHeaderUserClick = remember(author, onUserClick) {
-                { onUserClick(author) }
+            val onHeaderUserClick = remember(author) {
+                { currentOnUserClick(author) }
             }
             val accentColor = ExtendedTheme.colors.accent
             val cardModifier = remember(isSearchHighlighted, accentColor) {
@@ -146,7 +157,7 @@ fun PostCard(
                 menuState = menuState,
                 indication = null,
                 onClick = {
-                    onReplyClick(post)
+                    currentOnReplyClick(post)
                 }.takeIf { !context.appPreferences.hideReply },
                 menuContent = {
                     PostCardMenuContent(
@@ -154,11 +165,11 @@ fun PostCard(
                         isCollected = isCollected,
                         canDelete = canDelete,
                         isFold = isFold,
-                        onReplyClick = { onReplyClick(post) },
-                        onCopyClick = onMenuCopyClick,
-                        onFavoriteClick = onMenuFavoriteClick,
-                        onBookmarkClick = onMenuBookmarkClick,
-                        onDeleteClick = onMenuDeleteClick,
+                        onReplyClick = { currentOnReplyClick(post) },
+                        onCopyClick = currentOnMenuCopyClick,
+                        onFavoriteClick = currentOnMenuFavoriteClick,
+                        onBookmarkClick = currentOnMenuBookmarkClick,
+                        onDeleteClick = currentOnMenuDeleteClick,
                         onToggleFold = { isFoldExpanded = false },
                         onDismissMenu = { menuState.expanded = false }
                     )
@@ -176,7 +187,7 @@ fun PostCard(
                                 hasAgreed = hasAgreed,
                                 agreeNum = agreeNum,
                                 onUserClick = onHeaderUserClick,
-                                onAgree = onAgree
+                                onAgree = currentOnAgree
                             )
                         }
                     },
@@ -237,9 +248,9 @@ fun PostCard(
                                 post = post,
                                 subPosts = subPosts,
                                 paddingModifier = paddingModifier,
-                                onSubPostReplyClick = onSubPostReplyClick,
-                                onOpenSubPosts = onOpenSubPosts,
-                                onMenuCopyClick = onMenuCopyClick
+                                onSubPostReplyClick = currentOnSubPostReplyClick,
+                                onOpenSubPosts = currentOnOpenSubPosts,
+                                onMenuCopyClick = currentOnMenuCopyClick
                             )
                         }
                     }

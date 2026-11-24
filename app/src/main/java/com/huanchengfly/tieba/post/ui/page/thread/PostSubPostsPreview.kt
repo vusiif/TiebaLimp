@@ -16,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -55,6 +56,11 @@ fun PostSubPostsPreview(
     onMenuCopyClick: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
+    val currentOnSubPostReplyClick by rememberUpdatedState(onSubPostReplyClick)
+    val currentOnOpenSubPosts by rememberUpdatedState(onOpenSubPosts)
+    val currentOnMenuCopyClick by rememberUpdatedState(onMenuCopyClick)
+    val onOpenAllClick = remember { { currentOnOpenSubPosts(0) } }
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -68,9 +74,9 @@ fun PostSubPostsPreview(
             PreviewSubPostRow(
                 item = item,
                 post = post,
-                onSubPostReplyClick = onSubPostReplyClick,
-                onOpenSubPosts = onOpenSubPosts,
-                onMenuCopyClick = onMenuCopyClick,
+                onSubPostReplyClick = currentOnSubPostReplyClick,
+                onOpenSubPosts = currentOnOpenSubPosts,
+                onMenuCopyClick = currentOnMenuCopyClick,
             )
         }
 
@@ -86,9 +92,7 @@ fun PostSubPostsPreview(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 2.dp)
-                    .clickable {
-                        onOpenSubPosts(0)
-                    }
+                    .clickable(onClick = onOpenAllClick)
                     .padding(horizontal = 12.dp)
             )
         }
@@ -106,6 +110,10 @@ private fun PreviewSubPostRow(
     var subPostRevealed by rememberSaveable(item.id) {
         mutableStateOf(false)
     }
+    val currentSubReplyClick by rememberUpdatedState(onSubPostReplyClick)
+    val currentSubOpenSubPosts by rememberUpdatedState(onOpenSubPosts)
+    val currentSubCopyClick by rememberUpdatedState(onMenuCopyClick)
+
     val subReason = (item.blockResult as? FilterResult.Blocked)?.reason
     BlockableContent(
         blocked = item.blocked && !subPostRevealed,
@@ -127,15 +135,13 @@ private fun PreviewSubPostRow(
             )
         },
     ) {
-        val onReplyClick = remember(item, post, onSubPostReplyClick) {
-            if (onSubPostReplyClick != null) {
-                { it: SubPostList -> onSubPostReplyClick(post, it) }
-            } else null
+        val onReplyClick: ((SubPostList) -> Unit)? = remember(item.id, post.id) {
+            val replyClick = currentSubReplyClick ?: return@remember null
+            { it: SubPostList -> replyClick(post, it) }
         }
-        val onCopyClick = remember(item, onMenuCopyClick) {
-            if (onMenuCopyClick != null) {
-                { it: SubPostList -> onMenuCopyClick(it.content.plainText) }
-            } else null
+        val onCopyClick: ((SubPostList) -> Unit)? = remember(item.id) {
+            val copyClick = currentSubCopyClick ?: return@remember null
+            { it: SubPostList -> copyClick(it.content.plainText) }
         }
         SubPostItem(
             subPostList = item.subPost,
@@ -144,7 +150,7 @@ private fun PreviewSubPostRow(
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp),
             onReplyClick = onReplyClick,
-            onOpenSubPosts = onOpenSubPosts,
+            onOpenSubPosts = currentSubOpenSubPosts,
             onMenuCopyClick = onCopyClick
         )
     }

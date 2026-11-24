@@ -23,6 +23,11 @@ data class PostItemData(
     val contentRenders: ImmutableList<PbContentRender>,
     val subPosts: ImmutableList<SubPostItemData>,
     val blockResult: FilterResult = FilterResult.Allowed,
+    val id: Long = post.item.id,
+    val floor: Int = post.item.floor,
+    val authorId: Long = post.item.author_id,
+    val isFolded: Boolean = post.item.is_fold == 1 || post.item.fold_comment_status != 0,
+    val subPostCount: Int = post.item.sub_post_number,
 ) {
     constructor(
         post: ImmutableHolder<Post>,
@@ -39,7 +44,11 @@ data class PostItemData(
                 )
             }?.toImmutableList() ?: persistentListOf()
         },
-        result = post.get { checkBlock(forumName) }
+        result = try {
+            post.get { checkBlock(forumName) }
+        } catch (_: Throwable) {
+            FilterResult.Allowed
+        }
     )
 
     private constructor(
@@ -62,6 +71,8 @@ data class SubPostItemData(
     val subPostContent: AnnotatedString,
     val blocked: Boolean,
     val blockResult: FilterResult = FilterResult.Allowed,
+    val id: Long = subPost.item.id,
+    val authorId: Long = subPost.item.author?.id ?: 0L,
 ) {
     constructor(
         subPost: ImmutableHolder<SubPostList>,
@@ -70,7 +81,11 @@ data class SubPostItemData(
     ) : this(
         subPost = subPost,
         subPostContent = subPostContent,
-        result = subPost.get { checkBlock(forumName) }
+        result = try {
+            subPost.get { checkBlock(forumName) }
+        } catch (_: Throwable) {
+            FilterResult.Allowed
+        }
     )
 
     private constructor(
@@ -83,9 +98,6 @@ data class SubPostItemData(
         blocked = result is FilterResult.Blocked,
         blockResult = result,
     )
-
-    val id: Long
-        get() = subPost.get { id }
 
     val author: ImmutableHolder<User>?
         get() = subPost.get { author }?.wrapImmutable()

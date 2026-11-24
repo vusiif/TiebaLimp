@@ -69,9 +69,9 @@ private fun RenderPostCardItem(
 ) {
     val (item, blocked, renders, subPosts, blockResult) = postItem
     val reason = (blockResult as? FilterResult.Blocked)?.reason
-    val canDelete = remember(item, user) { item.get { author_id } == user.get { id } }
-    val isCollected = remember(item, thread) {
-        item.get { id } == thread?.get { collectMarkPid.toLongOrNull() }
+    val canDelete = remember(postItem.authorId, user) { postItem.authorId == user.get { id } }
+    val isCollected = remember(postItem.id, thread) {
+        postItem.id == thread?.get { collectMarkPid.toLongOrNull() }
     }
     val onCardUserClick = remember(onUserClick) {
         { u: User -> onUserClick(u.id) }
@@ -82,8 +82,8 @@ private fun RenderPostCardItem(
             onAgreePost(item, !postHasAgreed)
         }
     }
-    val onCardOpenSubPosts = remember(item, onOpenSubPosts) {
-        { subPostId: Long -> onOpenSubPosts(item.get { id }, subPostId) }
+    val onCardOpenSubPosts = remember(postItem.id, onOpenSubPosts) {
+        { subPostId: Long -> onOpenSubPosts(postItem.id, subPostId) }
     }
     PostCard(
         postHolder = item,
@@ -225,8 +225,8 @@ fun ThreadPostList(
                             .clickable {
                                 onLoadPrevious(
                                     max(currentPageMax - 1, 1),
-                                    data.first().post.get { id },
-                                    data.map { it.post.get { id } }
+                                    data.first().id,
+                                    data.map { it.id }
                                 )
                             }
                             .padding(8.dp),
@@ -281,10 +281,10 @@ fun ThreadPostList(
         } else {
             items(
                 items = data,
-                key = { (item) -> "Post_${item.get { id }}" },
-                contentType = { (item, blocked) ->
-                    if (blocked) "BlockedPost"
-                    else if (item.get { is_fold == 1 || fold_comment_status != 0 }) "FoldedPost"
+                key = { item: PostItemData -> item.id },
+                contentType = { item: PostItemData ->
+                    if (item.blocked) "BlockedPost"
+                    else if (item.isFolded) "FoldedPost"
                     else "NormalPost"
                 }
             ) { postItem ->
@@ -295,7 +295,7 @@ fun ThreadPostList(
                         user = user,
                         thread = thread,
                         isImmersiveMode = isImmersiveMode,
-                        isSearchHighlighted = highlightedFloor == postItem.post.get { floor },
+                        isSearchHighlighted = highlightedFloor == postItem.floor,
                         onUserClick = onUserClick,
                         onAgreePost = onAgreePost,
                         onReplyClick = onReplyClick,

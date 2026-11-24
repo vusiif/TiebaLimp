@@ -8,6 +8,7 @@ import com.github.panpf.sketch.sketch
 import com.huanchengfly.tieba.post.AppThemeDelegate
 import com.huanchengfly.tieba.post.api.retrofit.TiebaDns
 import com.huanchengfly.tieba.post.ui.common.theme.compose.clearThemeColorsCache
+import com.huanchengfly.tieba.post.ui.page.webview.WebResourceInterceptor
 
 /**
  * Centralized memory coordinator and OOM defense manager for TiebaLimp.
@@ -102,6 +103,7 @@ object AppMemoryManager {
         runCatching { TiebaDns.clear() }
         runCatching { AppDatabaseManager.checkpoint() }
         runCatching { AppNetworkManager.evictIdleConnections() }
+        runCatching { WebResourceInterceptor.clearCache() }
     }
 
     /**

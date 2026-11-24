@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import androidx.browser.customtabs.CustomTabColorSchemeParams
 import androidx.browser.customtabs.CustomTabsIntent
@@ -205,5 +206,18 @@ open class MyWebViewClient(
     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest?): Boolean {
         if (request == null) return false
         return interceptWebViewRequest(view, request)
+    }
+
+    override fun shouldInterceptRequest(
+        view: WebView,
+        request: WebResourceRequest?
+    ): WebResourceResponse? {
+        if (request != null) {
+            val intercepted = WebResourceInterceptor.intercept(request)
+            if (intercepted != null) {
+                return intercepted
+            }
+        }
+        return super.shouldInterceptRequest(view, request)
     }
 }

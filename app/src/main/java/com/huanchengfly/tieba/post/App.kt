@@ -38,6 +38,7 @@ import com.huanchengfly.tieba.post.utils.BlockRuleMatcher
 import com.huanchengfly.tieba.post.utils.ClientUtils
 import com.huanchengfly.tieba.post.utils.DateTimeUtils
 import com.huanchengfly.tieba.post.utils.EmoticonManager
+import com.huanchengfly.tieba.post.utils.WebViewHelper
 import com.huanchengfly.tieba.post.utils.EmoticonUtil
 import com.huanchengfly.tieba.post.utils.SharedPreferencesUtil
 import com.huanchengfly.tieba.post.utils.appPreferences
@@ -128,6 +129,7 @@ class App : Application(), SketchFactory {
             AppNetworkManager.init(this@App)
             BlockManager.init()
             EmoticonManager.init(this@App)
+            WebViewHelper.warmupAsync(this@App)
         }
         AppStartupProfiler.markAppCreateEnd()
     }

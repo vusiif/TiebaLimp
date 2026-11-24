@@ -71,6 +71,20 @@ fun ProvideShouldLoad(
     }
 }
 
+object LazyLoadHelper {
+    /**
+     * Determines whether a given page index falls within the allowed preload range of the current pager state.
+     */
+    fun isWithinPreloadRange(
+        pageIndex: Int,
+        currentPage: Int,
+        preloadDistance: Int = 0
+    ): Boolean {
+        if (preloadDistance < 0) return pageIndex == currentPage
+        return kotlin.math.abs(pageIndex - currentPage) <= preloadDistance
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LazyLoadHorizontalPager(
@@ -79,6 +93,7 @@ fun LazyLoadHorizontalPager(
     contentPadding: PaddingValues = PaddingValues(0.dp),
     pageSize: PageSize = PageSize.Fill,
     beyondBoundsPageCount: Int = 0,
+    preloadDistance: Int = beyondBoundsPageCount,
     pageSpacing: Dp = 0.dp,
     verticalAlignment: Alignment.Vertical = Alignment.CenterVertically,
     flingBehavior: SnapFlingBehavior = PagerDefaults.flingBehavior(state = state),
@@ -104,11 +119,14 @@ fun LazyLoadHorizontalPager(
         reverseLayout = reverseLayout,
         key = key,
         pageNestedScrollConnection = pageNestedScrollConnection
-    ) {
+    ) { page ->
+        val shouldLoad = remember(page, state.currentPage, preloadDistance) {
+            LazyLoadHelper.isWithinPreloadRange(page, state.currentPage, preloadDistance)
+        }
         ProvideShouldLoad(
-            shouldLoad = it == state.currentPage
+            shouldLoad = shouldLoad
         ) {
-            pageContent(it)
+            pageContent(page)
         }
     }
 }

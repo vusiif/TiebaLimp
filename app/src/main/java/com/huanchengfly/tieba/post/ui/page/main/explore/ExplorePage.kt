@@ -167,6 +167,7 @@ fun ExplorePage() {
         LazyLoadHorizontalPager(
             contentPadding = paddingValues,
             state = pagerState,
+            beyondBoundsPageCount = 1,
             key = { pages[it].id },
             modifier = Modifier.fillMaxSize(),
             verticalAlignment = Alignment.Top,

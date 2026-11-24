@@ -28,6 +28,7 @@ import com.huanchengfly.tieba.post.ui.common.theme.interfaces.ThemeSwitcher
 import com.huanchengfly.tieba.post.ui.common.theme.utils.ThemeUtils
 import com.huanchengfly.tieba.post.utils.AccountUtil
 import com.huanchengfly.tieba.post.utils.ActivityStackManager
+import com.huanchengfly.tieba.post.utils.AppCrashManager
 import com.huanchengfly.tieba.post.utils.AppDatabaseManager
 import com.huanchengfly.tieba.post.utils.AppIconUtil
 import com.huanchengfly.tieba.post.utils.AppMemoryManager
@@ -81,9 +82,16 @@ class App : Application(), SketchFactory {
     }
 
     override fun onCreate() {
+        val processName = getProcessName(this)
+        if (processName != null && processName.endsWith(":crash")) {
+            INSTANCE = this
+            super.onCreate()
+            return
+        }
         AppStartupProfiler.markAppCreateStart()
         INSTANCE = this
         super.onCreate()
+        AppCrashManager.init(this)
         AppStartupProfiler.traceStage("ClientUtils") {
             ClientUtils.init(this)
         }
@@ -130,6 +138,8 @@ class App : Application(), SketchFactory {
             BlockManager.init()
             EmoticonManager.init(this@App)
             WebViewHelper.warmupAsync(this@App)
+            kotlinx.coroutines.delay(30_000L)
+            AppCrashManager.markAppStartedSuccessfully(this@App)
         }
         AppStartupProfiler.markAppCreateEnd()
     }

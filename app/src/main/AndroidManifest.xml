@@ -272,6 +272,15 @@
             android:label="@string/title_activity_edit_profile"
             android:windowSoftInputMode="adjustResize" />
 
+        <activity
+            android:name=".activities.CrashRecoveryActivity"
+            android:configChanges="screenSize|screenLayout|orientation|smallestScreenSize|keyboardHidden"
+            android:excludeFromRecents="true"
+            android:finishOnTaskLaunch="true"
+            android:launchMode="singleInstance"
+            android:process=":crash"
+            android:theme="@style/Theme.NewAppTheme" />
+
         <receiver android:name=".receivers.AutoSignAlarm" />
 
         <provider

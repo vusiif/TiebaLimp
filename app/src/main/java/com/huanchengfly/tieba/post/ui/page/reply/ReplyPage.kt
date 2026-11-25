@@ -34,6 +34,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -170,8 +171,14 @@ internal fun ReplyPageContent(
     }
 
     var isDraftLoaded by remember { mutableStateOf(false) }
+    var isReplyCompleted by remember { mutableStateOf(false) }
     val curTextFlow = remember { MutableStateFlow("") }
     val curText by curTextFlow.collectAsState()
+    val currentReplySuccess by rememberUpdatedState(replySuccess || isReplyCompleted)
+    val currentIsDraftLoaded by rememberUpdatedState(isDraftLoaded)
+    val currentSelectedImages by rememberUpdatedState(selectedImageList)
+    val currentIsOriginImage by rememberUpdatedState(isOriginImage)
+
     LaunchedEffect(isDraftLoaded) {
         if (!isDraftLoaded) return@LaunchedEffect
         snapshotFlow {
@@ -182,9 +189,9 @@ internal fun ReplyPageContent(
             )
         }
             .debounce(500)
-            .distinctUntilChanged()
+            .distinctUntilChanged { old, new -> old.hasSameContent(new) }
             .collect { draft ->
-                if (!replySuccess) {
+                if (!currentReplySuccess) {
                     DraftHelper.saveDraft(accountUid, threadId, postId, subPostId, draft)
                 }
             }
@@ -192,19 +199,17 @@ internal fun ReplyPageContent(
 
     DisposableEffect(Unit) {
         onDispose {
-            if (isDraftLoaded && !replySuccess) {
+            if (currentIsDraftLoaded && !currentReplySuccess) {
                 val latestText = editTextView?.text?.toString() ?: curTextFlow.value
-                val latestImages = selectedImageList
-                val latestOrigin = isOriginImage
-                CoroutineScope(Dispatchers.IO).launch {
-                    DraftHelper.saveDraft(
-                        accountUid,
-                        threadId,
-                        postId,
-                        subPostId,
-                        DraftModel(latestText, latestImages, latestOrigin)
-                    )
-                }
+                val latestImages = currentSelectedImages
+                val latestOrigin = currentIsOriginImage
+                DraftHelper.saveDraftAsync(
+                    accountUid,
+                    threadId,
+                    postId,
+                    subPostId,
+                    DraftModel(latestText, latestImages, latestOrigin)
+                )
             }
         }
     }
@@ -224,6 +229,7 @@ internal fun ReplyPageContent(
     val isTextEmpty by remember { derivedStateOf { curText.isEmpty() } }
 
     viewModel.onEvent<ReplyUiEvent.ReplySuccess> {
+        isReplyCompleted = true
         if (it.expInc.isEmpty()) {
             context.toastShort(R.string.toast_reply_success_default)
         } else {

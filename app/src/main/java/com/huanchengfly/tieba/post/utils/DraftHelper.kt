@@ -3,11 +3,23 @@ package com.huanchengfly.tieba.post.utils
 import com.huanchengfly.tieba.post.models.DraftModel
 import com.huanchengfly.tieba.post.models.database.Draft
 import com.huanchengfly.tieba.post.toMD5
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.litepal.LitePal
+import java.util.concurrent.ConcurrentHashMap
 
 object DraftHelper {
+
+    internal const val OUTBOX_HASH_PREFIX = "outbox_"
+
+    private val draftScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val draftMutex = Mutex()
+    private val memoryCache = ConcurrentHashMap<String, DraftModel>()
 
     /**
      * Compute a user-scoped draft hash to isolate drafts across different accounts.
@@ -35,7 +47,7 @@ object DraftHelper {
 
     /**
      * Asynchronously loads a structured draft model (text + images + settings).
-     * Queries user-scoped draft first, falling back to legacy unscoped draft if not found.
+     * Queries L1 memory cache first, then user-scoped draft, falling back to legacy unscoped draft.
      */
     suspend fun loadDraftModel(
         accountUid: String?,
@@ -43,28 +55,35 @@ object DraftHelper {
         postId: Long? = null,
         subPostId: Long? = null
     ): DraftModel? = withContext(Dispatchers.IO) {
-        val userHash = getDraftHash(accountUid, threadId, postId, subPostId)
-        val userDraft = LitePal.where("hash = ?", userHash).findFirst(Draft::class.java)
-        if (userDraft != null && userDraft.content.isNotBlank()) {
-            val model = DraftModel.deserialize(userDraft.content)
-            if (!model.isBlank()) {
-                return@withContext model
+        draftMutex.withLock {
+            val userHash = getDraftHash(accountUid, threadId, postId, subPostId)
+            memoryCache[userHash]?.let { cached ->
+                if (!cached.isBlank()) return@withLock cached
             }
-        }
 
-        // Fallback to legacy draft
-        val legacyHash = getLegacyDraftHash(threadId, postId, subPostId)
-        val legacyDraft = LitePal.where("hash = ?", legacyHash).findFirst(Draft::class.java)
-        if (legacyDraft != null && legacyDraft.content.isNotBlank()) {
-            val model = DraftModel.deserialize(legacyDraft.content)
-            if (!model.isBlank()) {
-                // Upgrade legacy draft to user-scoped draft and clean up legacy
-                saveDraft(accountUid, threadId, postId, subPostId, model)
-                LitePal.deleteAll(Draft::class.java, "hash = ?", legacyHash)
-                return@withContext model
+            val userDraft = LitePal.where("hash = ?", userHash).findFirst(Draft::class.java)
+            if (userDraft != null && userDraft.content.isNotBlank()) {
+                val model = DraftModel.deserialize(userDraft.content)
+                if (!model.isBlank()) {
+                    memoryCache[userHash] = model
+                    return@withLock model
+                }
             }
+
+            // Fallback to legacy draft
+            val legacyHash = getLegacyDraftHash(threadId, postId, subPostId)
+            val legacyDraft = LitePal.where("hash = ?", legacyHash).findFirst(Draft::class.java)
+            if (legacyDraft != null && legacyDraft.content.isNotBlank()) {
+                val model = DraftModel.deserialize(legacyDraft.content)
+                if (!model.isBlank()) {
+                    Draft(userHash, model.serialize()).saveOrUpdate("hash = ?", userHash)
+                    LitePal.deleteAll(Draft::class.java, "hash = ?", legacyHash)
+                    memoryCache[userHash] = model
+                    return@withLock model
+                }
+            }
+            null
         }
-        null
     }
 
     /**
@@ -80,7 +99,7 @@ object DraftHelper {
 
     /**
      * Save structured rich draft if content is non-blank, or delete draft entry if content is blank.
-     * Prevents database bloat from empty draft rows.
+     * Serialized via [draftMutex] and deduplicated against L1 cache to avoid redundant SQLite writes.
      */
     suspend fun saveDraft(
         accountUid: String?,
@@ -89,10 +108,48 @@ object DraftHelper {
         subPostId: Long? = null,
         draft: DraftModel
     ) = withContext(Dispatchers.IO) {
+        draftMutex.withLock {
+            saveDraftLocked(accountUid, threadId, postId, subPostId, draft)
+        }
+    }
+
+    /**
+     * Supervised fire-and-forget variant for Compose DisposableEffect.onDispose.
+     * Ordered behind any in-flight clearDraft/saveDraft via [draftMutex].
+     */
+    fun saveDraftAsync(
+        accountUid: String?,
+        threadId: Long,
+        postId: Long? = null,
+        subPostId: Long? = null,
+        draft: DraftModel
+    ) {
+        draftScope.launch {
+            runCatching {
+                draftMutex.withLock {
+                    saveDraftLocked(accountUid, threadId, postId, subPostId, draft)
+                }
+            }
+        }
+    }
+
+    private fun saveDraftLocked(
+        accountUid: String?,
+        threadId: Long,
+        postId: Long?,
+        subPostId: Long?,
+        draft: DraftModel
+    ) {
         val userHash = getDraftHash(accountUid, threadId, postId, subPostId)
         if (!draft.isBlank()) {
+            val cached = memoryCache[userHash]
+            if (cached != null && cached.hasSameContent(draft)) {
+                return
+            }
             Draft(userHash, draft.serialize()).saveOrUpdate("hash = ?", userHash)
+            memoryCache[userHash] = draft
         } else {
+            memoryCache.remove(userHash)
             LitePal.deleteAll(Draft::class.java, "hash = ?", userHash)
         }
     }
@@ -117,9 +174,12 @@ object DraftHelper {
         postId: Long? = null,
         subPostId: Long? = null
     ) = withContext(Dispatchers.IO) {
-        val userHash = getDraftHash(accountUid, threadId, postId, subPostId)
-        val legacyHash = getLegacyDraftHash(threadId, postId, subPostId)
-        LitePal.deleteAll(Draft::class.java, "hash = ? or hash = ?", userHash, legacyHash)
+        draftMutex.withLock {
+            val userHash = getDraftHash(accountUid, threadId, postId, subPostId)
+            val legacyHash = getLegacyDraftHash(threadId, postId, subPostId)
+            memoryCache.remove(userHash)
+            LitePal.deleteAll(Draft::class.java, "hash = ? or hash = ?", userHash, legacyHash)
+        }
     }
 
     /**
@@ -131,26 +191,33 @@ object DraftHelper {
         postId: Long? = null,
         subPostId: Long? = null
     ): Boolean = withContext(Dispatchers.IO) {
-        val userHash = getDraftHash(accountUid, threadId, postId, subPostId)
-        if (LitePal.where("hash = ?", userHash).count(Draft::class.java) > 0) return@withContext true
-        val legacyHash = getLegacyDraftHash(threadId, postId, subPostId)
-        LitePal.where("hash = ?", legacyHash).count(Draft::class.java) > 0
+        draftMutex.withLock {
+            val userHash = getDraftHash(accountUid, threadId, postId, subPostId)
+            if (memoryCache[userHash]?.isBlank() == false) return@withLock true
+            if (LitePal.where("hash = ?", userHash).count(Draft::class.java) > 0) return@withLock true
+            val legacyHash = getLegacyDraftHash(threadId, postId, subPostId)
+            LitePal.where("hash = ?", legacyHash).count(Draft::class.java) > 0
+        }
     }
 
     /**
      * Purges expired drafts older than [maxAgeDays] to keep SQLite storage clean and compact.
      */
     suspend fun cleanExpiredDrafts(maxAgeDays: Int = 30): Int = withContext(Dispatchers.IO) {
-        val cutoff = System.currentTimeMillis() - maxAgeDays * 24L * 60 * 60 * 1000
-        val allDrafts = LitePal.findAll(Draft::class.java) ?: emptyList()
-        var deletedCount = 0
-        allDrafts.forEach { draft ->
-            val model = DraftModel.deserialize(draft.content)
-            if (model.isBlank() || (model.updateTimestamp in 1 until cutoff)) {
-                LitePal.deleteAll(Draft::class.java, "hash = ?", draft.hash)
-                deletedCount++
+        draftMutex.withLock {
+            val cutoff = System.currentTimeMillis() - maxAgeDays * 24L * 60 * 60 * 1000
+            val allDrafts = LitePal.findAll(Draft::class.java) ?: emptyList()
+            var deletedCount = 0
+            allDrafts.forEach { draft ->
+                if (draft.hash.startsWith(OUTBOX_HASH_PREFIX)) return@forEach
+                val model = DraftModel.deserialize(draft.content)
+                if (model.isBlank() || (model.updateTimestamp in 1 until cutoff)) {
+                    memoryCache.remove(draft.hash)
+                    LitePal.deleteAll(Draft::class.java, "hash = ?", draft.hash)
+                    deletedCount++
+                }
             }
+            deletedCount
         }
-        deletedCount
     }
 }

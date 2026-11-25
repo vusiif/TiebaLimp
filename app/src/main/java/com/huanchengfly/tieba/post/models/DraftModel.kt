@@ -22,6 +22,15 @@ data class DraftModel(
     fun isBlank(): Boolean = text.isBlank() && imageUris.isEmpty()
 
     /**
+     * True if user-editable content matches [other], ignoring [updateTimestamp].
+     */
+    fun hasSameContent(other: DraftModel): Boolean {
+        return text == other.text &&
+            imageUris == other.imageUris &&
+            isOriginImage == other.isOriginImage
+    }
+
+    /**
      * Serialize to JSON string for persistent database storage.
      */
     fun serialize(): String {

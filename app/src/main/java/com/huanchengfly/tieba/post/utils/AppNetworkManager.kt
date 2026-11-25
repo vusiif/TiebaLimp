@@ -48,6 +48,7 @@ object AppNetworkManager {
                             // Prewarm DNS and HTTP/2 sockets over the newly available network
                             TiebaDns.prewarm()
                             RetrofitTiebaApi.warmupConnections()
+                            ReplyOutboxCoordinator.flushPendingRepliesAsync()
                         }
                     }
 

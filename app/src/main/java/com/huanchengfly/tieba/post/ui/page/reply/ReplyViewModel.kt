@@ -19,8 +19,13 @@ import com.huanchengfly.tieba.post.arch.UiIntent
 import com.huanchengfly.tieba.post.arch.UiState
 import com.huanchengfly.tieba.post.components.ImageUploader
 import com.huanchengfly.tieba.post.repository.AddPostRepository
+import com.huanchengfly.tieba.post.utils.AccountUtil
 import com.huanchengfly.tieba.post.utils.FileUtil
+import com.huanchengfly.tieba.post.utils.PendingReplyItem
+import com.huanchengfly.tieba.post.utils.ReplyOutboxCoordinator
+import com.huanchengfly.tieba.post.utils.ReplyOutboxManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.util.UUID
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
@@ -113,6 +118,12 @@ class ReplyViewModel @Inject constructor() :
                 )
                 .map<AddPostResponse, ReplyPartialChange.Send> {
                     if (it.data_ == null) throw TiebaUnknownException
+                    ReplyOutboxCoordinator.removeByTarget(
+                        AccountUtil.getUid(),
+                        threadId,
+                        postId,
+                        subPostId
+                    )
                     ReplyPartialChange.Send.Success(
                         threadId = it.data_.tid,
                         postId = it.data_.pid,
@@ -123,6 +134,23 @@ class ReplyViewModel @Inject constructor() :
                 .catch {
                     Log.i("ReplyViewModel", "failure: ${it.message}")
                     it.printStackTrace()
+                    if (ReplyOutboxManager.isTransientNetworkError(it) && !tbs.isNullOrBlank()) {
+                        ReplyOutboxCoordinator.enqueue(
+                            PendingReplyItem(
+                                id = UUID.randomUUID().toString(),
+                                accountUid = AccountUtil.getUid(),
+                                content = content,
+                                forumId = forumId,
+                                forumName = forumName,
+                                threadId = threadId,
+                                tbs = tbs,
+                                postId = postId,
+                                subPostId = subPostId,
+                                replyUserId = replyUserId,
+                                lastError = it.message
+                            )
+                        )
+                    }
                     emit(ReplyPartialChange.Send.Failure(it.getErrorCode(), it.getErrorMessage()))
                 }
         }

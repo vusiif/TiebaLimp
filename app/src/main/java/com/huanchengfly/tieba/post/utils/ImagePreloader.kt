@@ -29,6 +29,30 @@ val Media.url: String
 val ImmutableHolder<Media>.url: String
     get() = get { url }
 
+/**
+ * Computes effective image preload depth based on live network quality,
+ * Data Saver mode, and current JVM/system memory pressure.
+ */
+object AdaptivePreloadPolicy {
+    fun effectivePreloadAhead(
+        requestedAhead: Int,
+        isConnected: Boolean,
+        isUnmeteredWifi: Boolean,
+        isDataSaverEnabled: Boolean,
+        memoryPressureLevel: Int,
+    ): Int {
+        if (requestedAhead <= 0 || !isConnected || isDataSaverEnabled) return 0
+        if (memoryPressureLevel >= AppMemoryManager.PRESSURE_CRITICAL) return 0
+        if (memoryPressureLevel >= AppMemoryManager.PRESSURE_MODERATE) {
+            return requestedAhead.coerceAtMost(1)
+        }
+        if (!isUnmeteredWifi) {
+            return requestedAhead.coerceAtMost(2)
+        }
+        return requestedAhead
+    }
+}
+
 object ImagePreloader {
     private const val MAX_PRELOAD_DEDUP_SIZE = 128
 
@@ -49,7 +73,7 @@ object ImagePreloader {
 
     fun preload(context: Context, url: String?) {
         if (url.isNullOrBlank()) return
-        if (!shouldLoadImage(context, false)) return
+        if (!AppNetworkManager.isConnected || !shouldLoadImage(context, false)) return
         if (!preloadedUrls.add(url)) {
             // Already preloaded recently, avoid redundant network/disk dispatch
             return
@@ -72,14 +96,26 @@ object ImagePreloader {
     }
 }
 
+private fun <T> preloadRange(
+    start: Int,
+    end: Int,
+    items: List<T>,
+    itemOffset: Int,
+    extractUrls: (T) -> List<String>,
+    context: Context,
+) {
+    if (start > end) return
+    for (i in start..end) {
+        val dataIndex = i - itemOffset
+        if (dataIndex in items.indices) {
+            ImagePreloader.preload(context, extractUrls(items[dataIndex]))
+        }
+    }
+}
+
 /**
- * Automatically preloads image URLs ahead of LazyColumn scrolling to eliminate white image flashes.
- *
- * @param state The [LazyListState] of the list.
- * @param items The backing list of data items.
- * @param preloadAhead Number of items ahead of visible bounds to preload.
- * @param itemOffset Offset index of items if leading headers/decorations exist before [items].
- * @param extractUrls Function that extracts a list of image URLs from an item of type [T].
+ * Automatically preloads image URLs ahead of LazyColumn scrolling to eliminate white image flashes,
+ * adapting lookahead depth to network state and memory pressure.
  */
 @Composable
 fun <T> LazyListImagePreloadEffect(
@@ -106,30 +142,23 @@ fun <T> LazyListImagePreloadEffect(
                 val isScrollingDown = lastIndex >= lastVisibleIndex
                 lastVisibleIndex = lastIndex
 
+                val effectiveAhead = AdaptivePreloadPolicy.effectivePreloadAhead(
+                    requestedAhead = preloadAhead,
+                    isConnected = AppNetworkManager.isConnected,
+                    isUnmeteredWifi = NetworkUtil.isUnmeteredWifi(context),
+                    isDataSaverEnabled = NetworkUtil.isDataSaverEnabled(context),
+                    memoryPressureLevel = AppMemoryManager.refreshMemoryPressureLevel()
+                )
+                if (effectiveAhead <= 0) return@collect
+
                 if (isScrollingDown) {
                     val start = (lastIndex + 1).coerceAtMost(totalCount - 1)
-                    val end = (lastIndex + preloadAhead).coerceAtMost(totalCount - 1)
-                    if (start <= end) {
-                        for (i in start..end) {
-                            val dataIndex = i - itemOffset
-                            if (dataIndex in items.indices) {
-                                val urls = extractUrls(items[dataIndex])
-                                ImagePreloader.preload(context, urls)
-                            }
-                        }
-                    }
+                    val end = (lastIndex + effectiveAhead).coerceAtMost(totalCount - 1)
+                    preloadRange(start, end, items, itemOffset, extractUrls, context)
                 } else {
-                    val start = (firstIndex - preloadAhead).coerceAtLeast(0)
+                    val start = (firstIndex - effectiveAhead).coerceAtLeast(0)
                     val end = (firstIndex - 1).coerceAtLeast(0)
-                    if (start <= end) {
-                        for (i in start..end) {
-                            val dataIndex = i - itemOffset
-                            if (dataIndex in items.indices) {
-                                val urls = extractUrls(items[dataIndex])
-                                ImagePreloader.preload(context, urls)
-                            }
-                        }
-                    }
+                    preloadRange(start, end, items, itemOffset, extractUrls, context)
                 }
             }
     }

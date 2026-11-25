@@ -1,6 +1,7 @@
 package com.huanchengfly.tieba.post
 
 import android.content.ComponentCallbacks2
+import com.huanchengfly.tieba.post.utils.AdaptivePreloadPolicy
 import com.huanchengfly.tieba.post.utils.AppMemoryManager
 import com.huanchengfly.tieba.post.utils.ImagePreloader
 import org.junit.After
@@ -111,5 +112,75 @@ class ImagePipelineOptimizationTest {
 
         // Massive 200.dp avatar: clamped to maximum 384px (preventing megapixel buffer OOM)
         assertEquals(384, computeTargetPx(200f, 3f))
+    }
+
+    @Test
+    fun testAdaptivePreloadPolicyThrottling() {
+        assertEquals(
+            5,
+            AdaptivePreloadPolicy.effectivePreloadAhead(
+                requestedAhead = 5,
+                isConnected = true,
+                isUnmeteredWifi = true,
+                isDataSaverEnabled = false,
+                memoryPressureLevel = AppMemoryManager.PRESSURE_NORMAL
+            )
+        )
+        assertEquals(
+            2,
+            AdaptivePreloadPolicy.effectivePreloadAhead(
+                requestedAhead = 5,
+                isConnected = true,
+                isUnmeteredWifi = false,
+                isDataSaverEnabled = false,
+                memoryPressureLevel = AppMemoryManager.PRESSURE_NORMAL
+            )
+        )
+        assertEquals(
+            1,
+            AdaptivePreloadPolicy.effectivePreloadAhead(
+                requestedAhead = 5,
+                isConnected = true,
+                isUnmeteredWifi = true,
+                isDataSaverEnabled = false,
+                memoryPressureLevel = AppMemoryManager.PRESSURE_MODERATE
+            )
+        )
+        assertEquals(
+            0,
+            AdaptivePreloadPolicy.effectivePreloadAhead(
+                requestedAhead = 5,
+                isConnected = true,
+                isUnmeteredWifi = true,
+                isDataSaverEnabled = false,
+                memoryPressureLevel = AppMemoryManager.PRESSURE_CRITICAL
+            )
+        )
+        assertEquals(
+            0,
+            AdaptivePreloadPolicy.effectivePreloadAhead(
+                requestedAhead = 5,
+                isConnected = false,
+                isUnmeteredWifi = true,
+                isDataSaverEnabled = false,
+                memoryPressureLevel = AppMemoryManager.PRESSURE_NORMAL
+            )
+        )
+        assertEquals(
+            0,
+            AdaptivePreloadPolicy.effectivePreloadAhead(
+                requestedAhead = 5,
+                isConnected = true,
+                isUnmeteredWifi = true,
+                isDataSaverEnabled = true,
+                memoryPressureLevel = AppMemoryManager.PRESSURE_NORMAL
+            )
+        )
+    }
+
+    @Test
+    fun testMemoryPressureRefresh() {
+        val level = AppMemoryManager.refreshMemoryPressureLevel()
+        assertTrue(level in AppMemoryManager.PRESSURE_NORMAL..AppMemoryManager.PRESSURE_CRITICAL)
     }
 }

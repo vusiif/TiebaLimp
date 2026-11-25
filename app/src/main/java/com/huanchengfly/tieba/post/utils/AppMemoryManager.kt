@@ -19,6 +19,14 @@ import com.huanchengfly.tieba.post.ui.widgets.compose.video.MediaPlaybackCoordin
 object AppMemoryManager {
     private const val TAG = "AppMemoryManager"
 
+    const val PRESSURE_NORMAL = 0
+    const val PRESSURE_MODERATE = 1
+    const val PRESSURE_CRITICAL = 2
+
+    @Volatile
+    var memoryPressureLevel: Int = PRESSURE_NORMAL
+        private set
+
     data class MemorySnapshot(
         val usedHeapBytes: Long,
         val totalHeapBytes: Long,
@@ -40,11 +48,13 @@ object AppMemoryManager {
             when {
                 level >= ComponentCallbacks2.TRIM_MEMORY_COMPLETE -> {
                     // Critical memory pressure: purge all dispensable in-memory caches
+                    memoryPressureLevel = PRESSURE_CRITICAL
                     purgeAllCaches(context)
                 }
                 level >= ComponentCallbacks2.TRIM_MEMORY_MODERATE ||
                 level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL -> {
                     // Severe pressure: trim image caches and clear transient text/date pools
+                    memoryPressureLevel = PRESSURE_CRITICAL
                     trimImageCaches(context, level)
                     purgeTransientCaches()
                     runCatching { MediaPlaybackCoordinator.pauseAll() }
@@ -52,6 +62,7 @@ object AppMemoryManager {
                 level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN ||
                 level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND -> {
                     // UI moved to background: evict drawables, transient caches, pause media and truncate WAL to avoid LMK kill
+                    memoryPressureLevel = PRESSURE_MODERATE
                     trimImageCaches(context, level)
                     purgeTransientCaches()
                     runCatching { MediaPlaybackCoordinator.pauseAll() }
@@ -59,6 +70,7 @@ object AppMemoryManager {
                 }
                 else -> {
                     // Running moderate or running low
+                    memoryPressureLevel = PRESSURE_MODERATE
                     trimImageCaches(context, level)
                 }
             }
@@ -74,10 +86,28 @@ object AppMemoryManager {
     fun onLowMemory(context: Context?) {
         if (context == null) return
         try {
+            memoryPressureLevel = PRESSURE_CRITICAL
             purgeAllCaches(context)
         } catch (t: Throwable) {
             Log.w(TAG, "Exception during onLowMemory", t)
         }
+    }
+
+    @JvmStatic
+    fun isHeapPressureHigh(thresholdPercent: Double = 85.0): Boolean {
+        val snapshot = getMemorySnapshot(null)
+        return snapshot.heapUsagePercentage >= thresholdPercent
+    }
+
+    @JvmStatic
+    fun refreshMemoryPressureLevel(): Int {
+        val snapshot = getMemorySnapshot(null)
+        memoryPressureLevel = when {
+            snapshot.heapUsagePercentage >= 85.0 -> PRESSURE_CRITICAL
+            snapshot.heapUsagePercentage >= 75.0 -> PRESSURE_MODERATE
+            else -> PRESSURE_NORMAL
+        }
+        return memoryPressureLevel
     }
 
     private fun trimImageCaches(context: Context, level: Int) {

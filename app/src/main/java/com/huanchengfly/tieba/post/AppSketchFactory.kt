@@ -24,7 +24,8 @@ import java.util.concurrent.TimeUnit
  */
 object AppSketchFactory {
     fun createSketch(context: Context): Sketch {
-        val isLowRam = (context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager)?.isLowRamDevice == true
+        val isLowRam = (context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager)?.isLowRamDevice == true ||
+            Runtime.getRuntime().maxMemory() <= 128L * 1024 * 1024
         val sketchHttpClient = RetrofitTiebaApi.baseOkHttpClient.newBuilder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(20, TimeUnit.SECONDS)

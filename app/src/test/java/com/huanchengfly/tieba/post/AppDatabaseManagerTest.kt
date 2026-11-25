@@ -1,6 +1,9 @@
 package com.huanchengfly.tieba.post
 
 import com.huanchengfly.tieba.post.utils.AppDatabaseManager
+import com.huanchengfly.tieba.post.utils.DatabaseMaintenanceCoordinator
+import com.huanchengfly.tieba.post.utils.DatabaseMaintenancePolicy
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -85,5 +88,34 @@ class AppDatabaseManagerTest {
         // Asynchronous scheduled checkpoint must not throw on null database
         AppDatabaseManager.scheduleCheckpoint(delayMillis = 10L, mode = AppDatabaseManager.CheckpointMode.TRUNCATE)
         AppDatabaseManager.scheduleCheckpoint(delayMillis = 10L, mode = AppDatabaseManager.CheckpointMode.PASSIVE)
+    }
+
+    @Test
+    fun testDatabaseMaintenancePolicyAndNullSafety() = runBlocking {
+        val now = 10_000_000_000L
+        assertTrue(DatabaseMaintenancePolicy.isMaintenanceDue(0L, now))
+        assertFalse(
+            DatabaseMaintenancePolicy.isMaintenanceDue(
+                lastRunMs = now - 60_000L,
+                nowMs = now
+            )
+        )
+        assertTrue(
+            DatabaseMaintenancePolicy.isMaintenanceDue(
+                lastRunMs = now - DatabaseMaintenancePolicy.MAINTENANCE_INTERVAL_MS - 1L,
+                nowMs = now
+            )
+        )
+
+        val cutoff = DatabaseMaintenancePolicy.computeCutoffTimestamp(now, 90)
+        assertEquals(now - 90L * 24L * 60L * 60L * 1000L, cutoff)
+
+        val sql = DatabaseMaintenancePolicy.buildRowCapDeleteSql("history", 2000)
+        assertTrue(sql.startsWith("DELETE FROM history WHERE id NOT IN"))
+        assertTrue(sql.contains("LIMIT 2000"))
+
+        val report = DatabaseMaintenanceCoordinator.runMaintenanceIfDue(null)
+        assertFalse(report.ranSuccessfully)
+        DatabaseMaintenanceCoordinator.runMaintenanceIfDueAsync(null)
     }
 }

@@ -8,6 +8,7 @@ import com.github.panpf.sketch.sketch
 import com.huanchengfly.tieba.post.AppThemeDelegate
 import com.huanchengfly.tieba.post.api.retrofit.TiebaDns
 import com.huanchengfly.tieba.post.ui.common.theme.compose.clearThemeColorsCache
+import com.huanchengfly.tieba.post.ui.page.thread.ThreadScrollAnchorRegistry
 import com.huanchengfly.tieba.post.ui.page.webview.WebResourceInterceptor
 import com.huanchengfly.tieba.post.ui.widgets.compose.video.MediaPlaybackCoordinator
 
@@ -140,6 +141,7 @@ object AppMemoryManager {
         runCatching { AppDatabaseManager.checkpoint(mode = AppDatabaseManager.CheckpointMode.TRUNCATE) }
         runCatching { AppNetworkManager.evictIdleConnections() }
         runCatching { WebResourceInterceptor.clearCache() }
+        runCatching { ThreadScrollAnchorRegistry.clear() }
     }
 
     /**

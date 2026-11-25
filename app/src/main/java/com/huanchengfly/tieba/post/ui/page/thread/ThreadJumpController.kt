@@ -42,6 +42,13 @@ class ThreadJumpController(
     var currentHitIndex by mutableIntStateOf(0)
     var highlightedFloor by mutableIntStateOf(-1)
 
+    private fun scrollToDataIndex(indexInData: Int) {
+        coroutineScope.launch {
+            val baseOffset = 2 + (if (hasPrevious()) 1 else 0)
+            lazyListState.animateScrollToItem(baseOffset + indexInData)
+        }
+    }
+
     fun onJumpToFloor(targetFloor: Int) {
         highlightedFloor = targetFloor
         if (targetFloor <= 1) {
@@ -50,12 +57,9 @@ class ThreadJumpController(
             }
         } else {
             val data = getPostsData()
-            val indexInData = data.indexOfFirst { it.post.get { floor } == targetFloor }
+            val indexInData = data.indexOfFirst { it.floor == targetFloor }
             if (indexInData != -1) {
-                coroutineScope.launch {
-                    val baseOffset = 2 + (if (hasPrevious()) 1 else 0)
-                    lazyListState.animateScrollToItem(baseOffset + indexInData)
-                }
+                scrollToDataIndex(indexInData)
             } else {
                 pendingScrollToFloor = targetFloor
                 val targetPage = maxOf((targetFloor - 1) / 30 + 1, 1)
@@ -80,12 +84,9 @@ class ThreadJumpController(
             }
         } else {
             val data = getPostsData()
-            val indexInData = data.indexOfFirst { it.post.get { floor } == hit.floor || it.post.get { id } == hit.postId }
+            val indexInData = data.indexOfFirst { it.floor == hit.floor || it.id == hit.postId }
             if (indexInData != -1) {
-                coroutineScope.launch {
-                    val baseOffset = 2 + (if (hasPrevious()) 1 else 0)
-                    lazyListState.animateScrollToItem(baseOffset + indexInData)
-                }
+                scrollToDataIndex(indexInData)
             } else {
                 pendingScrollToPostId = hit.postId
                 viewModel.send(
@@ -109,12 +110,9 @@ class ThreadJumpController(
             readingProgressState.dismiss()
             if (targetPid > 0L) {
                 val data = getPostsData()
-                val indexInData = data.indexOfFirst { it.post.get { id } == targetPid }
+                val indexInData = data.indexOfFirst { it.id == targetPid }
                 if (indexInData != -1) {
-                    coroutineScope.launch {
-                        val baseOffset = 2 + (if (hasPrevious()) 1 else 0)
-                        lazyListState.animateScrollToItem(baseOffset + indexInData)
-                    }
+                    scrollToDataIndex(indexInData)
                 } else {
                     pendingScrollToPostId = targetPid
                     viewModel.send(
@@ -143,12 +141,9 @@ class ThreadJumpController(
             onToast("1")
         } else if (targetPid > 0L) {
             val data = getPostsData()
-            val indexInData = data.indexOfFirst { it.post.get { id } == targetPid }
+            val indexInData = data.indexOfFirst { it.id == targetPid }
             if (indexInData != -1) {
-                coroutineScope.launch {
-                    val baseOffset = 2 + (if (hasPrevious()) 1 else 0)
-                    lazyListState.animateScrollToItem(baseOffset + indexInData)
-                }
+                scrollToDataIndex(indexInData)
             } else {
                 pendingScrollToPostId = targetPid
                 viewModel.send(
@@ -208,7 +203,7 @@ fun rememberThreadJumpController(
 
     LaunchedEffect(data, controller.pendingScrollToPostId) {
         val targetId = controller.pendingScrollToPostId ?: return@LaunchedEffect
-        val indexInData = data.indexOfFirst { it.post.get { id } == targetId }
+        val indexInData = data.indexOfFirst { it.id == targetId }
         if (indexInData != -1) {
             controller.pendingScrollToPostId = null
             val baseOffset = 2 + (if (hasPrevious) 1 else 0)
@@ -222,13 +217,13 @@ fun rememberThreadJumpController(
             controller.pendingScrollToFloor = null
             lazyListState.animateScrollToItem(0)
         } else {
-            val indexInData = data.indexOfFirst { it.post.get { floor } == targetFloor }
+            val indexInData = data.indexOfFirst { it.floor == targetFloor }
             if (indexInData != -1) {
                 controller.pendingScrollToFloor = null
                 val baseOffset = 2 + (if (hasPrevious) 1 else 0)
                 lazyListState.animateScrollToItem(baseOffset + indexInData)
             } else if (data.isNotEmpty()) {
-                val closestIndex = data.indices.minByOrNull { kotlin.math.abs(data[it].post.get { floor } - targetFloor) }
+                val closestIndex = data.indices.minByOrNull { kotlin.math.abs(data[it].floor - targetFloor) }
                 if (closestIndex != null) {
                     controller.pendingScrollToFloor = null
                     val baseOffset = 2 + (if (hasPrevious) 1 else 0)

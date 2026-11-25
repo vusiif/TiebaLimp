@@ -228,25 +228,40 @@ fun ThreadPage(
         initialValue = ModalBottomSheetValue.Hidden,
         skipHalfExpanded = true
     )
-    val lastVisibilityPost by remember {
+    val lastVisibilityPostItem by remember {
         derivedStateOf {
-            data.firstOrNull { (post) ->
-                val lastPostKey = lazyListState.layoutInfo.visibleItemsInfo.lastOrNull { info ->
-                    info.key is String && (info.key as String).startsWith("Post_")
-                }?.key as String?
-                lastPostKey?.endsWith(post.get { id }.toString()) == true
-            }?.post ?: firstPost
+            val lastVisibleId = lazyListState.layoutInfo.visibleItemsInfo
+                .lastOrNull { info -> info.key is Long }
+                ?.key as? Long
+            if (lastVisibleId != null) {
+                data.firstOrNull { it.id == lastVisibleId }
+            } else {
+                null
+            }
         }
     }
+    val lastVisibilityPost by remember {
+        derivedStateOf { lastVisibilityPostItem?.post ?: firstPost }
+    }
     val lastVisibilityPostId by remember {
-        derivedStateOf { lastVisibilityPost?.get { id } ?: 0L }
+        derivedStateOf { lastVisibilityPostItem?.id ?: firstPost?.get { id } ?: 0L }
     }
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
 
     val lastVisibilityFloor by remember {
-        derivedStateOf { lastVisibilityPost?.get { floor } ?: 0 }
+        derivedStateOf { lastVisibilityPostItem?.floor ?: firstPost?.get { floor } ?: 0 }
     }
+
+    ThreadScrollAnchorEffect(
+        lazyListState = lazyListState,
+        data = data,
+        hasPrevious = hasPrevious,
+        threadId = threadId,
+        isSeeLz = isSeeLz,
+        sortType = curSortType,
+        disableAutoRestore = postId != 0L || scrollToReply
+    )
     val readingProgressState = rememberThreadReadingProgress(
         threadId = threadId,
         postId = postId,
@@ -317,7 +332,7 @@ fun ThreadPage(
         coroutineScope = coroutineScope,
     )
 
-    val totalFloorCount = thread?.get { replyNum } ?: (data.lastOrNull()?.post?.get { floor } ?: 1)
+    val totalFloorCount = thread?.get { replyNum } ?: (data.lastOrNull()?.floor ?: 1)
 
     ThreadPageDialogContainer(
         dialogController = dialogController,

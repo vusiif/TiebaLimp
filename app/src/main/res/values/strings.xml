@@ -655,4 +655,13 @@
     <string name="toast_outbox_retry_none">暂无可发送的回帖，请检查网络连接</string>
     <string name="text_outbox_retry_count">已重试 %1$d/%2$d 次</string>
     <string name="text_outbox_forum_format">%1$s吧 · 贴子 %2$d</string>
+    <string name="title_db_maintenance">数据库优化与压缩</string>
+    <string name="summary_db_maintenance">体积 %1$s · 浏览 %2$d 条 · 草稿/队列 %3$d 条%4$s</string>
+    <string name="toast_db_maintenance_done">数据库优化完成，已清理 %d 条过期数据</string>
+    <string name="title_memory_diagnostics">实时内存诊断</string>
+    <string name="summary_memory_diagnostics">堆内存 %1$s / %2$s (%3$.1f%%) · 状态：%4$s</string>
+    <string name="toast_memory_trimmed">已执行轻量内存缓存回收</string>
+    <string name="memory_pressure_normal">充裕</string>
+    <string name="memory_pressure_moderate">中等</string>
+    <string name="memory_pressure_critical">吃紧</string>
 </resources>

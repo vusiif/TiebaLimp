@@ -118,4 +118,17 @@ class AppDatabaseManagerTest {
         assertFalse(report.ranSuccessfully)
         DatabaseMaintenanceCoordinator.runMaintenanceIfDueAsync(null)
     }
+
+    @Test
+    fun testFormatBytesAndNullStats() = runBlocking {
+        assertEquals("0 B", AppDatabaseManager.formatBytes(0L))
+        assertEquals("512 B", AppDatabaseManager.formatBytes(512L))
+        assertEquals("1.5 KB", AppDatabaseManager.formatBytes(1536L))
+        assertEquals("2.00 MB", AppDatabaseManager.formatBytes(2L * 1024L * 1024L))
+
+        val stats = AppDatabaseManager.getDatabaseStats(null)
+        assertEquals(0, stats.historyCount)
+        assertEquals(0, stats.draftCount)
+        assertEquals(0L, stats.dbFileSizeBytes)
+    }
 }

@@ -1,5 +1,6 @@
 package com.huanchengfly.tieba.post.ui.page.settings.more
 
+import android.content.ComponentCallbacks2
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.ExperimentalMaterialApi
@@ -8,7 +9,9 @@ import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.OfflineBolt
+import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -39,12 +42,17 @@ import com.huanchengfly.tieba.post.ui.widgets.compose.LocalSnackbarHostState
 import com.huanchengfly.tieba.post.ui.widgets.compose.MyScaffold
 import com.huanchengfly.tieba.post.ui.widgets.compose.Sizes
 import com.huanchengfly.tieba.post.ui.widgets.compose.TitleCentredToolbar
+import com.huanchengfly.tieba.post.utils.AppDatabaseManager
+import com.huanchengfly.tieba.post.utils.AppMemoryManager
+import com.huanchengfly.tieba.post.utils.DatabaseMaintenanceCoordinator
+import com.huanchengfly.tieba.post.utils.DatabaseStats
 import com.huanchengfly.tieba.post.utils.ImageCacheUtil
 import com.huanchengfly.tieba.post.utils.appPreferences
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlin.concurrent.thread
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterialApi::class)
 @Destination
@@ -72,10 +80,13 @@ fun MoreSettingsPage(
         val snackbarHostState = LocalSnackbarHostState.current
         val context = LocalContext.current
         var cacheSize by remember { mutableStateOf("0.0B") }
+        var dbStats by remember { mutableStateOf(DatabaseStats()) }
+        var memorySnapshot by remember { mutableStateOf(AppMemoryManager.getMemorySnapshot(context)) }
+        var memoryPressure by remember { mutableStateOf(AppMemoryManager.refreshMemoryPressureLevel()) }
+
         LaunchedEffect(Unit) {
-            thread {
-                cacheSize = ImageCacheUtil.getCacheSize(context)
-            }
+            cacheSize = withContext(Dispatchers.IO) { ImageCacheUtil.getCacheSize(context) }
+            dbStats = AppDatabaseManager.getDatabaseStats(context)
         }
         PrefsScreen(
             dataStore = LocalContext.current.dataStore,
@@ -165,6 +176,78 @@ fun MoreSettingsPage(
                         }
                     },
                     summary = stringResource(id = R.string.tip_cache, cacheSize)
+                )
+            }
+            prefsItem {
+                val walSuffix = if (dbStats.walEnabled) " · WAL" else ""
+                TextPref(
+                    leadingIcon = {
+                        LeadingIcon {
+                            AvatarIcon(
+                                icon = Icons.Outlined.Storage,
+                                size = Sizes.Small,
+                                contentDescription = null,
+                            )
+                        }
+                    },
+                    enabled = true,
+                    title = stringResource(id = R.string.title_db_maintenance),
+                    onClick = {
+                        coroutineScope.launch {
+                            val report = withContext(Dispatchers.IO) {
+                                DatabaseMaintenanceCoordinator.runMaintenanceIfDue(context, force = true)
+                            }
+                            dbStats = AppDatabaseManager.getDatabaseStats(context)
+                            val purged = report.expiredDraftsDeleted + report.expiredHistoryDeleted + report.expiredSearchDeleted
+                            snackbarHostState.showSnackbar(
+                                context.getString(R.string.toast_db_maintenance_done, purged)
+                            )
+                        }
+                    },
+                    summary = stringResource(
+                        id = R.string.summary_db_maintenance,
+                        AppDatabaseManager.formatBytes(dbStats.dbFileSizeBytes),
+                        dbStats.historyCount,
+                        dbStats.draftCount,
+                        walSuffix
+                    )
+                )
+            }
+            prefsItem {
+                val pressureText = when (memoryPressure) {
+                    AppMemoryManager.PRESSURE_CRITICAL -> stringResource(id = R.string.memory_pressure_critical)
+                    AppMemoryManager.PRESSURE_MODERATE -> stringResource(id = R.string.memory_pressure_moderate)
+                    else -> stringResource(id = R.string.memory_pressure_normal)
+                }
+                TextPref(
+                    leadingIcon = {
+                        LeadingIcon {
+                            AvatarIcon(
+                                icon = Icons.Outlined.Memory,
+                                size = Sizes.Small,
+                                contentDescription = null,
+                            )
+                        }
+                    },
+                    enabled = true,
+                    title = stringResource(id = R.string.title_memory_diagnostics),
+                    onClick = {
+                        coroutineScope.launch {
+                            AppMemoryManager.trimMemory(context, ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW)
+                            memorySnapshot = AppMemoryManager.getMemorySnapshot(context)
+                            memoryPressure = AppMemoryManager.refreshMemoryPressureLevel()
+                            snackbarHostState.showSnackbar(
+                                context.getString(R.string.toast_memory_trimmed)
+                            )
+                        }
+                    },
+                    summary = stringResource(
+                        id = R.string.summary_memory_diagnostics,
+                        AppDatabaseManager.formatBytes(memorySnapshot.usedHeapBytes),
+                        AppDatabaseManager.formatBytes(memorySnapshot.maxHeapBytes),
+                        memorySnapshot.heapUsagePercentage,
+                        pressureText
+                    )
                 )
             }
             prefsItem {

@@ -5,13 +5,27 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.util.Log
 import androidx.annotation.WorkerThread
+import com.huanchengfly.tieba.post.models.database.Draft
+import com.huanchengfly.tieba.post.models.database.History
+import com.huanchengfly.tieba.post.models.database.SearchHistory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.litepal.LitePal
+import java.io.File
+import java.util.Locale
+
+data class DatabaseStats(
+    val historyCount: Int = 0,
+    val draftCount: Int = 0,
+    val searchCount: Int = 0,
+    val dbFileSizeBytes: Long = 0L,
+    val walEnabled: Boolean = false,
+)
 
 object AppDatabaseManager {
     private const val TAG = "AppDatabaseManager"
@@ -248,5 +262,35 @@ object AppDatabaseManager {
             val targetDb = db ?: runCatching { LitePal.getDatabase() }.getOrNull() ?: return false
             targetDb.isWriteAheadLoggingEnabled
         }.getOrDefault(false)
+    }
+
+    @JvmStatic
+    fun formatBytes(bytes: Long): String {
+        if (bytes <= 0L) return "0 B"
+        val kb = 1024.0
+        val mb = kb * 1024.0
+        return when {
+            bytes < kb -> "$bytes B"
+            bytes < mb -> String.format(Locale.US, "%.1f KB", bytes / kb)
+            else -> String.format(Locale.US, "%.2f MB", bytes / mb)
+        }
+    }
+
+    @JvmStatic
+    suspend fun getDatabaseStats(context: Context?): DatabaseStats = withContext(Dispatchers.IO) {
+        if (context == null) return@withContext DatabaseStats()
+        runCatching {
+            val db = runCatching { LitePal.getDatabase() }.getOrNull()
+            val dbPath = db?.path
+            val mainFileSize = if (!dbPath.isNullOrBlank()) File(dbPath).length() else 0L
+            val walFileSize = if (!dbPath.isNullOrBlank()) File("$dbPath-wal").length() else 0L
+            DatabaseStats(
+                historyCount = runCatching { LitePal.count(History::class.java) }.getOrDefault(0),
+                draftCount = runCatching { LitePal.count(Draft::class.java) }.getOrDefault(0),
+                searchCount = runCatching { LitePal.count(SearchHistory::class.java) }.getOrDefault(0),
+                dbFileSizeBytes = mainFileSize + walFileSize,
+                walEnabled = db?.isWriteAheadLoggingEnabled == true,
+            )
+        }.getOrDefault(DatabaseStats())
     }
 }

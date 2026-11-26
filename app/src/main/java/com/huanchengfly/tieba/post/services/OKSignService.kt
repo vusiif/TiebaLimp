@@ -1,12 +1,13 @@
 package com.huanchengfly.tieba.post.services
 
 import android.Manifest
-import android.app.IntentService
 import android.app.PendingIntent
+import android.app.Service
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
+import android.os.IBinder
 import android.util.Log
 import android.widget.Toast
 import androidx.core.app.ActivityCompat
@@ -27,13 +28,13 @@ import com.huanchengfly.tieba.post.utils.SingleAccountSigner
 import com.huanchengfly.tieba.post.utils.extension.addFlag
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.launch
 import kotlin.coroutines.CoroutineContext
 
-class OKSignService : IntentService(TAG), CoroutineScope, ProgressListener {
-    private var job: Job = Job()
+class OKSignService : Service(), CoroutineScope, ProgressListener {
+    private val job = SupervisorJob()
     override val coroutineContext: CoroutineContext
         get() = Dispatchers.Main + job
 
@@ -42,6 +43,8 @@ class OKSignService : IntentService(TAG), CoroutineScope, ProgressListener {
     private val notificationManager: NotificationManagerCompat by lazy {
         NotificationManagerCompat.from(this)
     }
+
+    override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.i(TAG, "onStartCommand")
@@ -67,27 +70,25 @@ class OKSignService : IntentService(TAG), CoroutineScope, ProgressListener {
                 false
             }
             if (!started) {
-                stopSelf()
+                stopSelf(startId)
                 return START_NOT_STICKY
             }
-        }
-        return super.onStartCommand(intent, flags, startId)
-    }
 
-    override fun onHandleIntent(intent: Intent?) {
-        Log.i(TAG, "onHandleWork")
-        if (intent?.action == ACTION_START_SIGN) {
             val loginInfo = AccountUtil.getLoginInfo()
             if (loginInfo != null) {
-                runBlocking {
-                    SingleAccountSigner(
-                        this@OKSignService,
-                        loginInfo
-                    )
-                        .apply {
-                            setProgressListener(this@OKSignService)
-                        }
-                        .start()
+                launch {
+                    try {
+                        SingleAccountSigner(
+                            this@OKSignService,
+                            loginInfo
+                        )
+                            .apply {
+                                setProgressListener(this@OKSignService)
+                            }
+                            .start()
+                    } finally {
+                        stopSelf(startId)
+                    }
                 }
             } else {
                 updateNotification(
@@ -97,12 +98,15 @@ class OKSignService : IntentService(TAG), CoroutineScope, ProgressListener {
                 runCatching {
                     ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_DETACH)
                 }
+                stopSelf(startId)
             }
         } else {
             runCatching {
                 ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
             }
+            stopSelf(startId)
         }
+        return START_NOT_STICKY
     }
 
     private fun hasNotificationPermission(): Boolean {

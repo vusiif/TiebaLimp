@@ -13,6 +13,11 @@ import kotlinx.coroutines.withContext
 import org.litepal.LitePal
 import java.util.concurrent.ConcurrentHashMap
 
+data class SavedDraftItem(
+    val hash: String,
+    val model: DraftModel,
+)
+
 object DraftHelper {
 
     internal const val OUTBOX_HASH_PREFIX = "outbox_"
@@ -218,6 +223,36 @@ object DraftHelper {
                 }
             }
             deletedCount
+        }
+    }
+
+    /**
+     * Loads all non-empty user drafts (excluding outbox entries), sorted newest first.
+     */
+    suspend fun getAllDrafts(): List<SavedDraftItem> = withContext(Dispatchers.IO) {
+        draftMutex.withLock {
+            val rows = runCatching { LitePal.findAll(Draft::class.java) }.getOrNull() ?: emptyList()
+            rows.mapNotNull { row ->
+                if (row.hash.startsWith(OUTBOX_HASH_PREFIX)) return@mapNotNull null
+                val model = DraftModel.deserialize(row.content)
+                if (model.isBlank()) null else SavedDraftItem(row.hash, model)
+            }.sortedByDescending { it.model.updateTimestamp }
+        }
+    }
+
+    suspend fun deleteDraftByHash(hash: String): Boolean = withContext(Dispatchers.IO) {
+        draftMutex.withLock {
+            memoryCache.remove(hash)
+            runCatching { LitePal.deleteAll(Draft::class.java, "hash = ?", hash) > 0 }.getOrDefault(false)
+        }
+    }
+
+    suspend fun clearAllDrafts() = withContext(Dispatchers.IO) {
+        draftMutex.withLock {
+            memoryCache.clear()
+            runCatching {
+                LitePal.deleteAll(Draft::class.java, "hash not like ?", "$OUTBOX_HASH_PREFIX%")
+            }
         }
     }
 }

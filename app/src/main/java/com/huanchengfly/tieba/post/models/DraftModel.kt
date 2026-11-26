@@ -14,7 +14,17 @@ data class DraftModel(
     @SerializedName("is_origin")
     val isOriginImage: Boolean = false,
     @SerializedName("timestamp")
-    val updateTimestamp: Long = System.currentTimeMillis()
+    val updateTimestamp: Long = System.currentTimeMillis(),
+    @SerializedName("forum_id")
+    val forumId: Long = 0L,
+    @SerializedName("forum_name")
+    val forumName: String = "",
+    @SerializedName("thread_id")
+    val threadId: Long = 0L,
+    @SerializedName("post_id")
+    val postId: Long? = null,
+    @SerializedName("sub_post_id")
+    val subPostId: Long? = null,
 ) {
     /**
      * True if there is neither text nor any attached images.

@@ -664,4 +664,10 @@
     <string name="memory_pressure_normal">充裕</string>
     <string name="memory_pressure_moderate">中等</string>
     <string name="memory_pressure_critical">吃紧</string>
+    <string name="title_history_draft">草稿箱</string>
+    <string name="tip_empty_drafts">暂无已保存的回帖草稿\n编辑未发送的内容会自动暂存至此</string>
+    <string name="text_draft_legacy_target">历史草稿</string>
+    <string name="text_draft_images_count">含 %d 张图片</string>
+    <string name="button_open_draft_thread">前往原贴</string>
+    <string name="button_delete_draft">删除</string>
 </resources>

@@ -61,11 +61,19 @@ class DraftAndOutboxTest {
             text = "multi line\ndraft",
             imageUris = listOf("file:///a.jpg"),
             isOriginImage = true,
-            updateTimestamp = 123456L
+            updateTimestamp = 123456L,
+            forumId = 88L,
+            forumName = "android",
+            threadId = 999L,
+            postId = 1001L
         )
         val restored = DraftModel.deserialize(original.serialize())
         assertTrue(original.hasSameContent(restored))
         assertEquals(123456L, restored.updateTimestamp)
+        assertEquals(88L, restored.forumId)
+        assertEquals("android", restored.forumName)
+        assertEquals(999L, restored.threadId)
+        assertEquals(1001L, restored.postId)
 
         val legacy = DraftModel.deserialize("legacy plain text")
         assertEquals("legacy plain text", legacy.text)

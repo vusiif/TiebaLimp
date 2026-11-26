@@ -2,7 +2,7 @@ package com.huanchengfly.tieba.post.ui.page.history
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.Icon
@@ -31,6 +31,7 @@ import com.huanchengfly.tieba.post.R
 import com.huanchengfly.tieba.post.arch.emitGlobalEvent
 import com.huanchengfly.tieba.post.ui.common.theme.compose.ExtendedTheme
 import com.huanchengfly.tieba.post.ui.page.ProvideNavigator
+import com.huanchengfly.tieba.post.ui.page.history.draft.DraftsListPage
 import com.huanchengfly.tieba.post.ui.page.history.list.HistoryListPage
 import com.huanchengfly.tieba.post.ui.page.history.outbox.OutboxListPage
 import com.huanchengfly.tieba.post.ui.page.history.snapshot.ThreadSnapshotListPage
@@ -40,6 +41,7 @@ import com.huanchengfly.tieba.post.ui.widgets.compose.MyScaffold
 import com.huanchengfly.tieba.post.ui.widgets.compose.PagerTabIndicator
 import com.huanchengfly.tieba.post.ui.widgets.compose.TabRow
 import com.huanchengfly.tieba.post.ui.widgets.compose.TitleCentredToolbar
+import com.huanchengfly.tieba.post.utils.DraftHelper
 import com.huanchengfly.tieba.post.utils.HistoryUtil
 import com.huanchengfly.tieba.post.utils.ReplyOutboxCoordinator
 import com.ramcosta.composedestinations.annotation.DeepLink
@@ -57,8 +59,9 @@ import kotlinx.coroutines.launch
 fun HistoryPage(
     navigator: DestinationsNavigator
 ) {
-    val pagerState = rememberPagerState { 4 }
+    val pagerState = rememberPagerState { 5 }
     var outboxRefreshSignal by remember { mutableIntStateOf(0) }
+    var draftsRefreshSignal by remember { mutableIntStateOf(0) }
     val coroutineScope = rememberCoroutineScope()
     val scaffoldState = rememberScaffoldState()
 
@@ -82,12 +85,19 @@ fun HistoryPage(
                     if (pagerState.currentPage != 2) {
                         IconButton(onClick = {
                             coroutineScope.launch {
-                                if (pagerState.currentPage == 3) {
-                                    ReplyOutboxCoordinator.clearAll()
-                                    outboxRefreshSignal++
-                                } else {
-                                    HistoryUtil.deleteAll()
-                                    emitGlobalEvent(HistoryListUiEvent.DeleteAll)
+                                when (pagerState.currentPage) {
+                                    3 -> {
+                                        ReplyOutboxCoordinator.clearAll()
+                                        outboxRefreshSignal++
+                                    }
+                                    4 -> {
+                                        DraftHelper.clearAllDrafts()
+                                        draftsRefreshSignal++
+                                    }
+                                    else -> {
+                                        HistoryUtil.deleteAll()
+                                        emitGlobalEvent(HistoryListUiEvent.DeleteAll)
+                                    }
                                 }
                                 launch {
                                     scaffoldState.snackbarHostState.showSnackbar(
@@ -119,73 +129,35 @@ fun HistoryPage(
                         backgroundColor = Color.Transparent,
                         contentColor = ExtendedTheme.colors.primary,
                         modifier = Modifier
-                            .width(80.dp * 4)
+                            .fillMaxWidth()
                             .align(Alignment.CenterHorizontally)
                     ) {
-                        Tab(
-                            text = {
-                                Text(
-                                    text = stringResource(id = R.string.title_history_thread),
-                                    fontSize = 13.sp
-                                )
-                            },
-                            selected = pagerState.currentPage == 0,
-                            onClick = {
-                                coroutineScope.launch {
-                                    pagerState.animateScrollToPage(0)
-                                }
-                            },
-                            selectedContentColor = ExtendedTheme.colors.onTopBar,
-                            unselectedContentColor = ExtendedTheme.colors.onTopBarSecondary
+                        val tabTitles = listOf(
+                            R.string.title_history_thread,
+                            R.string.title_history_forum,
+                            R.string.title_history_snapshot,
+                            R.string.title_history_outbox,
+                            R.string.title_history_draft,
                         )
-                        Tab(
-                            text = {
-                                Text(
-                                    text = stringResource(id = R.string.title_history_forum),
-                                    fontSize = 13.sp
-                                )
-                            },
-                            selected = pagerState.currentPage == 1,
-                            onClick = {
-                                coroutineScope.launch {
-                                    pagerState.animateScrollToPage(1)
-                                }
-                            },
-                            selectedContentColor = ExtendedTheme.colors.onTopBar,
-                            unselectedContentColor = ExtendedTheme.colors.onTopBarSecondary
-                        )
-                        Tab(
-                            text = {
-                                Text(
-                                    text = stringResource(id = R.string.title_history_snapshot),
-                                    fontSize = 13.sp
-                                )
-                            },
-                            selected = pagerState.currentPage == 2,
-                            onClick = {
-                                coroutineScope.launch {
-                                    pagerState.animateScrollToPage(2)
-                                }
-                            },
-                            selectedContentColor = ExtendedTheme.colors.onTopBar,
-                            unselectedContentColor = ExtendedTheme.colors.onTopBarSecondary
-                        )
-                        Tab(
-                            text = {
-                                Text(
-                                    text = stringResource(id = R.string.title_history_outbox),
-                                    fontSize = 13.sp
-                                )
-                            },
-                            selected = pagerState.currentPage == 3,
-                            onClick = {
-                                coroutineScope.launch {
-                                    pagerState.animateScrollToPage(3)
-                                }
-                            },
-                            selectedContentColor = ExtendedTheme.colors.onTopBar,
-                            unselectedContentColor = ExtendedTheme.colors.onTopBarSecondary
-                        )
+                        tabTitles.forEachIndexed { index, titleRes ->
+                            Tab(
+                                text = {
+                                    Text(
+                                        text = stringResource(id = titleRes),
+                                        fontSize = 12.sp,
+                                        maxLines = 1
+                                    )
+                                },
+                                selected = pagerState.currentPage == index,
+                                onClick = {
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(index)
+                                    }
+                                },
+                                selectedContentColor = ExtendedTheme.colors.onTopBar,
+                                unselectedContentColor = ExtendedTheme.colors.onTopBarSecondary
+                            )
+                        }
                     }
                 }
             )
@@ -203,7 +175,8 @@ fun HistoryPage(
                     0 -> HistoryListPage(type = HistoryUtil.TYPE_THREAD)
                     1 -> HistoryListPage(type = HistoryUtil.TYPE_FORUM)
                     2 -> ThreadSnapshotListPage()
-                    else -> OutboxListPage(refreshSignal = outboxRefreshSignal)
+                    3 -> OutboxListPage(refreshSignal = outboxRefreshSignal)
+                    else -> DraftsListPage(refreshSignal = draftsRefreshSignal)
                 }
             }
         }

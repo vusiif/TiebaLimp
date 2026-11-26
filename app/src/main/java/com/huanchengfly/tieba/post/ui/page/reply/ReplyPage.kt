@@ -185,7 +185,12 @@ internal fun ReplyPageContent(
             DraftModel(
                 text = curText,
                 imageUris = selectedImageList,
-                isOriginImage = isOriginImage
+                isOriginImage = isOriginImage,
+                forumId = forumId,
+                forumName = forumName,
+                threadId = threadId,
+                postId = postId,
+                subPostId = subPostId,
             )
         }
             .debounce(500)
@@ -208,7 +213,16 @@ internal fun ReplyPageContent(
                     threadId,
                     postId,
                     subPostId,
-                    DraftModel(latestText, latestImages, latestOrigin)
+                    DraftModel(
+                        text = latestText,
+                        imageUris = latestImages,
+                        isOriginImage = latestOrigin,
+                        forumId = forumId,
+                        forumName = forumName,
+                        threadId = threadId,
+                        postId = postId,
+                        subPostId = subPostId,
+                    )
                 )
             }
         }

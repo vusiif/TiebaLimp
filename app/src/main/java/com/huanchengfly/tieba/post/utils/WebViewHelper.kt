@@ -47,7 +47,8 @@ object WebViewHelper {
     fun applyDefaultSettings(
         webView: WebView,
         context: Context,
-        enableZoom: Boolean = true
+        enableZoom: Boolean = true,
+        allowMixedContent: Boolean = false
     ) {
         // Prevent white screen flash on dark / translucent theme
         webView.setBackgroundColor(Color.TRANSPARENT)
@@ -81,7 +82,11 @@ object WebViewHelper {
             }
 
             // Mixed content & modern offline-resilient cache strategy
-            mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+            mixedContentMode = if (allowMixedContent) {
+                WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+            } else {
+                WebSettings.MIXED_CONTENT_NEVER_ALLOW
+            }
             val isConnected = NetworkUtil.isNetworkConnected(context)
             cacheMode = if (isConnected) WebSettings.LOAD_DEFAULT else WebSettings.LOAD_CACHE_ELSE_NETWORK
 

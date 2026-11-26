@@ -44,8 +44,7 @@ private fun ThreadInfo.getNextPagePostId(
     sortType: Int = ThreadSortType.SORT_TYPE_DEFAULT
 ): Long {
     val fetchedPostIds = pids.split(",")
-        .filterNot { it.isBlank() }
-        .map { it.toLong() }
+        .mapNotNull { it.trim().toLongOrNull() }
     if (sortType == ThreadSortType.SORT_TYPE_DESC) {
         return fetchedPostIds.firstOrNull() ?: 0
     }

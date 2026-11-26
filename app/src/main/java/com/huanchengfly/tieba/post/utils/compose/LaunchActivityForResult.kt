@@ -5,7 +5,11 @@ import android.content.Intent
 import androidx.activity.result.contract.ActivityResultContract
 import com.huanchengfly.tieba.post.arch.GlobalEvent
 import com.huanchengfly.tieba.post.arch.emitGlobalEvent
-import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+
+private val activityResultScope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
 
 data class LaunchActivityRequest(
     val requesterId: String,
@@ -22,7 +26,7 @@ fun launchActivityForResult(
     requesterId: String,
     intent: Intent,
 ) {
-    GlobalScope.emitGlobalEvent(GlobalEvent.StartActivityForResult(requesterId, intent))
+    activityResultScope.emitGlobalEvent(GlobalEvent.StartActivityForResult(requesterId, intent))
 }
 
 class LaunchActivityForResult : ActivityResultContract<LaunchActivityRequest, ActivityResult>() {

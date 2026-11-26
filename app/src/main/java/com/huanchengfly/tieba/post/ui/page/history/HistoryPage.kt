@@ -14,7 +14,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.rememberScaffoldState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -28,6 +32,7 @@ import com.huanchengfly.tieba.post.arch.emitGlobalEvent
 import com.huanchengfly.tieba.post.ui.common.theme.compose.ExtendedTheme
 import com.huanchengfly.tieba.post.ui.page.ProvideNavigator
 import com.huanchengfly.tieba.post.ui.page.history.list.HistoryListPage
+import com.huanchengfly.tieba.post.ui.page.history.outbox.OutboxListPage
 import com.huanchengfly.tieba.post.ui.page.history.snapshot.ThreadSnapshotListPage
 import com.huanchengfly.tieba.post.ui.page.history.list.HistoryListUiEvent
 import com.huanchengfly.tieba.post.ui.widgets.compose.BackNavigationIcon
@@ -36,6 +41,7 @@ import com.huanchengfly.tieba.post.ui.widgets.compose.PagerTabIndicator
 import com.huanchengfly.tieba.post.ui.widgets.compose.TabRow
 import com.huanchengfly.tieba.post.ui.widgets.compose.TitleCentredToolbar
 import com.huanchengfly.tieba.post.utils.HistoryUtil
+import com.huanchengfly.tieba.post.utils.ReplyOutboxCoordinator
 import com.ramcosta.composedestinations.annotation.DeepLink
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
@@ -51,7 +57,8 @@ import kotlinx.coroutines.launch
 fun HistoryPage(
     navigator: DestinationsNavigator
 ) {
-    val pagerState = rememberPagerState { 3 }
+    val pagerState = rememberPagerState { 4 }
+    var outboxRefreshSignal by remember { mutableIntStateOf(0) }
     val coroutineScope = rememberCoroutineScope()
     val scaffoldState = rememberScaffoldState()
 
@@ -74,24 +81,29 @@ fun HistoryPage(
                 actions = {
                     if (pagerState.currentPage != 2) {
                         IconButton(onClick = {
-                        coroutineScope.launch {
-                            HistoryUtil.deleteAll()
-                            emitGlobalEvent(HistoryListUiEvent.DeleteAll)
-                            launch {
-                                scaffoldState.snackbarHostState.showSnackbar(
-                                    context.getString(
-                                        R.string.toast_clear_success
+                            coroutineScope.launch {
+                                if (pagerState.currentPage == 3) {
+                                    ReplyOutboxCoordinator.clearAll()
+                                    outboxRefreshSignal++
+                                } else {
+                                    HistoryUtil.deleteAll()
+                                    emitGlobalEvent(HistoryListUiEvent.DeleteAll)
+                                }
+                                launch {
+                                    scaffoldState.snackbarHostState.showSnackbar(
+                                        context.getString(
+                                            R.string.toast_clear_success
+                                        )
                                     )
-                                )
+                                }
                             }
+                        }) {
+                            Icon(
+                                imageVector = Icons.Outlined.Delete,
+                                contentDescription = stringResource(id = R.string.title_history_delete),
+                                tint = ExtendedTheme.colors.onTopBar
+                            )
                         }
-                    }) {
-                        Icon(
-                            imageVector = Icons.Outlined.Delete,
-                            contentDescription = stringResource(id = R.string.title_history_delete),
-                            tint = ExtendedTheme.colors.onTopBar
-                        )
-                    }
                     }
                 },
                 content = {
@@ -107,7 +119,7 @@ fun HistoryPage(
                         backgroundColor = Color.Transparent,
                         contentColor = ExtendedTheme.colors.primary,
                         modifier = Modifier
-                            .width(80.dp * 3)
+                            .width(80.dp * 4)
                             .align(Alignment.CenterHorizontally)
                     ) {
                         Tab(
@@ -158,6 +170,22 @@ fun HistoryPage(
                             selectedContentColor = ExtendedTheme.colors.onTopBar,
                             unselectedContentColor = ExtendedTheme.colors.onTopBarSecondary
                         )
+                        Tab(
+                            text = {
+                                Text(
+                                    text = stringResource(id = R.string.title_history_outbox),
+                                    fontSize = 13.sp
+                                )
+                            },
+                            selected = pagerState.currentPage == 3,
+                            onClick = {
+                                coroutineScope.launch {
+                                    pagerState.animateScrollToPage(3)
+                                }
+                            },
+                            selectedContentColor = ExtendedTheme.colors.onTopBar,
+                            unselectedContentColor = ExtendedTheme.colors.onTopBarSecondary
+                        )
                     }
                 }
             )
@@ -174,7 +202,8 @@ fun HistoryPage(
                 when (it) {
                     0 -> HistoryListPage(type = HistoryUtil.TYPE_THREAD)
                     1 -> HistoryListPage(type = HistoryUtil.TYPE_FORUM)
-                    else -> ThreadSnapshotListPage()
+                    2 -> ThreadSnapshotListPage()
+                    else -> OutboxListPage(refreshSignal = outboxRefreshSignal)
                 }
             }
         }

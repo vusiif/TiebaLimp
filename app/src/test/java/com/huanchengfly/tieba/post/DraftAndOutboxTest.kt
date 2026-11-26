@@ -171,4 +171,54 @@ class DraftAndOutboxTest {
         assertEquals(0, manager.flushPendingReplies(true))
         assertEquals(0, manager.pendingCount())
     }
+
+    @Test
+    fun testOutboxManualInspectionRetryAndClear() = runBlocking {
+        val store = InMemoryOutboxStore()
+        var failSend = true
+        val manager = ReplyOutboxManager(
+            store = store,
+            sender = { if (failSend) throw IOException("offline") },
+            onDelivered = { }
+        )
+
+        val first = PendingReplyItem(
+            id = "item-1",
+            accountUid = "1001",
+            content = "first",
+            forumId = 1L,
+            forumName = "f1",
+            threadId = 10L,
+            tbs = "t1",
+            createdAt = 1000L
+        )
+        val second = PendingReplyItem(
+            id = "item-2",
+            accountUid = "1001",
+            content = "second",
+            forumId = 1L,
+            forumName = "f1",
+            threadId = 20L,
+            tbs = "t2",
+            createdAt = 2000L
+        )
+        manager.enqueue(first)
+        manager.enqueue(second)
+
+        val ordered = manager.getPendingItems()
+        assertEquals(listOf("item-2", "item-1"), ordered.map { it.id })
+
+        // Manual retry fails transiently -> increments retryCount
+        assertFalse(manager.retryItem("item-2", isNetworkAvailable = true))
+        assertEquals(1, manager.getPendingItems().first { it.id == "item-2" }.retryCount)
+
+        // Manual retry succeeds -> removes item-2
+        failSend = false
+        assertTrue(manager.retryItem("item-2", isNetworkAvailable = true))
+        assertEquals(listOf("item-1"), manager.getPendingItems().map { it.id })
+
+        // Clear all removes remaining
+        manager.clearAll()
+        assertEquals(0, manager.pendingCount())
+    }
 }

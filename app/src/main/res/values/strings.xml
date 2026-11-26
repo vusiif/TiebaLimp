@@ -646,4 +646,13 @@
     <string name="filter_all_rules">全部规则</string>
     <string name="filter_global_rules">全吧通用</string>
     <string name="tip_empty_forum_rules">当前贴吧分类下暂无规则</string>
+    <string name="title_history_outbox">待发队列</string>
+    <string name="tip_empty_outbox">暂无离线待发送的回帖\n弱网发送失败的回帖将自动暂存至此</string>
+    <string name="button_retry_send">立即重试</string>
+    <string name="button_retry_all">全部重试</string>
+    <string name="button_delete_outbox">取消发送</string>
+    <string name="toast_outbox_retry_success">已成功发送 %d 条待发回帖</string>
+    <string name="toast_outbox_retry_none">暂无可发送的回帖，请检查网络连接</string>
+    <string name="text_outbox_retry_count">已重试 %1$d/%2$d 次</string>
+    <string name="text_outbox_forum_format">%1$s吧 · 贴子 %2$d</string>
 </resources>

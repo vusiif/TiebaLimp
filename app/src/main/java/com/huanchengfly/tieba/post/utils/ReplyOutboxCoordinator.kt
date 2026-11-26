@@ -130,6 +130,44 @@ class ReplyOutboxManager(
         store.getAll().size
     }
 
+    suspend fun getPendingItems(): List<PendingReplyItem> = mutex.withLock {
+        store.getAll().sortedByDescending { it.createdAt }
+    }
+
+    suspend fun removeById(id: String): Boolean = mutex.withLock {
+        val exists = store.getAll().any { it.id == id }
+        if (exists) {
+            store.remove(id)
+        }
+        exists
+    }
+
+    suspend fun clearAll() = mutex.withLock {
+        store.getAll().forEach { store.remove(it.id) }
+    }
+
+    suspend fun retryItem(id: String, isNetworkAvailable: Boolean = true): Boolean = mutex.withLock {
+        if (!isNetworkAvailable) return@withLock false
+        val item = store.getAll().firstOrNull { it.id == id } ?: return@withLock false
+        val result = runCatching { sender(item) }
+        if (result.isSuccess) {
+            store.remove(item.id)
+            runCatching { onDelivered(item) }
+            true
+        } else {
+            val err = result.exceptionOrNull()
+            if (err != null && isTransientNetworkError(err)) {
+                store.put(
+                    item.copy(
+                        retryCount = (item.retryCount + 1).coerceAtMost(MAX_RETRIES),
+                        lastError = err.message
+                    )
+                )
+            }
+            false
+        }
+    }
+
     suspend fun flushPendingReplies(isNetworkAvailable: Boolean = true): Int = mutex.withLock {
         if (!isNetworkAvailable) return@withLock 0
         val now = timeProvider()
@@ -204,6 +242,24 @@ object ReplyOutboxCoordinator {
             manager.removeByTarget(accountUid, threadId, postId, subPostId)
         }
     }
+
+    suspend fun getPendingItems(): List<PendingReplyItem> =
+        runCatching { manager.getPendingItems() }.getOrDefault(emptyList())
+
+    suspend fun removeById(id: String): Boolean =
+        runCatching { manager.removeById(id) }.getOrDefault(false)
+
+    suspend fun clearAll() {
+        runCatching { manager.clearAll() }
+    }
+
+    suspend fun retryItem(id: String): Boolean =
+        runCatching { manager.retryItem(id, isNetworkAvailable = AppNetworkManager.isConnected) }
+            .getOrDefault(false)
+
+    suspend fun flushAll(): Int =
+        runCatching { manager.flushPendingReplies(isNetworkAvailable = AppNetworkManager.isConnected) }
+            .getOrDefault(0)
 
     fun flushPendingRepliesAsync() {
         if (!AppNetworkManager.isConnected) return
